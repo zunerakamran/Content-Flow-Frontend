@@ -170,6 +170,11 @@ export function parseJson(str) {
   try { return JSON.parse(str) } catch { return { heading: str } }
 }
 
+function isHeroSection(name) {
+  const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return key === 'heroslider' || key === 'hero' || key.includes('heroslider')
+}
+
 function isWhatWeDoSection(name) {
   const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
   return key === 'whatwedo' || key === 'featurescarousel' || key === 'features'
@@ -183,6 +188,18 @@ function isAboutSection(name) {
 function isCompanyHistorySection(name) {
   const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
   return key === 'companyhistory' || key === 'history' || key.includes('history')
+}
+
+function isAdvisorVisibleSection(name) {
+  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name)
+}
+
+function advisorSectionOrder(name) {
+  if (isHeroSection(name)) return 0
+  if (isWhatWeDoSection(name)) return 1
+  if (isAboutSection(name)) return 2
+  if (isCompanyHistorySection(name)) return 3
+  return 99
 }
 
 function defaultAboutGauges() {
@@ -650,7 +667,7 @@ export default function AdvisorDashboard() {
     setSections(sectionsForAdvisor)
 
     const lockedByMeIds = sectionsForAdvisor
-      .filter(s => s.is_locked && s.locked_by === user?.id)
+      .filter(s => s.is_locked && s.locked_by === user?.id && isAdvisorVisibleSection(s.name))
       .map(s => s.id)
 
     setCheckedSectionIds(lockedByMeIds)
@@ -807,6 +824,9 @@ export default function AdvisorDashboard() {
   const pendingRequest = templateRequests.find(r => r.status === 'pending')
   const rejectedRequest = templateRequests.find(r => r.status === 'rejected')
   const isSiteDeployed = Boolean(deployedRequest)
+  const visibleSections = [...sections]
+    .filter((s) => isAdvisorVisibleSection(s.name))
+    .sort((a, b) => advisorSectionOrder(a.name) - advisorSectionOrder(b.name))
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans text-gray-800">
@@ -1135,8 +1155,8 @@ export default function AdvisorDashboard() {
                     )}
                   </div>
 
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {sections.map(section => {
+                  <div className="flex flex-col gap-3">
+                    {visibleSections.map(section => {
                       const isChecked = checkedSectionIds.includes(section.id)
                       const isLockedByMe = section.is_locked && section.locked_by === user?.id
                       const isLockedByOther = section.is_locked && section.locked_by !== user?.id
@@ -1203,7 +1223,7 @@ export default function AdvisorDashboard() {
                     </div>
 
                     {checkedSectionIds.map(secId => {
-                      const section = sections.find(s => s.id === secId)
+                      const section = visibleSections.find(s => s.id === secId)
                       if (!section) return null
                       const values = sectionEdits[secId] || {}
                       const isPreview = previewTab[secId]
@@ -1286,13 +1306,6 @@ export default function AdvisorDashboard() {
                                                 {uploadingState[`${secId}-${slideIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
                                                 )}
-                                                {(localPreviewUrls[`${secId}-${slideIndex}`] || editorPreviewSrc(displayImagePath(slideImage), localImages)) && (
-                                                  <img
-                                                    src={localPreviewUrls[`${secId}-${slideIndex}`] || editorPreviewSrc(displayImagePath(slideImage), localImages)}
-                                                    alt={`Slide ${slideIndex + 1} preview`}
-                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
-                                                  />
-                                                )}
                                               </div>
 
                                               {/* 2. Select Local Template Image */}
@@ -1315,13 +1328,6 @@ export default function AdvisorDashboard() {
                                                     <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
                                                   ))}
                                                 </select>
-                                                {localThumbSrc(slideImage, localImages) && (
-                                                  <img
-                                                    src={localThumbSrc(slideImage, localImages)}
-                                                    alt={imageStem(slideImage)}
-                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
-                                                  />
-                                                )}
                                               </div>
                                             </div>
 
@@ -1461,7 +1467,7 @@ export default function AdvisorDashboard() {
                                         value={values.subheading || values.eyebrow || ''}
                                         onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
                                         placeholder="WHAT WE DO"
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold tracking-wider uppercase"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                       />
                                     </div>
                                     <div className="md:col-span-2">
@@ -1514,13 +1520,6 @@ export default function AdvisorDashboard() {
                                                 />
                                                 {uploadingState[`box-${secId}-${boxIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
-                                                )}
-                                                {(localPreviewUrls[`box-${secId}-${boxIndex}`] || editorPreviewSrc(displayImagePath(boxImage), localImages)) && (
-                                                  <img
-                                                    src={localPreviewUrls[`box-${secId}-${boxIndex}`] || editorPreviewSrc(displayImagePath(boxImage), localImages)}
-                                                    alt={`Box ${boxIndex + 1} preview`}
-                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
-                                                  />
                                                 )}
                                               </div>
                                               <div className="bg-gray-50 border p-2.5 rounded-md">
@@ -1607,7 +1606,7 @@ export default function AdvisorDashboard() {
                                         value={values.eyebrow || ''}
                                         onChange={(e) => handleFieldValueChange(secId, 'eyebrow', e.target.value)}
                                         placeholder="ABOUT US"
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold tracking-wider uppercase"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                       />
                                     </div>
                                     <div className="md:col-span-2">
@@ -1669,13 +1668,6 @@ export default function AdvisorDashboard() {
                                           />
                                           {uploadingState[`about-${secId}`] && (
                                             <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
-                                          )}
-                                          {(localPreviewUrls[`about-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages)) && (
-                                            <img
-                                              src={localPreviewUrls[`about-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages)}
-                                              alt="About preview"
-                                              className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
-                                            />
                                           )}
                                         </div>
                                         <div className="bg-gray-50 border p-2.5 rounded-md">
@@ -1777,7 +1769,7 @@ export default function AdvisorDashboard() {
                                         value={values.subheading || values.eyebrow || ''}
                                         onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
                                         placeholder="OUR JOURNEY"
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold tracking-wider uppercase"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                       />
                                     </div>
                                     <div className="md:col-span-2">
@@ -1829,7 +1821,7 @@ export default function AdvisorDashboard() {
                                               value={yearItem.red_text || ''}
                                               onChange={(e) => patchYear(secId, yearIndex, { red_text: e.target.value })}
                                               placeholder="2020 Milestone"
-                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                             />
                                           </div>
                                           <div className="md:col-span-2">
@@ -1870,13 +1862,6 @@ export default function AdvisorDashboard() {
                                                 />
                                                 {uploadingState[`year-${secId}-${yearIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
-                                                )}
-                                                {(localPreviewUrls[`year-${secId}-${yearIndex}`] || editorPreviewSrc(displayImagePath(yearImage), localImages)) && (
-                                                  <img
-                                                    src={localPreviewUrls[`year-${secId}-${yearIndex}`] || editorPreviewSrc(displayImagePath(yearImage), localImages)}
-                                                    alt={`Year ${yearIndex + 1} preview`}
-                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
-                                                  />
                                                 )}
                                               </div>
                                               <div className="bg-gray-50 border p-2.5 rounded-md">
