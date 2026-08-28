@@ -184,12 +184,41 @@ function normalizeAboutEditorContent(content) {
   c.gauges = defaults.map((fallback, i) => ({
     ...fallback,
     ...(list[i] || {}),
+    value: list[i]?.value || c[`percent_${i + 1}`] || fallback.value,
+    label: list[i]?.label || c[`percent_${i + 1}_text`] || fallback.label,
   }))
   if (!c.eyebrow) c.eyebrow = 'ABOUT US'
   if (!c.experience_years) c.experience_years = c.years || '10+'
   if (!c.experience_label) c.experience_label = 'Years of Experience'
   if (!c.image_url) c.image_url = c.image || c.img || ''
+  c.percent_1 = c.gauges[0].value
+  c.percent_1_text = c.gauges[0].label
+  c.percent_2 = c.gauges[1].value
+  c.percent_2_text = c.gauges[1].label
   return c
+}
+
+function withAbsoluteUploadUrls(value) {
+  if (typeof value === 'string') {
+    return isUploadedAsset(value) ? absoluteAssetUrl(value) : value
+  }
+  if (Array.isArray(value)) return value.map(withAbsoluteUploadUrls)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, withAbsoluteUploadUrls(v)]))
+  }
+  return value
+}
+
+function aboutPreviewPayload(values) {
+  const normalized = normalizeAboutEditorContent(values || {})
+  const image = normalized.image_url || ''
+  const absImage = isUploadedAsset(image) ? absoluteAssetUrl(image) : image
+  return withAbsoluteUploadUrls({
+    ...normalized,
+    image_url: absImage || image,
+    image: absImage || image,
+    img: absImage || image,
+  })
 }
 
 export default function AdvisorDashboard() {
@@ -300,6 +329,18 @@ export default function AdvisorDashboard() {
     const uploadKey = `about-${secId}`
     setLocalPreview(uploadKey, file)
     setUploadingState((prev) => ({ ...prev, [uploadKey]: true }))
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+      reader.onerror = () => resolve('')
+      reader.readAsDataURL(file)
+    })
+    if (dataUrl) {
+      setSectionEdits((prev) => ({
+        ...prev,
+        [secId]: { ...(prev[secId] || {}), image_url: dataUrl, image: dataUrl, img: dataUrl },
+      }))
+    }
     try {
       const formData = new FormData()
       formData.append('image', file)
@@ -308,7 +349,7 @@ export default function AdvisorDashboard() {
       if (uploadedUrl) {
         setSectionEdits((prev) => ({
           ...prev,
-          [secId]: { ...(prev[secId] || {}), image_url: uploadedUrl },
+          [secId]: { ...(prev[secId] || {}), image_url: uploadedUrl, image: uploadedUrl, img: uploadedUrl },
         }))
         setMessage('📸 About image uploaded successfully!')
       } else {
@@ -517,7 +558,17 @@ export default function AdvisorDashboard() {
       const source = prev[secId]?.gauges || defaultAboutGauges()
       const gauges = [0, 1].map((i) => ({ ...(source[i] || {}) }))
       gauges[index] = { ...gauges[index], ...patch }
-      return { ...prev, [secId]: { ...(prev[secId] || {}), gauges } }
+      return {
+        ...prev,
+        [secId]: {
+          ...(prev[secId] || {}),
+          gauges,
+          percent_1: gauges[0].value,
+          percent_1_text: gauges[0].label,
+          percent_2: gauges[1].value,
+          percent_2_text: gauges[1].label,
+        },
+      }
     })
   }
 
@@ -1357,6 +1408,36 @@ export default function AdvisorDashboard() {
                                     </p>
                                   </div>
 
+                                  <div className="border border-gray-200 rounded-lg p-4 bg-white">
+                                    <p className="text-[11px] font-extrabold uppercase tracking-wide text-gray-500 mb-3">Updates as you type</p>
+                                    <div className="flex flex-wrap items-center gap-6">
+                                      {[0, 1].map((i) => {
+                                        const g = (values.gauges && values.gauges[i]) || {}
+                                        return (
+                                          <div key={i} className="flex items-center gap-3">
+                                            <span className="w-14 h-14 rounded-full border-4 border-[#C8102E] flex items-center justify-center text-sm font-black text-[#0B1B3D]">
+                                              {g.value || (i === 0 ? '50%' : '75%')}
+                                            </span>
+                                            <span className="text-xs font-semibold text-[#0B1B3D] max-w-[110px]">
+                                              {g.label || (i === 0 ? 'Business strategy growth' : 'Finance valuable ideas')}
+                                            </span>
+                                          </div>
+                                        )
+                                      })}
+                                      {(localPreviewUrls[`about-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages) || values.image_url) && (
+                                        <img
+                                          src={localPreviewUrls[`about-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages) || values.image_url}
+                                          alt="About"
+                                          className="h-20 w-28 object-cover rounded border"
+                                        />
+                                      )}
+                                      <div className="bg-[#C8102E] text-white px-5 py-3 shadow">
+                                        <div className="text-2xl font-bold leading-none">{values.experience_years || '10+'}</div>
+                                        <div className="text-[10px] uppercase tracking-widest font-semibold mt-1">{values.experience_label || 'Years of Experience'}</div>
+                                      </div>
+                                    </div>
+                                  </div>
+
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
                                       <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
@@ -1630,7 +1711,10 @@ export default function AdvisorDashboard() {
                               {/* Real template4 component rendered inside an iframe via postMessage */}
                               <SectionIframePreview
                                 sectionName={section.name}
-                                data={{ ...values, preview_slide: previewSlide[secId] ?? 0 }}
+                                data={{
+                                  ...(isAboutSection(section.name) ? aboutPreviewPayload(values) : values),
+                                  preview_slide: previewSlide[secId] ?? 0,
+                                }}
                                 height={isWhatWeDoSection(section.name) || isAboutSection(section.name) ? 720 : 520}
                                 borderColor="border-[#C8102E]"
                               />

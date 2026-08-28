@@ -42,9 +42,15 @@ export default function SectionIframePreview({
   // ── Send data into the iframe ──────────────────────────────────────────────
   const send = (payload) => {
     if (!payload || !iframeRef.current?.contentWindow) return
+    let content = payload
+    try {
+      content = JSON.parse(JSON.stringify(payload))
+    } catch {
+      content = payload
+    }
     iframeRef.current.contentWindow.postMessage(
-      { type: 'SECTION_PREVIEW', sectionKey: key, content: payload },
-      '*'   // use * so origin mismatches never silently swallow the message
+      { type: 'SECTION_PREVIEW', sectionKey: key, content },
+      '*'
     )
   }
 
