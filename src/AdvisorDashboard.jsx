@@ -1,0 +1,1054 @@
+import { useState, useEffect, useRef } from 'react'
+import Navbar from './Navbar'
+import api from './api/axios'
+import { useAuth } from './context/AuthContext'
+import SectionIframePreview from './SectionIframePreview'
+
+export function parseJson(str) {
+  if (!str) return {}
+  if (typeof str === 'object') return str
+  try { return JSON.parse(str) } catch { return { heading: str } }
+}
+
+export default function AdvisorDashboard() {
+  const { user } = useAuth()
+  const [pages, setPages] = useState([])
+  const [selectedPageId, setSelectedPageId] = useState('')
+  const [sections, setSections] = useState([])
+  const [checkedSectionIds, setCheckedSectionIds] = useState([])
+  const [sectionEdits, setSectionEdits] = useState({})
+  const [previewTab, setPreviewTab] = useState({})
+  const [message, setMessage] = useState('')
+  const [error, setError] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Template Request States
+  const [templateRequests, setTemplateRequests] = useState([])
+  const [availableTemplates, setAvailableTemplates] = useState([])
+  const [showTemplateModal, setShowTemplateModal] = useState(false)
+  const [selectedTemplateName, setSelectedTemplateName] = useState('template4')
+  const [domainName, setDomainName] = useState('')
+  const [logoUrl, setLogoUrl] = useState('')
+  const [primaryColor, setPrimaryColor] = useState('#0B1B3D')
+  const [secondaryColor, setSecondaryColor] = useState('#C8102E')
+  const [isSubmittingTemplate, setIsSubmittingTemplate] = useState(false)
+
+  const fetchTemplateRequests = () => {
+    api.get('/template-requests')
+      .then(res => setTemplateRequests(res.data))
+      .catch(() => {})
+  }
+
+  const fetchAvailableTemplates = () => {
+    api.get('/templates')
+      .then(res => {
+        setAvailableTemplates(res.data)
+        if (res.data.length > 0 && !selectedTemplateName) {
+          setSelectedTemplateName(res.data[0].slug)
+        }
+      })
+      .catch(() => {})
+  }
+
+  useEffect(() => {
+    fetchTemplateRequests()
+    fetchAvailableTemplates()
+  }, [])
+
+  const applyPages = (data) => {
+    const list = Array.isArray(data) ? data : (data?.pages || [])
+    setPages(list)
+    if (list.length > 0) {
+      handlePageSelect(list[0].id)
+    } else {
+      setSelectedPageId('')
+      setSections([])
+    }
+  }
+
+  // Fetch pages for the deployed template. Fall back to all/public pages so
+  // the dropdown is not empty if the template filter fails.
+  useEffect(() => {
+    const deployedRequest = templateRequests.find(r => r.status === 'deployed')
+    if (!deployedRequest) {
+      setPages([])
+      setSelectedPageId('')
+      setSections([])
+      return
+    }
+
+    const loadPages = async () => {
+      const templateName = deployedRequest.template_name
+      try {
+        const res = await api.get('/pages', {
+          params: templateName ? { template: templateName } : {},
+        })
+        const list = Array.isArray(res.data) ? res.data : (res.data?.pages || [])
+        if (list.length > 0) {
+          applyPages(list)
+          return
+        }
+      } catch (_) {
+        // Authenticated /pages can 500 if a stale backend still queries pages.advisor_id
+      }
+
+      try {
+        const fallback = await api.get('/public/pages')
+        applyPages(fallback.data)
+      } catch (_) {
+        setPages([])
+        setSelectedPageId('')
+        setSections([])
+        setError('Could not load pages for the editor.')
+      }
+    }
+
+    loadPages()
+  }, [templateRequests])
+
+  const handleTemplateSubmit = async (e) => {
+    e.preventDefault()
+    if (!domainName) return
+    setIsSubmittingTemplate(true)
+    setError('')
+    try {
+      await api.post('/template-requests', {
+        template_name: selectedTemplateName,
+        domain_name: domainName,
+        logo_url: logoUrl,
+        primary_color: primaryColor,
+        secondary_color: secondaryColor,
+        request_type: 'advisor_website'
+      })
+      setMessage('🎉 Template deployment request submitted! Power admin will manually deploy it to your cPanel.')
+      setShowTemplateModal(false)
+      setDomainName('')
+      setLogoUrl('')
+      fetchTemplateRequests()
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to submit template request.')
+    } finally {
+      setIsSubmittingTemplate(false)
+    }
+  }
+
+  const fetchAdvisorSections = async (pageId) => {
+    const res = await api.get(`/pages/${pageId}/sections`, {
+      params: user?.id ? { advisor_id: user.id } : {},
+    })
+    const list = Array.isArray(res.data) ? res.data : []
+    if (!user?.id) return list
+    return list.filter(s => String(s.advisor_id) === String(user.id))
+  }
+
+  const handlePageSelect = async (pageId) => {
+    setSelectedPageId(pageId)
+    setCheckedSectionIds([])
+    setSectionEdits({})
+    setMessage('')
+    setError('')
+
+    if (!pageId) {
+      setSections([])
+      return
+    }
+
+    const sectionsForAdvisor = await fetchAdvisorSections(pageId)
+    setSections(sectionsForAdvisor)
+
+    const lockedByMeIds = sectionsForAdvisor
+      .filter(s => s.is_locked && s.locked_by === user?.id)
+      .map(s => s.id)
+
+    setCheckedSectionIds(lockedByMeIds)
+
+    const initialEdits = {}
+    sectionsForAdvisor.forEach(s => {
+      if (lockedByMeIds.includes(s.id)) {
+        initialEdits[s.id] = parseJson(s.content)
+      }
+    })
+    setSectionEdits(initialEdits)
+  }
+
+  const handleSectionCheckboxChange = async (section, isChecked) => {
+    setMessage('')
+    setError('')
+
+    if (!isChecked) {
+      setError(`Cannot unlock section "${section.name}". Sections remain locked until submitted or reviewed by an approver.`)
+      return
+    }
+
+    if (section.is_locked && section.locked_by !== user?.id) {
+      setError(`Section "${section.name}" is locked by ${section.locked_by_user?.name || 'another advisor'}.`)
+      return
+    }
+
+    try {
+      const lockRes = await api.post(`/sections/${section.id}/lock`)
+      if (lockRes.data?.section) {
+        setSections(prev => prev.map(s => s.id === section.id ? lockRes.data.section : s))
+      }
+
+      setCheckedSectionIds(prev => [...new Set([...prev, section.id])])
+      setSectionEdits(prev => ({
+        ...prev,
+        [section.id]: parseJson(section.content)
+      }))
+      setMessage(`🔒 Section "${section.name}" locked for you. You can now edit its content.`)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Could not lock section.')
+    }
+  }
+
+  const handleFieldValueChange = (sectionId, fieldKey, value) => {
+    setSectionEdits(prev => ({
+      ...prev,
+      [sectionId]: {
+        ...(prev[sectionId] || {}),
+        [fieldKey]: value
+      }
+    }))
+  }
+
+  const handleBatchSubmit = async () => {
+    if (checkedSectionIds.length === 0) {
+      setError('Please select at least one section to edit and submit.')
+      return
+    }
+
+    setMessage('')
+    setError('')
+    setIsSubmitting(true)
+
+    const batchPayload = checkedSectionIds.map(secId => ({
+      section_id: secId,
+      proposed_content: JSON.stringify(sectionEdits[secId] || {}, null, 2)
+    }))
+
+    try {
+      await api.post('/change-requests', { section_edits: batchPayload })
+      setMessage(`🎉 Successfully submitted a single request containing edits for ${checkedSectionIds.length} section(s).`)
+
+      if (selectedPageId) {
+        const refreshed = await fetchAdvisorSections(selectedPageId)
+        setSections(refreshed)
+      }
+      setCheckedSectionIds([])
+      setSectionEdits({})
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to submit change request.')
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const selectedPage = pages.find(p => p.id === Number(selectedPageId))
+
+  // Find deployment statuses
+  const deployedRequest = templateRequests.find(r => r.status === 'deployed')
+  const pendingRequest = templateRequests.find(r => r.status === 'pending')
+  const rejectedRequest = templateRequests.find(r => r.status === 'rejected')
+  const isSiteDeployed = Boolean(deployedRequest)
+
+  return (
+    <div className="min-h-screen bg-gray-100 font-sans text-gray-800">
+      <Navbar />
+
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+          <div>
+            <h1 className="text-3xl font-extrabold text-[#0B1B3D]">Advisor Dashboard</h1>
+            <p className="text-gray-500 text-sm mt-1">
+              Select showcase template, request cPanel deployment, lock sections, edit content, and submit change requests.
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowTemplateModal(true)}
+              className="bg-[#0B1B3D] text-white text-xs font-bold px-4 py-2.5 rounded-lg hover:bg-slate-800 transition shadow-sm flex items-center gap-2"
+            >
+              🎨 Request Template Deployment
+            </button>
+            {user && (
+              <div className="bg-white border rounded-lg px-4 py-2 text-right shadow-sm">
+                <span className="text-xs text-gray-400 block uppercase font-bold tracking-wider">Logged in as</span>
+                <span className="text-sm font-bold text-[#C8102E]">{user.name} ({user.role})</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Global Notifications */}
+        {message && (
+          <div className="bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 p-4 mb-6 rounded-lg shadow-sm flex items-center justify-between text-sm font-medium">
+            <span>{message}</span>
+            <button onClick={() => setMessage('')} className="font-bold hover:opacity-75 text-lg">✕</button>
+          </div>
+        )}
+
+        {error && (
+          <div className="bg-rose-50 border-l-4 border-rose-500 text-rose-800 p-4 mb-6 rounded-lg shadow-sm flex items-center justify-between text-sm font-medium">
+            <span>{error}</span>
+            <button onClick={() => setError('')} className="font-bold hover:opacity-75 text-lg">✕</button>
+          </div>
+        )}
+
+        {/* Step 1: Template Deployment Status & Selection */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
+          <div className="flex items-center justify-between border-b pb-4 mb-4">
+            <div>
+              <h2 className="text-xs font-extrabold text-gray-400 uppercase tracking-wider">
+                1. cPanel Template Deployment Status
+              </h2>
+              <p className="text-sm text-gray-600 mt-0.5">
+                Each advisor site must be requested and deployed to cPanel before section editing is enabled.
+              </p>
+            </div>
+            {isSiteDeployed && (
+              <span className="bg-emerald-100 text-emerald-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider">
+                ✅ Site Active & Deployed
+              </span>
+            )}
+            {!isSiteDeployed && pendingRequest && (
+              <span className="bg-amber-100 text-amber-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider">
+                ⏳ Deployment Pending
+              </span>
+            )}
+            {!isSiteDeployed && !pendingRequest && (
+              <span className="bg-slate-100 text-slate-700 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider">
+                ⚠️ Template Not Deployed
+              </span>
+            )}
+          </div>
+
+          {/* Active Deployed State */}
+          {isSiteDeployed && (
+            <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-5">
+              <div className="flex items-start justify-between flex-wrap gap-4">
+                <div>
+                  <h3 className="font-extrabold text-emerald-950 text-base flex items-center gap-2">
+                    <span>🌐 {deployedRequest.domain_name}</span>
+                    <span className="text-xs bg-emerald-200 text-emerald-900 font-bold px-2 py-0.5 rounded">
+                      {deployedRequest.template_name || 'template4'}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-emerald-700 mt-1">
+                    cPanel Target Domain: <code className="bg-emerald-100 px-1.5 py-0.5 rounded font-mono font-semibold">{deployedRequest.cpanel_domain || deployedRequest.domain_name}</code>
+                  </p>
+                  <div className="flex items-center gap-3 mt-3">
+                    <span className="text-xs text-emerald-800 font-bold">Theme Colors:</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-4 h-4 rounded-full border border-gray-300 shadow-sm" style={{ backgroundColor: deployedRequest.primary_color }} title="Primary Color"></span>
+                      <span className="w-4 h-4 rounded-full border border-gray-300 shadow-sm" style={{ backgroundColor: deployedRequest.secondary_color }} title="Secondary Color"></span>
+                    </div>
+                    {deployedRequest.logo_url && (
+                      <span className="text-xs bg-white text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded font-medium">
+                        🖼️ Logo Attached
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs font-bold text-emerald-800 bg-white border border-emerald-300 px-3 py-1.5 rounded-lg shadow-sm inline-block">
+                    ⚡ Live Content Sync Active
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Pending Deployment State */}
+          {!isSiteDeployed && pendingRequest && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+              <div className="flex items-start justify-between flex-wrap gap-4">
+                <div>
+                  <h3 className="font-bold text-amber-900 text-base flex items-center gap-2">
+                    <span>⏳ Deployment Request Submitted</span>
+                    <span className="text-xs bg-amber-200 text-amber-900 font-bold px-2 py-0.5 rounded uppercase">
+                      Pending Power Admin
+                    </span>
+                  </h3>
+                  <p className="text-xs text-amber-800 mt-1">
+                    Requested Domain: <strong>{pendingRequest.domain_name}</strong> | Template: <strong>{pendingRequest.template_name || 'template4'}</strong>
+                  </p>
+                  <p className="text-xs text-amber-700 mt-2 bg-amber-100/70 p-2.5 rounded-lg border border-amber-200">
+                    💡 Power Admin will review your request and manually deploy the template to your cPanel environment. Once completed, your page and section editor below will unlock automatically.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Rejected State */}
+          {!isSiteDeployed && !pendingRequest && rejectedRequest && (
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-5 mb-4">
+              <h3 className="font-bold text-rose-900 text-sm">❌ Previous Template Request Rejected</h3>
+              <p className="text-xs text-rose-700 mt-1">Reason: {rejectedRequest.rejection_reason}</p>
+            </div>
+          )}
+
+          {/* Setup / Request Form Card if No Deployed Site */}
+          {!isSiteDeployed && !pendingRequest && (
+            <div className="space-y-4">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
+                <h3 className="text-sm font-bold text-[#0B1B3D] mb-1">
+                  🎨 Choose a Showcase Template & Request Deployment
+                </h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  Select from available React templates, customize your domain and color palette, and submit a deployment request.
+                </p>
+
+                <form onSubmit={handleTemplateSubmit} className="space-y-4">
+                  {/* Dynamic Template Selection Grid */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Select Showcase Template *</label>
+                    <div className="grid md:grid-cols-2 gap-3">
+                      {availableTemplates.map(tpl => {
+                        const isSelected = selectedTemplateName === tpl.slug
+                        return (
+                          <div
+                            key={tpl.id}
+                            onClick={() => setSelectedTemplateName(tpl.slug)}
+                            className={`p-4 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
+                              isSelected
+                                ? 'bg-blue-50/70 border-[#0B1B3D] ring-2 ring-[#0B1B3D]/20 shadow-sm'
+                                : 'bg-white border-gray-200 hover:border-gray-300'
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="font-extrabold text-sm text-[#0B1B3D]">{tpl.name}</span>
+                                {isSelected && (
+                                  <span className="text-[10px] bg-[#0B1B3D] text-white font-bold px-2 py-0.5 rounded uppercase">Selected</span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-600 line-clamp-2">{tpl.description || 'Showcase template layout'}</p>
+                            </div>
+                            <div className="mt-2 text-[10px] font-mono text-gray-400">slug: {tpl.slug}</div>
+                          </div>
+                        )
+                      })}
+                      {availableTemplates.length === 0 && (
+                        <div className="p-4 border border-[#0B1B3D] bg-blue-50/40 rounded-xl flex items-center justify-between">
+                          <div>
+                            <div className="font-extrabold text-sm text-[#0B1B3D]">Template 4 - Corporate Financial Advisory</div>
+                            <div className="text-xs text-gray-600 mt-0.5">Corporate React showcase template for advisors.</div>
+                          </div>
+                          <span className="text-xs bg-[#0B1B3D] text-white font-bold px-3 py-1 rounded">Selected</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Target Domain Name *</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. advisor.myfirm.com"
+                        value={domainName}
+                        onChange={e => setDomainName(e.target.value)}
+                        className="w-full text-sm p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Logo URL (Optional)</label>
+                      <input
+                        type="url"
+                        placeholder="https://myfirm.com/logo.png"
+                        value={logoUrl}
+                        onChange={e => setLogoUrl(e.target.value)}
+                        className="w-full text-sm p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E]"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Primary Color</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={primaryColor}
+                          onChange={e => setPrimaryColor(e.target.value)}
+                          className="w-10 h-10 border rounded cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={primaryColor}
+                          onChange={e => setPrimaryColor(e.target.value)}
+                          className="w-full text-xs p-2 border rounded font-mono"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Secondary Color</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={secondaryColor}
+                          onChange={e => setSecondaryColor(e.target.value)}
+                          className="w-10 h-10 border rounded cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={secondaryColor}
+                          onChange={e => setSecondaryColor(e.target.value)}
+                          className="w-full text-xs p-2 border rounded font-mono"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSubmittingTemplate}
+                      className="bg-[#0B1B3D] text-white text-xs font-extrabold px-6 py-3 rounded-lg hover:bg-slate-800 transition disabled:opacity-50 shadow-md"
+                    >
+                      {isSubmittingTemplate ? 'Submitting Request...' : '🚀 Submit Deployment Request to Power Admin'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Step 2: Page Selection & Section Editing (Gated by Template Deployment) */}
+        {!isSiteDeployed ? (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center text-gray-500">
+            <div className="text-4xl mb-3">🔒</div>
+            <h3 className="text-lg font-bold text-[#0B1B3D]">Page & Section Content Editor Locked</h3>
+            <p className="text-sm text-gray-500 mt-2 max-w-lg mx-auto">
+              Before you can lock sections and edit content, your template deployment request must be submitted and manually deployed to cPanel by Power Admin.
+            </p>
+            {pendingRequest ? (
+              <div className="mt-4 inline-block bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold px-4 py-2 rounded-lg">
+                ⏳ Deployment pending with Power Admin. Check back shortly!
+              </div>
+            ) : (
+              <button
+                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                className="mt-4 bg-[#0B1B3D] text-white text-xs font-bold px-5 py-2.5 rounded-lg hover:bg-slate-800 transition shadow-sm"
+              >
+                👆 Request Template Deployment Above
+              </button>
+            )}
+          </div>
+        ) : (
+          <div>
+            <div className="bg-white rounded-xl shadow-sm p-6 mb-8 border border-gray-200">
+              <label className="block text-xs font-extrabold text-gray-400 uppercase tracking-wider mb-2">
+                2. Select Page
+              </label>
+              <select
+                value={selectedPageId}
+                onChange={(e) => handlePageSelect(e.target.value)}
+                className="w-full md:w-96 text-sm font-semibold p-3 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#C8102E] outline-none transition"
+              >
+                <option value="">-- Choose a Page --</option>
+                {pages.map(page => (
+                  <option key={page.id} value={page.id}>
+                    {page.title} ({page.slug})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {selectedPage && (
+              <div className="space-y-8">
+                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h2 className="text-xs font-extrabold text-gray-400 uppercase tracking-wider">
+                        3. Select Sections to Edit & Lock ({selectedPage.title})
+                      </h2>
+                      <p className="text-xs text-gray-500 mt-1">Checking a checkbox locks that section instantly.</p>
+                    </div>
+                    {checkedSectionIds.length > 0 && (
+                      <span className="text-xs bg-red-100 text-[#C8102E] font-bold px-3 py-1 rounded-full">
+                        {checkedSectionIds.length} Section(s) Selected & Locked
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {sections.map(section => {
+                      const isChecked = checkedSectionIds.includes(section.id)
+                      const isLockedByMe = section.is_locked && section.locked_by === user?.id
+                      const isLockedByOther = section.is_locked && section.locked_by !== user?.id
+
+                      return (
+                        <label
+                          key={section.id}
+                          className={`p-4 rounded-xl border flex items-start gap-3 transition-all ${isLockedByOther
+                            ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-75'
+                            : isChecked || isLockedByMe
+                              ? 'bg-red-50/40 border-[#C8102E] ring-2 ring-[#C8102E]/20 cursor-default'
+                              : 'bg-white border-gray-200 hover:border-gray-300 cursor-pointer'
+                            }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked || isLockedByMe}
+                            disabled={isLockedByOther || isChecked || isLockedByMe}
+                            onChange={(e) => handleSectionCheckboxChange(section, e.target.checked)}
+                            className="w-5 h-5 text-[#C8102E] rounded border-gray-300 focus:ring-[#C8102E] mt-0.5"
+                          />
+                          <div className="flex-1">
+                            <div className="font-bold text-[#0B1B3D] text-sm flex items-center justify-between">
+                              <span>{section.name}</span>
+                              {isLockedByOther && (
+                                <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded">
+                                  🔒 Locked by {section.locked_by_user?.name || 'Other'}
+                                </span>
+                              )}
+                              {(isChecked || isLockedByMe) && (
+                                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">
+                                  🔒 Locked by You
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {isLockedByOther
+                                ? 'Locked by another advisor'
+                                : isChecked || isLockedByMe
+                                  ? 'Locked & active in editor below'
+                                  : 'Click checkbox to lock & edit'}
+                            </p>
+                          </div>
+                        </label>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {checkedSectionIds.length > 0 ? (
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between bg-[#0B1B3D] text-white px-6 py-4 rounded-xl shadow-sm">
+                      <div>
+                        <h2 className="text-lg font-bold">4. Edit Selected Sections & Submit</h2>
+                        <p className="text-xs text-gray-300 mt-0.5">All edits will be submitted together as one single request.</p>
+                      </div>
+                      <button
+                        onClick={handleBatchSubmit}
+                        disabled={isSubmitting}
+                        className="bg-[#C8102E] text-white text-sm font-bold px-6 py-2.5 rounded-lg hover:bg-red-700 shadow-md transition disabled:opacity-50"
+                      >
+                        {isSubmitting ? 'Submitting...' : '🚀 Submit All Changes'}
+                      </button>
+                    </div>
+
+                    {checkedSectionIds.map(secId => {
+                      const section = sections.find(s => s.id === secId)
+                      if (!section) return null
+                      const values = sectionEdits[secId] || {}
+                      const isPreview = previewTab[secId]
+
+                      return (
+                        <div key={secId} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                          <div className="bg-slate-50 border-b px-6 py-4 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <span className="w-3 h-3 rounded-full bg-[#C8102E]"></span>
+                              <h3 className="text-base font-bold text-[#0B1B3D]">Editing: {section.name}</h3>
+                            </div>
+                            <div className="flex items-center gap-2 bg-white border p-1 rounded-lg">
+                              <button
+                                type="button"
+                                onClick={() => setPreviewTab(prev => ({ ...prev, [secId]: false }))}
+                                className={`text-xs font-bold px-3 py-1 rounded transition ${!isPreview ? 'bg-[#0B1B3D] text-white' : 'text-gray-600'}`}
+                              >
+                                Form Fields
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setPreviewTab(prev => ({ ...prev, [secId]: true }))}
+                                className={`text-xs font-bold px-3 py-1 rounded transition ${isPreview ? 'bg-[#0B1B3D] text-white' : 'text-gray-600'}`}
+                              >
+                                Preview
+                              </button>
+                            </div>
+                          </div>
+
+                          {!isPreview ? (
+                            <div className="p-6">
+                              {section.name === 'Hero Slider' ? (
+                                // Hero Slider - 3 Slides Editor
+                                <div className="space-y-8">
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                                    <h4 className="text-sm font-bold text-blue-900 mb-2">Hero Slider - 3 Slides</h4>
+                                    <p className="text-xs text-blue-700">Configure each slide with its own background image, heading, text, and buttons.</p>
+                                  </div>
+                                  
+                                  {[0, 1, 2].map((slideIndex) => {
+                                    const slide = (values.slides && Array.isArray(values.slides) && values.slides[slideIndex]) || {};
+                                    return (
+                                      <div key={slideIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
+                                          <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">{slideIndex + 1}</span>
+                                          Slide {slideIndex + 1}
+                                        </h5>
+                                        
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Background Image URL</label>
+                                            <input
+                                              type="text"
+                                              value={slide.bg || ''}
+                                              onChange={(e) => {
+                                                const updatedSlides = [...(values.slides || [{}, {}, {}])];
+                                                updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: e.target.value, id: slideIndex + 1 };
+                                                handleFieldValueChange(secId, 'slides', updatedSlides);
+                                              }}
+                                              placeholder="https://..."
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Eyebrow / Tagline</label>
+                                            <input
+                                              type="text"
+                                              value={slide.eyebrow || ''}
+                                              onChange={(e) => {
+                                                const updatedSlides = [...(values.slides || [{}, {}, {}])];
+                                                updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], eyebrow: e.target.value, id: slideIndex + 1 };
+                                                handleFieldValueChange(secId, 'slides', updatedSlides);
+                                              }}
+                                              placeholder="e.g. FINANCIAL CENTRE & WEALTH MANAGEMENT"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Heading / Title</label>
+                                            <input
+                                              type="text"
+                                              value={slide.heading || ''}
+                                              onChange={(e) => {
+                                                const updatedSlides = [...(values.slides || [{}, {}, {}])];
+                                                updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], heading: e.target.value, id: slideIndex + 1 };
+                                                handleFieldValueChange(secId, 'slides', updatedSlides);
+                                              }}
+                                              placeholder="e.g. Strategic Advisory for Long-Term Growth"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none font-semibold text-[#0B1B3D]"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
+                                            <textarea
+                                              rows={2}
+                                              value={slide.subheading || ''}
+                                              onChange={(e) => {
+                                                const updatedSlides = [...(values.slides || [{}, {}, {}])];
+                                                updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], subheading: e.target.value, id: slideIndex + 1 };
+                                                handleFieldValueChange(secId, 'slides', updatedSlides);
+                                              }}
+                                              placeholder="Summary or tagline..."
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Body Text</label>
+                                            <textarea
+                                              rows={2}
+                                              value={slide.text || ''}
+                                              onChange={(e) => {
+                                                const updatedSlides = [...(values.slides || [{}, {}, {}])];
+                                                updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], text: e.target.value, id: slideIndex + 1 };
+                                                handleFieldValueChange(secId, 'slides', updatedSlides);
+                                              }}
+                                              placeholder="Full slide text..."
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Button Text</label>
+                                            <input
+                                              type="text"
+                                              value={slide.button_text || ''}
+                                              onChange={(e) => {
+                                                const updatedSlides = [...(values.slides || [{}, {}, {}])];
+                                                updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], button_text: e.target.value, id: slideIndex + 1 };
+                                                handleFieldValueChange(secId, 'slides', updatedSlides);
+                                              }}
+                                              placeholder="GET IN TOUCH"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Button Link</label>
+                                            <input
+                                              type="text"
+                                              value={slide.button_url || ''}
+                                              onChange={(e) => {
+                                                const updatedSlides = [...(values.slides || [{}, {}, {}])];
+                                                updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], button_url: e.target.value, id: slideIndex + 1 };
+                                                handleFieldValueChange(secId, 'slides', updatedSlides);
+                                              }}
+                                              placeholder="#appointment"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">YouTube URL</label>
+                                            <input
+                                              type="text"
+                                              value={slide.youtube_url || ''}
+                                              onChange={(e) => {
+                                                const updatedSlides = [...(values.slides || [{}, {}, {}])];
+                                                updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], youtube_url: e.target.value, id: slideIndex + 1 };
+                                                handleFieldValueChange(secId, 'slides', updatedSlides);
+                                              }}
+                                              placeholder="https://www.youtube.com/watch?v=..."
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                // Standard Section Editor
+                                <div className="grid md:grid-cols-2 gap-4">
+                                  <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Eyebrow / Tagline</label>
+                                    <input
+                                      type="text"
+                                      value={values.eyebrow || ''}
+                                      onChange={(e) => handleFieldValueChange(secId, 'eyebrow', e.target.value)}
+                                      placeholder="e.g. ABOUT US"
+                                      className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                    />
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Heading / Title</label>
+                                    <input
+                                      type="text"
+                                      value={values.heading || ''}
+                                      onChange={(e) => handleFieldValueChange(secId, 'heading', e.target.value)}
+                                      placeholder="e.g. Section Title"
+                                      className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none font-semibold text-[#0B1B3D]"
+                                    />
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
+                                    <textarea
+                                      rows={2}
+                                      value={values.subheading || ''}
+                                      onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
+                                      placeholder="Summary or tagline..."
+                                      className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                    />
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Body Text</label>
+                                    <textarea
+                                      rows={3}
+                                      value={values.text || ''}
+                                      onChange={(e) => handleFieldValueChange(secId, 'text', e.target.value)}
+                                      placeholder="Full section text..."
+                                      className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                    />
+                                  </div>
+                                  <div className="md:col-span-2">
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Image URL</label>
+                                    <input
+                                      type="text"
+                                      value={values.image_url || ''}
+                                      onChange={(e) => handleFieldValueChange(secId, 'image_url', e.target.value)}
+                                      placeholder="https://..."
+                                      className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Button Text</label>
+                                    <input
+                                      type="text"
+                                      value={values.button_text || ''}
+                                      onChange={(e) => handleFieldValueChange(secId, 'button_text', e.target.value)}
+                                      placeholder="GET IN TOUCH"
+                                      className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Button Link</label>
+                                    <input
+                                      type="text"
+                                      value={values.button_url || ''}
+                                      onChange={(e) => handleFieldValueChange(secId, 'button_url', e.target.value)}
+                                      placeholder="#appointment"
+                                      className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <div className="p-4 bg-slate-100 space-y-3">
+                              <div className="bg-white px-5 py-3 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                                <span className="text-xs font-extrabold text-[#0B1B3D] flex items-center gap-2">
+                                  <span className="w-2.5 h-2.5 rounded-full bg-[#C8102E]"></span>
+                                  Live Template Preview — reflects your current edits
+                                </span>
+                                <span className="text-[11px] text-gray-400 font-mono">
+                                  {section.name}
+                                </span>
+                              </div>
+
+                              {/* Real template4 component rendered inside an iframe via postMessage */}
+                              <SectionIframePreview
+                                sectionName={section.name}
+                                data={values}
+                                height={520}
+                                borderColor="border-[#C8102E]"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
+
+                    <div className="pt-4 flex justify-end">
+                      <button
+                        onClick={handleBatchSubmit}
+                        disabled={isSubmitting}
+                        className="bg-[#C8102E] text-white text-base font-extrabold px-8 py-3 rounded-xl hover:bg-red-700 shadow-lg transition disabled:opacity-50"
+                      >
+                        {isSubmitting ? 'Submitting...' : '🚀 Submit All Section Edits'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center text-gray-500">
+                    <div className="text-4xl mb-3">☑️</div>
+                    <h3 className="text-lg font-bold text-[#0B1B3D]">No Sections Checked Yet</h3>
+                    <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
+                      Check one or more section checkboxes above to lock them for editing.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Template Deployment Request Modal */}
+      {showTemplateModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-gray-200 space-y-4">
+            <div className="flex items-center justify-between border-b pb-3">
+              <h3 className="text-lg font-bold text-[#0B1B3D]">🎨 Request Template Deployment</h3>
+              <button onClick={() => setShowTemplateModal(false)} className="text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
+            </div>
+
+            <form onSubmit={handleTemplateSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Showcase Template</label>
+                <select
+                  value={selectedTemplateName}
+                  onChange={e => setSelectedTemplateName(e.target.value)}
+                  className="w-full text-sm p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E]"
+                >
+                  {availableTemplates.map(tpl => (
+                    <option key={tpl.id} value={tpl.slug}>
+                      {tpl.name} ({tpl.slug})
+                    </option>
+                  ))}
+                  {availableTemplates.length === 0 && (
+                    <option value="template4">Template 4 - Corporate Financial Advisory (template4)</option>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Target Domain Name *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. advisor.myfirm.com"
+                  value={domainName}
+                  onChange={e => setDomainName(e.target.value)}
+                  className="w-full text-sm p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Logo URL (Optional)</label>
+                <input
+                  type="url"
+                  placeholder="https://myfirm.com/logo.png"
+                  value={logoUrl}
+                  onChange={e => setLogoUrl(e.target.value)}
+                  className="w-full text-sm p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Primary Color</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={primaryColor}
+                      onChange={e => setPrimaryColor(e.target.value)}
+                      className="w-10 h-10 border rounded cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={primaryColor}
+                      onChange={e => setPrimaryColor(e.target.value)}
+                      className="w-full text-xs p-2 border rounded font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Secondary Color</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="color"
+                      value={secondaryColor}
+                      onChange={e => setSecondaryColor(e.target.value)}
+                      className="w-10 h-10 border rounded cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={secondaryColor}
+                      onChange={e => setSecondaryColor(e.target.value)}
+                      className="w-full text-xs p-2 border rounded font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3 flex items-center justify-end gap-3 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingTemplate}
+                  className="px-5 py-2 text-xs font-bold bg-[#0B1B3D] text-white rounded-lg hover:bg-slate-800 transition disabled:opacity-50 shadow-md"
+                >
+                  {isSubmittingTemplate ? 'Submitting...' : 'Submit Deployment Request'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
