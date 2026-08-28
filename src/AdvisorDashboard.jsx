@@ -143,7 +143,7 @@ function stripDataImageUrls(value) {
 
 function sanitizeSectionContent(content) {
   if (!content || typeof content !== 'object') return content || {}
-  const { preview_slide, ...rest } = content
+  const { preview_slide, image_preview, preview_url, preview_image, ...rest } = content
   return stripDataImageUrls(rest)
 }
 
@@ -181,15 +181,21 @@ function normalizeAboutEditorContent(content) {
   const list = Array.isArray(c.gauges) && c.gauges.length
     ? c.gauges
     : (Array.isArray(c.stats) ? c.stats : [])
-  c.gauges = defaults.map((fallback, i) => ({
-    ...fallback,
-    ...(list[i] || {}),
-    value: list[i]?.value || c[`percent_${i + 1}`] || fallback.value,
-    label: list[i]?.label || c[`percent_${i + 1}_text`] || fallback.label,
-  }))
+  c.gauges = defaults.map((fallback, i) => {
+    const item = list[i] && typeof list[i] === 'object' ? list[i] : {}
+    const n = i + 1
+    return {
+      ...fallback,
+      ...item,
+      value: c[`percent_${n}`] || c[`percentage_${n}`] || item.value || item.percentage || item.pct || fallback.value,
+      label: c[`percent_${n}_text`] || c[`percentage_${n}_text`] || item.label || item.text || item.heading || fallback.label,
+    }
+  })
   if (!c.eyebrow) c.eyebrow = 'ABOUT US'
-  if (!c.experience_years) c.experience_years = c.years || '10+'
-  if (!c.experience_label) c.experience_label = 'Years of Experience'
+  c.experience_years = c.experience_years || c.red_box_number || c.red_box || c.years || '10+'
+  c.experience_label = c.experience_label || c.red_box_text || c.red_box_label || 'Years of Experience'
+  c.red_box_number = c.experience_years
+  c.red_box_text = c.experience_label
   if (!c.image_url) c.image_url = c.image || c.img || ''
   c.percent_1 = c.gauges[0].value
   c.percent_1_text = c.gauges[0].label
@@ -211,13 +217,26 @@ function withAbsoluteUploadUrls(value) {
 
 function aboutPreviewPayload(values) {
   const normalized = normalizeAboutEditorContent(values || {})
-  const image = normalized.image_url || ''
-  const absImage = isUploadedAsset(image) ? absoluteAssetUrl(image) : image
+  const preview = normalized.image_preview || ''
+  const image = preview || normalized.image_url || ''
+  const absImage = /^data:|^blob:/i.test(image)
+    ? image
+    : (isUploadedAsset(image) ? absoluteAssetUrl(image) : image)
   return withAbsoluteUploadUrls({
     ...normalized,
+    image_preview: preview || undefined,
     image_url: absImage || image,
     image: absImage || image,
     img: absImage || image,
+    experience_years: normalized.experience_years,
+    experience_label: normalized.experience_label,
+    red_box_number: normalized.experience_years,
+    red_box_text: normalized.experience_label,
+    percent_1: normalized.gauges[0].value,
+    percent_1_text: normalized.gauges[0].label,
+    percent_2: normalized.gauges[1].value,
+    percent_2_text: normalized.gauges[1].label,
+    gauges: normalized.gauges,
   })
 }
 
@@ -338,7 +357,13 @@ export default function AdvisorDashboard() {
     if (dataUrl) {
       setSectionEdits((prev) => ({
         ...prev,
-        [secId]: { ...(prev[secId] || {}), image_url: dataUrl, image: dataUrl, img: dataUrl },
+        [secId]: {
+          ...(prev[secId] || {}),
+          image_url: dataUrl,
+          image: dataUrl,
+          img: dataUrl,
+          image_preview: dataUrl,
+        },
       }))
     }
     try {
@@ -349,7 +374,13 @@ export default function AdvisorDashboard() {
       if (uploadedUrl) {
         setSectionEdits((prev) => ({
           ...prev,
-          [secId]: { ...(prev[secId] || {}), image_url: uploadedUrl, image: uploadedUrl, img: uploadedUrl },
+          [secId]: {
+            ...(prev[secId] || {}),
+            image_url: uploadedUrl,
+            image: uploadedUrl,
+            img: uploadedUrl,
+            image_preview: dataUrl || prev[secId]?.image_preview,
+          },
         }))
         setMessage('📸 About image uploaded successfully!')
       } else {
@@ -535,13 +566,19 @@ export default function AdvisorDashboard() {
   }
 
   const handleFieldValueChange = (sectionId, fieldKey, value) => {
-    setSectionEdits(prev => ({
-      ...prev,
-      [sectionId]: {
-        ...(prev[sectionId] || {}),
-        [fieldKey]: value
+    setSectionEdits(prev => {
+      const current = { ...(prev[sectionId] || {}), [fieldKey]: value }
+      if (fieldKey === 'image_url') {
+        current.image = value
+        current.img = value
+        if (!/^data:|^blob:/i.test(value || '')) current.image_preview = ''
       }
-    }))
+      if (fieldKey === 'experience_years') current.red_box_number = value
+      if (fieldKey === 'experience_label') current.red_box_text = value
+      if (fieldKey === 'red_box_number') current.experience_years = value
+      if (fieldKey === 'red_box_text') current.experience_label = value
+      return { ...prev, [sectionId]: current }
+    })
   }
 
   const patchBox = (secId, boxIndex, patch) => {
@@ -567,6 +604,10 @@ export default function AdvisorDashboard() {
           percent_1_text: gauges[0].label,
           percent_2: gauges[1].value,
           percent_2_text: gauges[1].label,
+          percentage_1: gauges[0].value,
+          percentage_1_text: gauges[0].label,
+          percentage_2: gauges[1].value,
+          percentage_2_text: gauges[1].label,
         },
       }
     })
@@ -1406,36 +1447,6 @@ export default function AdvisorDashboard() {
                                     <p className="text-xs text-gray-600">
                                       This section has no button. Edit the headings, photo (upload or pick), two percentage + text items, and the red box.
                                     </p>
-                                  </div>
-
-                                  <div className="border border-gray-200 rounded-lg p-4 bg-white">
-                                    <p className="text-[11px] font-extrabold uppercase tracking-wide text-gray-500 mb-3">Updates as you type</p>
-                                    <div className="flex flex-wrap items-center gap-6">
-                                      {[0, 1].map((i) => {
-                                        const g = (values.gauges && values.gauges[i]) || {}
-                                        return (
-                                          <div key={i} className="flex items-center gap-3">
-                                            <span className="w-14 h-14 rounded-full border-4 border-[#C8102E] flex items-center justify-center text-sm font-black text-[#0B1B3D]">
-                                              {g.value || (i === 0 ? '50%' : '75%')}
-                                            </span>
-                                            <span className="text-xs font-semibold text-[#0B1B3D] max-w-[110px]">
-                                              {g.label || (i === 0 ? 'Business strategy growth' : 'Finance valuable ideas')}
-                                            </span>
-                                          </div>
-                                        )
-                                      })}
-                                      {(localPreviewUrls[`about-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages) || values.image_url) && (
-                                        <img
-                                          src={localPreviewUrls[`about-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages) || values.image_url}
-                                          alt="About"
-                                          className="h-20 w-28 object-cover rounded border"
-                                        />
-                                      )}
-                                      <div className="bg-[#C8102E] text-white px-5 py-3 shadow">
-                                        <div className="text-2xl font-bold leading-none">{values.experience_years || '10+'}</div>
-                                        <div className="text-[10px] uppercase tracking-widest font-semibold mt-1">{values.experience_label || 'Years of Experience'}</div>
-                                      </div>
-                                    </div>
                                   </div>
 
                                   <div className="grid md:grid-cols-2 gap-4">
