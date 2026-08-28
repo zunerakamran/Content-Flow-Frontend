@@ -165,7 +165,7 @@ function isWhatWeDoSection(name) {
 
 function isAboutSection(name) {
   const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
-  return key === 'aboutsection' || key === 'about' || key === 'aboutus'
+  return key.includes('about')
 }
 
 function defaultAboutGauges() {
@@ -1352,12 +1352,14 @@ export default function AdvisorDashboard() {
                                 <div className="space-y-8">
                                   <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">About Section</h4>
-                                    <p className="text-xs text-gray-600">Edit the red eyebrow, headings, body copy, two gauges, photo, and years-of-experience badge.</p>
+                                    <p className="text-xs text-gray-600">
+                                      This section has no button. Edit the headings, photo (upload or pick), two percentage + text items, and the red box.
+                                    </p>
                                   </div>
 
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Eyebrow (red)</label>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
                                       <input
                                         type="text"
                                         value={values.eyebrow || ''}
@@ -1377,7 +1379,7 @@ export default function AdvisorDashboard() {
                                       />
                                     </div>
                                     <div className="md:col-span-2">
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Text (bold)</label>
                                       <textarea
                                         rows={2}
                                         value={values.subheading || ''}
@@ -1398,47 +1400,20 @@ export default function AdvisorDashboard() {
                                     </div>
                                   </div>
 
-                                  {[0, 1].map((gaugeIndex) => {
-                                    const gauge = (values.gauges && values.gauges[gaugeIndex]) || {}
-                                    return (
-                                      <div key={gaugeIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
-                                          <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">{gaugeIndex + 1}</span>
-                                          Gauge {gaugeIndex + 1}
-                                        </h5>
-                                        <div className="grid md:grid-cols-2 gap-4">
-                                          <div>
-                                            <label className="block text-xs font-bold text-gray-700 mb-1">Value</label>
-                                            <input
-                                              type="text"
-                                              value={gauge.value || ''}
-                                              onChange={(e) => patchGauge(secId, gaugeIndex, { value: e.target.value })}
-                                              placeholder={gaugeIndex === 0 ? '50%' : '75%'}
-                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
-                                            />
-                                          </div>
-                                          <div>
-                                            <label className="block text-xs font-bold text-gray-700 mb-1">Label</label>
-                                            <input
-                                              type="text"
-                                              value={gauge.label || ''}
-                                              onChange={(e) => patchGauge(secId, gaugeIndex, { label: e.target.value })}
-                                              placeholder={gaugeIndex === 0 ? 'Business strategy growth' : 'Finance valuable ideas'}
-                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
-                                            />
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )
-                                  })}
-
-                                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-4">
-                                    <h5 className="text-sm font-bold text-[#0B1B3D]">Photo & experience badge</h5>
+                                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                    <h5 className="text-sm font-bold text-[#0B1B3D] mb-4">Image</h5>
                                     <div className="space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
-                                      <label className="block text-xs font-extrabold text-[#0B1B3D]">Section Image</label>
+                                      <div className="flex items-center justify-between flex-wrap gap-2">
+                                        <label className="block text-xs font-extrabold text-[#0B1B3D]">About Image</label>
+                                        {displayImagePath(values.image_url) && (
+                                          <span className="text-[11px] font-mono bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full truncate max-w-xs">
+                                            {selectedLocalValue(values.image_url, localImages) || displayImagePath(values.image_url)}
+                                          </span>
+                                        )}
+                                      </div>
                                       <div className="grid md:grid-cols-2 gap-3">
                                         <div className="bg-gray-50 border p-2.5 rounded-md">
-                                          <label className="block text-[11px] font-bold text-gray-700 mb-1">📁 Upload Custom Image</label>
+                                          <label className="block text-[11px] font-bold text-gray-700 mb-1">📁 Upload Custom Image File</label>
                                           <input
                                             type="file"
                                             accept="image/*"
@@ -1483,9 +1458,47 @@ export default function AdvisorDashboard() {
                                         className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
                                       />
                                     </div>
+                                  </div>
+
+                                  {[0, 1].map((gaugeIndex) => {
+                                    const gauge = (values.gauges && values.gauges[gaugeIndex]) || {}
+                                    return (
+                                      <div key={gaugeIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
+                                          <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">{gaugeIndex + 1}</span>
+                                          Percentage {gaugeIndex + 1}
+                                        </h5>
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Percentage</label>
+                                            <input
+                                              type="text"
+                                              value={gauge.value || ''}
+                                              onChange={(e) => patchGauge(secId, gaugeIndex, { value: e.target.value })}
+                                              placeholder={gaugeIndex === 0 ? '50%' : '75%'}
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Text</label>
+                                            <input
+                                              type="text"
+                                              value={gauge.label || ''}
+                                              onChange={(e) => patchGauge(secId, gaugeIndex, { label: e.target.value })}
+                                              placeholder={gaugeIndex === 0 ? 'Business strategy growth' : 'Finance valuable ideas'}
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+
+                                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                    <h5 className="text-sm font-bold text-[#0B1B3D] mb-4">Red box</h5>
                                     <div className="grid md:grid-cols-2 gap-4">
                                       <div>
-                                        <label className="block text-xs font-bold text-gray-700 mb-1">Years value</label>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Number in red box</label>
                                         <input
                                           type="text"
                                           value={values.experience_years || ''}
@@ -1495,7 +1508,7 @@ export default function AdvisorDashboard() {
                                         />
                                       </div>
                                       <div>
-                                        <label className="block text-xs font-bold text-gray-700 mb-1">Years label</label>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Text in red box</label>
                                         <input
                                           type="text"
                                           value={values.experience_label || ''}
