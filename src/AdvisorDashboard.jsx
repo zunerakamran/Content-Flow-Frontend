@@ -32,6 +32,42 @@ export default function AdvisorDashboard() {
   const [primaryColor, setPrimaryColor] = useState('#0B1B3D')
   const [secondaryColor, setSecondaryColor] = useState('#C8102E')
   const [isSubmittingTemplate, setIsSubmittingTemplate] = useState(false)
+  const [uploadingState, setUploadingState] = useState({})
+
+  const LOCAL_HERO_PRESETS = [
+    { label: 'Default Hero Background 1 (bg-slider-01.jpg)', value: 'bg-slider-01.jpg' },
+    { label: 'Default Hero Background 2 (bg-slider2.jpg)', value: 'bg-slider2.jpg' },
+    { label: 'Default Hero Background 3 (bg-slider3.jpg)', value: 'bg-slider3.jpg' },
+    { label: 'Financial Advisory 1 (intime-08.jpg)', value: 'intime-08.jpg' },
+    { label: 'Financial Advisory 2 (intime-12.jpg)', value: 'intime-12.jpg' },
+    { label: 'Financial Advisory 3 (intime-15.jpg)', value: 'intime-15.jpg' },
+    { label: 'Corporate Banner (banner1.jpg)', value: 'banner1.jpg' },
+  ]
+
+  const handleSlideImageUpload = async (secId, slideIndex, file) => {
+    if (!file) return
+    const uploadKey = `${secId}-${slideIndex}`
+    setUploadingState(prev => ({ ...prev, [uploadKey]: true }))
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await api.post('/upload-image', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+      const uploadedUrl = res.data?.relative_url || res.data?.url
+      if (uploadedUrl) {
+        const currentSlides = sectionEdits[secId]?.slides || [{}, {}, {}]
+        const updatedSlides = [...currentSlides]
+        updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: uploadedUrl, id: slideIndex + 1 }
+        handleFieldValueChange(secId, 'slides', updatedSlides)
+        setMessage(`📸 Image uploaded successfully for Slide ${slideIndex + 1}!`)
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to upload image.')
+    } finally {
+      setUploadingState(prev => ({ ...prev, [uploadKey]: false }))
+    }
+  }
 
   const fetchTemplateRequests = () => {
     api.get('/template-requests')
@@ -697,19 +733,79 @@ export default function AdvisorDashboard() {
                                         </h5>
                                         
                                         <div className="grid md:grid-cols-2 gap-4">
-                                          <div className="md:col-span-2">
-                                            <label className="block text-xs font-bold text-gray-700 mb-1">Background Image URL</label>
-                                            <input
-                                              type="text"
-                                              value={slide.bg || ''}
-                                              onChange={(e) => {
-                                                const updatedSlides = [...(values.slides || [{}, {}, {}])];
-                                                updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: e.target.value, id: slideIndex + 1 };
-                                                handleFieldValueChange(secId, 'slides', updatedSlides);
-                                              }}
-                                              placeholder="https://..."
-                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
-                                            />
+                                          <div className="md:col-span-2 space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
+                                            <div className="flex items-center justify-between flex-wrap gap-2">
+                                              <label className="block text-xs font-extrabold text-[#0B1B3D]">
+                                                Background Image for Slide {slideIndex + 1}
+                                              </label>
+                                              {slide.bg && (
+                                                <span className="text-[11px] font-mono bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full truncate max-w-xs">
+                                                  {slide.bg}
+                                                </span>
+                                              )}
+                                            </div>
+
+                                            <div className="grid md:grid-cols-2 gap-3">
+                                              {/* 1. Upload Custom Image */}
+                                              <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                                                  📁 Upload Custom Image File
+                                                </label>
+                                                <input
+                                                  type="file"
+                                                  accept="image/*"
+                                                  disabled={uploadingState[`${secId}-${slideIndex}`]}
+                                                  onChange={(e) => {
+                                                    if (e.target.files && e.target.files[0]) {
+                                                      handleSlideImageUpload(secId, slideIndex, e.target.files[0]);
+                                                    }
+                                                  }}
+                                                  className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
+                                                />
+                                                {uploadingState[`${secId}-${slideIndex}`] && (
+                                                  <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
+                                                )}
+                                              </div>
+
+                                              {/* 2. Select Local Template Image */}
+                                              <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">
+                                                  🎨 Or Select Local Template Image
+                                                </label>
+                                                <select
+                                                  value={slide.bg || ''}
+                                                  onChange={(e) => {
+                                                    const updatedSlides = [...(values.slides || [{}, {}, {}])];
+                                                    updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: e.target.value, id: slideIndex + 1 };
+                                                    handleFieldValueChange(secId, 'slides', updatedSlides);
+                                                  }}
+                                                  className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
+                                                >
+                                                  <option value="">-- Choose Local Template Image --</option>
+                                                  {LOCAL_HERO_PRESETS.map(preset => (
+                                                    <option key={preset.value} value={preset.value}>{preset.label}</option>
+                                                  ))}
+                                                </select>
+                                              </div>
+                                            </div>
+
+                                            {/* 3. Direct Image URL / Path Input */}
+                                            <div>
+                                              <label className="block text-[11px] text-gray-500 mb-1 font-semibold">
+                                                🔗 Image URL / Relative Path
+                                              </label>
+                                              <input
+                                                type="text"
+                                                value={slide.bg || ''}
+                                                onChange={(e) => {
+                                                  const updatedSlides = [...(values.slides || [{}, {}, {}])];
+                                                  updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: e.target.value, id: slideIndex + 1 };
+                                                  handleFieldValueChange(secId, 'slides', updatedSlides);
+                                                }}
+                                                placeholder="e.g. /uploads/170000_image.jpg or bg-slider-01.jpg"
+                                                className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                              />
+                                            </div>
                                           </div>
                                           <div className="md:col-span-2">
                                             <label className="block text-xs font-bold text-gray-700 mb-1">Eyebrow / Tagline</label>
