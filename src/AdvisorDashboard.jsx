@@ -141,10 +141,22 @@ function stripDataImageUrls(value) {
   return value
 }
 
+function stripPreviewKeys(value) {
+  if (Array.isArray(value)) return value.map(stripPreviewKeys)
+  if (value && typeof value === 'object') {
+    const next = {}
+    for (const [key, nested] of Object.entries(value)) {
+      if (key === 'preview_slide' || key === 'image_preview' || key === 'preview_url' || key === 'preview_image') continue
+      next[key] = stripPreviewKeys(nested)
+    }
+    return next
+  }
+  return value
+}
+
 function sanitizeSectionContent(content) {
   if (!content || typeof content !== 'object') return content || {}
-  const { preview_slide, image_preview, preview_url, preview_image, ...rest } = content
-  return stripDataImageUrls(rest)
+  return stripDataImageUrls(stripPreviewKeys(content))
 }
 
 function displayImagePath(url) {
@@ -166,6 +178,11 @@ function isWhatWeDoSection(name) {
 function isAboutSection(name) {
   const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
   return key.includes('about')
+}
+
+function isCompanyHistorySection(name) {
+  const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return key === 'companyhistory' || key === 'history' || key.includes('history')
 }
 
 function defaultAboutGauges() {
@@ -213,6 +230,66 @@ function withAbsoluteUploadUrls(value) {
     return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, withAbsoluteUploadUrls(v)]))
   }
   return value
+}
+
+function defaultCompanyHistoryYears() {
+  return [
+    { year: '2010', red_text: '2010 Milestone', grey_text: 'Company Founded', heading: 'Started Business', image_url: 'intime-06.jpg', text: "We partner with you to enable your technology so you focus on your organization's mission, leveraging our top-tier talent." },
+    { year: '2012', red_text: '2012 Milestone', grey_text: '10+ Key Partners', heading: 'Resilience & Expansion', image_url: 'intime-07.jpg', text: 'A dedicated People Ops leader committed to the growth and continuous development of leaders across operations.' },
+    { year: '2016', red_text: '2016 Milestone', grey_text: '24/7 Support Launched', heading: 'Crisis & Opportunity', image_url: 'intime-09.jpg', text: 'Our support works around the clock to ensure your business operations are secure, resilient, and monitored safely.' },
+    { year: '2017', red_text: '2017 Milestone', grey_text: '50+ Nationwide Branches', heading: '50+ Branches Milestone', image_url: 'intime-01.jpg', text: 'We cross industries and provide services to almost every business either as a co-managed or supplemental asset.' },
+    { year: '2019', red_text: '2019 Milestone', grey_text: 'Global Market Entry', heading: '100+ Global Branches', image_url: 'intime-04.jpg', text: 'Providing consulting expertise on vendor technology, IT budget strategy, and multi-cloud enterprise security.' },
+    { year: '2021', red_text: '2021 Milestone', grey_text: 'Top Enterprise Award', heading: 'Industry Excellence Award', image_url: 'intime-10.jpg', text: 'Our team is held to the highest level of accountability to ensure exceptional satisfaction and proven results.' },
+  ]
+}
+
+function normalizeCompanyHistoryEditorContent(content) {
+  const c = content && typeof content === 'object' ? { ...content } : {}
+  const defaults = defaultCompanyHistoryYears()
+  const legacy = Boolean(c.eyebrow && c.subheading && !c.text && !c.years)
+  const list = Array.isArray(c.years) && c.years.length
+    ? c.years
+    : (Array.isArray(c.items) && c.items.length ? c.items : (Array.isArray(c.milestones) ? c.milestones : []))
+  const originalSubheading = c.subheading
+  c.subheading = legacy ? (c.eyebrow || 'OUR JOURNEY') : (c.subheading || c.eyebrow || 'OUR JOURNEY')
+  c.text = legacy ? (originalSubheading || '') : (c.text || 'A decade of growth, innovation, and unwavering commitment to client success.')
+  if (!c.heading) c.heading = 'Our Company History'
+  c.years = defaults.map((fallback, i) => {
+    const item = list[i] && typeof list[i] === 'object' ? list[i] : {}
+    const year = item.year || fallback.year
+    return {
+      ...fallback,
+      ...item,
+      year,
+      red_text: item.red_text || item.milestone || item.badge || (year ? `${year} Milestone` : fallback.red_text),
+      grey_text: item.grey_text || item.highlight || item.caption || fallback.grey_text,
+      heading: item.heading || item.title || fallback.heading,
+      image_url: item.image_url || item.image || item.img || fallback.image_url,
+      text: item.text || item.desc || item.description || fallback.text,
+    }
+  })
+  return c
+}
+
+function companyHistoryPreviewPayload(values) {
+  const normalized = normalizeCompanyHistoryEditorContent(values || {})
+  return withAbsoluteUploadUrls({
+    ...normalized,
+    years: (normalized.years || []).map((year) => {
+      const preview = year.image_preview || ''
+      const image = preview || year.image_url || ''
+      const absImage = /^data:|^blob:/i.test(image)
+        ? image
+        : (isUploadedAsset(image) ? absoluteAssetUrl(image) : image)
+      return {
+        ...year,
+        image_preview: preview || undefined,
+        image_url: absImage || image,
+        image: absImage || image,
+        img: absImage || image,
+      }
+    }),
+  })
 }
 
 function aboutPreviewPayload(values) {
@@ -332,6 +409,61 @@ export default function AdvisorDashboard() {
           return { ...prev, [secId]: { ...(prev[secId] || {}), boxes: updatedBoxes } }
         })
         setMessage(`📸 Image uploaded successfully for Box ${boxIndex + 1}!`)
+      } else {
+        setError('Upload succeeded but no image path was returned.')
+      }
+    } catch (err) {
+      const fieldError = err.response?.data?.errors?.image?.[0]
+      setError(fieldError || err.response?.data?.message || 'Failed to upload image.')
+    } finally {
+      setUploadingState((prev) => ({ ...prev, [uploadKey]: false }))
+    }
+  }
+
+  const handleYearImageUpload = async (secId, yearIndex, file) => {
+    if (!file) return
+    const uploadKey = `year-${secId}-${yearIndex}`
+    setLocalPreview(uploadKey, file)
+    setUploadingState((prev) => ({ ...prev, [uploadKey]: true }))
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+      reader.onerror = () => resolve('')
+      reader.readAsDataURL(file)
+    })
+    if (dataUrl) {
+      setSectionEdits((prev) => {
+        const source = prev[secId]?.years || prev[secId]?.items || defaultCompanyHistoryYears()
+        const years = defaultCompanyHistoryYears().map((_, i) => ({ ...(source[i] || {}) }))
+        years[yearIndex] = {
+          ...years[yearIndex],
+          image_url: dataUrl,
+          image: dataUrl,
+          img: dataUrl,
+          image_preview: dataUrl,
+        }
+        return { ...prev, [secId]: { ...(prev[secId] || {}), years } }
+      })
+    }
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await api.post('upload-image', formData)
+      const uploadedUrl = storedUploadPath(res.data)
+      if (uploadedUrl) {
+        setSectionEdits((prev) => {
+          const source = prev[secId]?.years || prev[secId]?.items || defaultCompanyHistoryYears()
+          const years = defaultCompanyHistoryYears().map((_, i) => ({ ...(source[i] || {}) }))
+          years[yearIndex] = {
+            ...years[yearIndex],
+            image_url: uploadedUrl,
+            image: uploadedUrl,
+            img: uploadedUrl,
+            image_preview: dataUrl || years[yearIndex].image_preview,
+          }
+          return { ...prev, [secId]: { ...(prev[secId] || {}), years } }
+        })
+        setMessage(`📸 Image uploaded successfully for Year ${yearIndex + 1}!`)
       } else {
         setError('Upload succeeded but no image path was returned.')
       }
@@ -527,7 +659,9 @@ export default function AdvisorDashboard() {
     sectionsForAdvisor.forEach(s => {
       if (lockedByMeIds.includes(s.id)) {
         const parsed = parseJson(s.content)
-        initialEdits[s.id] = isAboutSection(s.name) ? normalizeAboutEditorContent(parsed) : parsed
+        initialEdits[s.id] = isAboutSection(s.name)
+          ? normalizeAboutEditorContent(parsed)
+          : (isCompanyHistorySection(s.name) ? normalizeCompanyHistoryEditorContent(parsed) : parsed)
       }
     })
     setSectionEdits(initialEdits)
@@ -557,7 +691,9 @@ export default function AdvisorDashboard() {
       const parsed = parseJson(section.content)
       setSectionEdits(prev => ({
         ...prev,
-        [section.id]: isAboutSection(section.name) ? normalizeAboutEditorContent(parsed) : parsed
+        [section.id]: isAboutSection(section.name)
+          ? normalizeAboutEditorContent(parsed)
+          : (isCompanyHistorySection(section.name) ? normalizeCompanyHistoryEditorContent(parsed) : parsed)
       }))
       setMessage(`🔒 Section "${section.name}" locked for you. You can now edit its content.`)
     } catch (err) {
@@ -587,6 +723,20 @@ export default function AdvisorDashboard() {
       const boxes = [0, 1, 2].map((i) => ({ ...(source[i] || {}) }))
       boxes[boxIndex] = { ...boxes[boxIndex], ...patch }
       return { ...prev, [secId]: { ...(prev[secId] || {}), boxes } }
+    })
+  }
+
+  const patchYear = (secId, yearIndex, patch) => {
+    setSectionEdits((prev) => {
+      const source = prev[secId]?.years || prev[secId]?.items || defaultCompanyHistoryYears()
+      const years = defaultCompanyHistoryYears().map((_, i) => ({ ...(source[i] || {}) }))
+      years[yearIndex] = { ...years[yearIndex], ...patch }
+      if (patch.image_url && !/^data:|^blob:/i.test(patch.image_url)) {
+        years[yearIndex].image_preview = ''
+        years[yearIndex].image = patch.image_url
+        years[yearIndex].img = patch.image_url
+      }
+      return { ...prev, [secId]: { ...(prev[secId] || {}), years } }
     })
   }
 
@@ -1612,6 +1762,160 @@ export default function AdvisorDashboard() {
                                     </div>
                                   </div>
                                 </div>
+                              ) : isCompanyHistorySection(section.name) ? (
+                                <div className="space-y-8">
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Company History</h4>
+                                    <p className="text-xs text-gray-600">Edit the red subheading, heading, intro text, and the six year milestones.</p>
+                                  </div>
+
+                                  <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
+                                      <input
+                                        type="text"
+                                        value={values.subheading || values.eyebrow || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
+                                        placeholder="OUR JOURNEY"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold tracking-wider uppercase"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Heading</label>
+                                      <input
+                                        type="text"
+                                        value={values.heading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'heading', e.target.value)}
+                                        placeholder="Our Company History"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none font-semibold text-[#0B1B3D]"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Text</label>
+                                      <textarea
+                                        rows={3}
+                                        value={values.text || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'text', e.target.value)}
+                                        placeholder="A decade of growth, innovation, and unwavering commitment to client success."
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {[0, 1, 2, 3, 4, 5].map((yearIndex) => {
+                                    const yearItem = (values.years && values.years[yearIndex]) || {}
+                                    const yearImage = yearItem.image_url || yearItem.img || yearItem.image || ''
+                                    return (
+                                      <div key={yearIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
+                                          <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">{yearIndex + 1}</span>
+                                          Year {yearIndex + 1}
+                                        </h5>
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Year</label>
+                                            <input
+                                              type="text"
+                                              value={yearItem.year || ''}
+                                              onChange={(e) => patchYear(secId, yearIndex, { year: e.target.value })}
+                                              placeholder="2020"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Red text</label>
+                                            <input
+                                              type="text"
+                                              value={yearItem.red_text || ''}
+                                              onChange={(e) => patchYear(secId, yearIndex, { red_text: e.target.value })}
+                                              placeholder="2020 Milestone"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Grey text</label>
+                                            <input
+                                              type="text"
+                                              value={yearItem.grey_text || ''}
+                                              onChange={(e) => patchYear(secId, yearIndex, { grey_text: e.target.value })}
+                                              placeholder="Company Founded"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-gray-500"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Heading</label>
+                                            <input
+                                              type="text"
+                                              value={yearItem.heading || yearItem.title || ''}
+                                              onChange={(e) => patchYear(secId, yearIndex, { heading: e.target.value })}
+                                              placeholder="Started Business"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none font-semibold text-[#0B1B3D]"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2 space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
+                                            <label className="block text-xs font-extrabold text-[#0B1B3D]">Image</label>
+                                            <div className="grid md:grid-cols-2 gap-3">
+                                              <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">📁 Upload Custom Image</label>
+                                                <input
+                                                  type="file"
+                                                  accept="image/*"
+                                                  disabled={uploadingState[`year-${secId}-${yearIndex}`]}
+                                                  onChange={(e) => {
+                                                    if (e.target.files && e.target.files[0]) {
+                                                      handleYearImageUpload(secId, yearIndex, e.target.files[0])
+                                                    }
+                                                  }}
+                                                  className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
+                                                />
+                                                {uploadingState[`year-${secId}-${yearIndex}`] && (
+                                                  <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
+                                                )}
+                                                {(localPreviewUrls[`year-${secId}-${yearIndex}`] || editorPreviewSrc(displayImagePath(yearImage), localImages)) && (
+                                                  <img
+                                                    src={localPreviewUrls[`year-${secId}-${yearIndex}`] || editorPreviewSrc(displayImagePath(yearImage), localImages)}
+                                                    alt={`Year ${yearIndex + 1} preview`}
+                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
+                                                  />
+                                                )}
+                                              </div>
+                                              <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
+                                                <select
+                                                  value={selectedLocalValue(yearImage, localImages)}
+                                                  onChange={(e) => patchYear(secId, yearIndex, { image_url: e.target.value })}
+                                                  className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
+                                                >
+                                                  <option value="">-- Choose Local Template Image --</option>
+                                                  {localImages.map(preset => (
+                                                    <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
+                                                  ))}
+                                                </select>
+                                              </div>
+                                            </div>
+                                            <input
+                                              type="text"
+                                              value={displayImagePath(yearImage)}
+                                              onChange={(e) => patchYear(secId, yearIndex, { image_url: e.target.value })}
+                                              placeholder="intime-06 or /uploads/image.jpg"
+                                              className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Text</label>
+                                            <textarea
+                                              rows={3}
+                                              value={yearItem.text || ''}
+                                              onChange={(e) => patchYear(secId, yearIndex, { text: e.target.value })}
+                                              placeholder="Milestone description..."
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
                               ) : (
                                 // Standard Section Editor
                                 <div className="grid md:grid-cols-2 gap-4">
@@ -1723,10 +2027,12 @@ export default function AdvisorDashboard() {
                               <SectionIframePreview
                                 sectionName={section.name}
                                 data={{
-                                  ...(isAboutSection(section.name) ? aboutPreviewPayload(values) : values),
+                                  ...(isAboutSection(section.name)
+                                    ? aboutPreviewPayload(values)
+                                    : (isCompanyHistorySection(section.name) ? companyHistoryPreviewPayload(values) : values)),
                                   preview_slide: previewSlide[secId] ?? 0,
                                 }}
-                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) ? 720 : 520}
+                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) ? 720 : 520}
                                 borderColor="border-[#C8102E]"
                               />
                             </div>
