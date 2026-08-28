@@ -4,6 +4,82 @@ import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import SectionIframePreview from './SectionIframePreview'
 
+const UPLOADS_ORIGIN = String(api.defaults.baseURL || '').replace(/\/api\/?$/, '')
+
+const LOCAL_TEMPLATE_IMAGES = [
+  { label: 'banner1', value: 'banner1' },
+  { label: 'bg-slider-01', value: 'bg-slider-01' },
+  { label: 'bg-slider2', value: 'bg-slider2' },
+  { label: 'bg-slider3', value: 'bg-slider3' },
+  { label: 'business-01-368x290', value: 'business-01-368x290' },
+  { label: 'business-02-368x290', value: 'business-02-368x290' },
+  { label: 'business-03-368x290', value: 'business-03-368x290' },
+  { label: 'gallery-1', value: 'gallery-1' },
+  { label: 'gallery-2', value: 'gallery-2' },
+  { label: 'gallery-3', value: 'gallery-3' },
+  { label: 'gallery-4', value: 'gallery-4' },
+  { label: 'gallery-5', value: 'gallery-5' },
+  { label: 'gallery-6', value: 'gallery-6' },
+  { label: 'intime-01', value: 'intime-01' },
+  { label: 'intime-02', value: 'intime-02' },
+  { label: 'intime-03', value: 'intime-03' },
+  { label: 'intime-04', value: 'intime-04' },
+  { label: 'intime-05', value: 'intime-05' },
+  { label: 'intime-06', value: 'intime-06' },
+  { label: 'intime-07', value: 'intime-07' },
+  { label: 'intime-08', value: 'intime-08' },
+  { label: 'intime-09', value: 'intime-09' },
+  { label: 'intime-10', value: 'intime-10' },
+  { label: 'intime-11', value: 'intime-11' },
+  { label: 'intime-12', value: 'intime-12' },
+  { label: 'intime-14', value: 'intime-14' },
+  { label: 'intime-15', value: 'intime-15' },
+  { label: 'intime-17', value: 'intime-17' },
+  { label: 'logo-dark', value: 'logo-dark' },
+  { label: 'logo-light', value: 'logo-light' },
+  { label: 'logo-mobile', value: 'logo-mobile' },
+  { label: 'maps-point', value: 'maps-point' },
+  { label: 'placeholder', value: 'placeholder' },
+  { label: 'team-01', value: 'team-01' },
+  { label: 'team-02', value: 'team-02' },
+  { label: 'team-03', value: 'team-03' },
+  { label: 'team-04', value: 'team-04' },
+  { label: 'team-05', value: 'team-05' },
+  { label: 'team-06', value: 'team-06' },
+  { label: 'team-07', value: 'team-07' },
+  { label: 'team-08', value: 'team-08' },
+  { label: 'team-09', value: 'team-09' },
+  { label: 'team-10', value: 'team-10' },
+  { label: 'team-11', value: 'team-11' },
+  { label: 'team-12', value: 'team-12' },
+  { label: 'testimonial-01', value: 'testimonial-01' },
+  { label: 'testimonial-02', value: 'testimonial-02' },
+  { label: 'testimonial-03', value: 'testimonial-03' },
+  { label: 'testimonial-04', value: 'testimonial-04' },
+]
+
+const LOCAL_IMAGE_VALUES = new Set(LOCAL_TEMPLATE_IMAGES.map((p) => p.value))
+
+function imageStem(path) {
+  if (!path || typeof path !== 'string') return ''
+  return path.split('/').pop().split('?')[0].replace(/\.[a-zA-Z0-9]+$/, '')
+}
+
+function selectedLocalValue(path) {
+  const stem = imageStem(path)
+  return LOCAL_IMAGE_VALUES.has(stem) ? stem : ''
+}
+
+function absoluteAssetUrl(url) {
+  if (!url) return ''
+  if (/^(https?:|data:|blob:)/i.test(url)) return url
+  if (url.startsWith('/uploads') || url.includes('/uploads/')) {
+    const path = url.startsWith('/') ? url : `/${url}`
+    return `${UPLOADS_ORIGIN}${path}`
+  }
+  return url
+}
+
 export function parseJson(str) {
   if (!str) return {}
   if (typeof str === 'object') return str
@@ -34,19 +110,18 @@ export default function AdvisorDashboard() {
   const [isSubmittingTemplate, setIsSubmittingTemplate] = useState(false)
   const [uploadingState, setUploadingState] = useState({})
 
-  const LOCAL_HERO_PRESETS = [
-    { label: 'Default Hero Background 1 (bg-slider-01.jpg)', value: 'bg-slider-01.jpg' },
-    { label: 'Default Hero Background 2 (bg-slider2.jpg)', value: 'bg-slider2.jpg' },
-    { label: 'Default Hero Background 3 (bg-slider3.jpg)', value: 'bg-slider3.jpg' },
-    { label: 'Financial Advisory 1 (intime-08.jpg)', value: 'intime-08.jpg' },
-    { label: 'Financial Advisory 2 (intime-12.jpg)', value: 'intime-12.jpg' },
-    { label: 'Financial Advisory 3 (intime-15.jpg)', value: 'intime-15.jpg' },
-    { label: 'Corporate Banner (banner1.jpg)', value: 'banner1.jpg' },
-  ]
-
   const handleSlideImageUpload = async (secId, slideIndex, file) => {
     if (!file) return
     const uploadKey = `${secId}-${slideIndex}`
+    const blobUrl = URL.createObjectURL(file)
+
+    setSectionEdits(prev => {
+      const currentSlides = prev[secId]?.slides || [{}, {}, {}]
+      const updatedSlides = [...currentSlides]
+          updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: blobUrl, image_url: blobUrl, id: slideIndex + 1 }
+      return { ...prev, [secId]: { ...(prev[secId] || {}), slides: updatedSlides } }
+    })
+
     setUploadingState(prev => ({ ...prev, [uploadKey]: true }))
     try {
       const formData = new FormData()
@@ -54,12 +129,14 @@ export default function AdvisorDashboard() {
       const res = await api.post('/upload-image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
-      const uploadedUrl = res.data?.relative_url || res.data?.url
+      const uploadedUrl = absoluteAssetUrl(res.data?.url || res.data?.relative_url)
       if (uploadedUrl) {
-        const currentSlides = sectionEdits[secId]?.slides || [{}, {}, {}]
-        const updatedSlides = [...currentSlides]
-        updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: uploadedUrl, id: slideIndex + 1 }
-        handleFieldValueChange(secId, 'slides', updatedSlides)
+        setSectionEdits(prev => {
+          const currentSlides = prev[secId]?.slides || [{}, {}, {}]
+          const updatedSlides = [...currentSlides]
+          updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: uploadedUrl, image_url: uploadedUrl, id: slideIndex + 1 }
+          return { ...prev, [secId]: { ...(prev[secId] || {}), slides: updatedSlides } }
+        })
         setMessage(`📸 Image uploaded successfully for Slide ${slideIndex + 1}!`)
       }
     } catch (err) {
@@ -725,6 +802,7 @@ export default function AdvisorDashboard() {
                                   
                                   {[0, 1, 2].map((slideIndex) => {
                                     const slide = (values.slides && Array.isArray(values.slides) && values.slides[slideIndex]) || {};
+                                    const slideImage = slide.bg || slide.image_url || '';
                                     return (
                                       <div key={slideIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                                         <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
@@ -738,9 +816,9 @@ export default function AdvisorDashboard() {
                                               <label className="block text-xs font-extrabold text-[#0B1B3D]">
                                                 Background Image for Slide {slideIndex + 1}
                                               </label>
-                                              {slide.bg && (
+                                              {slideImage && (
                                                 <span className="text-[11px] font-mono bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full truncate max-w-xs">
-                                                  {slide.bg}
+                                                  {selectedLocalValue(slideImage) || slideImage}
                                                 </span>
                                               )}
                                             </div>
@@ -765,6 +843,13 @@ export default function AdvisorDashboard() {
                                                 {uploadingState[`${secId}-${slideIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
                                                 )}
+                                                {slideImage && (slideImage.startsWith('blob:') || slideImage.includes('/uploads') || /^https?:/i.test(slideImage)) && (
+                                                  <img
+                                                    src={absoluteAssetUrl(slideImage)}
+                                                    alt={`Slide ${slideIndex + 1} preview`}
+                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
+                                                  />
+                                                )}
                                               </div>
 
                                               {/* 2. Select Local Template Image */}
@@ -773,16 +858,16 @@ export default function AdvisorDashboard() {
                                                   🎨 Or Select Local Template Image
                                                 </label>
                                                 <select
-                                                  value={slide.bg || ''}
+                                                  value={selectedLocalValue(slideImage)}
                                                   onChange={(e) => {
                                                     const updatedSlides = [...(values.slides || [{}, {}, {}])];
-                                                    updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: e.target.value, id: slideIndex + 1 };
+                                                    updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: e.target.value, image_url: e.target.value, id: slideIndex + 1 };
                                                     handleFieldValueChange(secId, 'slides', updatedSlides);
                                                   }}
                                                   className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
                                                 >
                                                   <option value="">-- Choose Local Template Image --</option>
-                                                  {LOCAL_HERO_PRESETS.map(preset => (
+                                                  {LOCAL_TEMPLATE_IMAGES.map(preset => (
                                                     <option key={preset.value} value={preset.value}>{preset.label}</option>
                                                   ))}
                                                 </select>
@@ -796,13 +881,13 @@ export default function AdvisorDashboard() {
                                               </label>
                                               <input
                                                 type="text"
-                                                value={slide.bg || ''}
+                                                value={slideImage}
                                                 onChange={(e) => {
                                                   const updatedSlides = [...(values.slides || [{}, {}, {}])];
-                                                  updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: e.target.value, id: slideIndex + 1 };
+                                                  updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: e.target.value, image_url: e.target.value, id: slideIndex + 1 };
                                                   handleFieldValueChange(secId, 'slides', updatedSlides);
                                                 }}
-                                                placeholder="e.g. /uploads/170000_image.jpg or bg-slider-01.jpg"
+                                                placeholder="e.g. intime-08 or /uploads/170000_image.jpg"
                                                 className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
                                               />
                                             </div>
@@ -954,14 +1039,26 @@ export default function AdvisorDashboard() {
                                     />
                                   </div>
                                   <div className="md:col-span-2">
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">Image URL</label>
-                                    <input
-                                      type="text"
-                                      value={values.image_url || ''}
-                                      onChange={(e) => handleFieldValueChange(secId, 'image_url', e.target.value)}
-                                      placeholder="https://..."
-                                      className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
-                                    />
+                                    <label className="block text-xs font-bold text-gray-700 mb-1">Image</label>
+                                    <div className="grid md:grid-cols-2 gap-3 mb-2">
+                                      <select
+                                        value={selectedLocalValue(values.image_url)}
+                                        onChange={(e) => handleFieldValueChange(secId, 'image_url', e.target.value)}
+                                        className="w-full text-xs p-2 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
+                                      >
+                                        <option value="">-- Choose Local Template Image --</option>
+                                        {LOCAL_TEMPLATE_IMAGES.map(preset => (
+                                          <option key={preset.value} value={preset.value}>{preset.label}</option>
+                                        ))}
+                                      </select>
+                                      <input
+                                        type="text"
+                                        value={values.image_url || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'image_url', e.target.value)}
+                                        placeholder="intime-08"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                      />
+                                    </div>
                                   </div>
                                   <div>
                                     <label className="block text-xs font-bold text-gray-700 mb-1">Button Text</label>
