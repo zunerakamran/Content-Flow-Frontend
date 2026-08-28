@@ -102,10 +102,15 @@ function selectedLocalValue(path, catalog) {
   return (catalog || []).some((p) => p.value === stem) ? stem : ''
 }
 
-function resolveUploadedAsset(data) {
-  if (data?.relative_url) return absoluteAssetUrl(data.relative_url)
-  if (data?.url) return absoluteAssetUrl(data.url)
-  return ''
+function storedUploadPath(data) {
+  const path = data?.relative_url || data?.url || ''
+  if (!path || /^data:/i.test(path)) return ''
+  const name = String(path).split('/').pop().split('?')[0]
+  if (!name) return ''
+  if (path.includes('/uploaded-images') || path.includes('/uploads/')) {
+    return `/uploaded-images/${name}`
+  }
+  return path.startsWith('/') ? path : `/uploaded-images/${name}`
 }
 
 function localThumbSrc(path, catalog) {
@@ -125,19 +130,26 @@ function editorPreviewSrc(slideImage, catalog) {
   return localThumbSrc(slideImage, catalog)
 }
 
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.onerror = () => reject(reader.error)
-    reader.readAsDataURL(file)
-  })
+function stripDataImageUrls(value) {
+  if (typeof value === 'string') {
+    return /^data:/i.test(value) ? '' : value
+  }
+  if (Array.isArray(value)) return value.map(stripDataImageUrls)
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, stripDataImageUrls(nested)]))
+  }
+  return value
 }
 
 function sanitizeSectionContent(content) {
   if (!content || typeof content !== 'object') return content || {}
   const { preview_slide, ...rest } = content
-  return rest
+  return stripDataImageUrls(rest)
+}
+
+function displayImagePath(url) {
+  if (!url || /^data:/i.test(url)) return ''
+  return url
 }
 
 export function parseJson(str) {
@@ -174,6 +186,7 @@ export default function AdvisorDashboard() {
   const [secondaryColor, setSecondaryColor] = useState('#C8102E')
   const [isSubmittingTemplate, setIsSubmittingTemplate] = useState(false)
   const [uploadingState, setUploadingState] = useState({})
+  const [localPreviewUrls, setLocalPreviewUrls] = useState({})
   const [localImages, setLocalImages] = useState(LOCAL_TEMPLATE_IMAGES)
   const [previewSlide, setPreviewSlide] = useState({})
 
@@ -187,29 +200,24 @@ export default function AdvisorDashboard() {
       .catch(() => {})
   }, [])
 
+  const setLocalPreview = (key, file) => {
+    setLocalPreviewUrls((prev) => {
+      if (prev[key]) URL.revokeObjectURL(prev[key])
+      return { ...prev, [key]: URL.createObjectURL(file) }
+    })
+  }
+
   const handleSlideImageUpload = async (secId, slideIndex, file) => {
     if (!file) return
     const uploadKey = `${secId}-${slideIndex}`
     setPreviewSlide((prev) => ({ ...prev, [secId]: slideIndex }))
-
-    try {
-      const dataUrl = await fileToDataUrl(file)
-      setSectionEdits((prev) => {
-        const currentSlides = prev[secId]?.slides || [{}, {}, {}]
-        const updatedSlides = [...currentSlides]
-        updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: dataUrl, image_url: dataUrl, id: slideIndex + 1 }
-        return { ...prev, [secId]: { ...(prev[secId] || {}), slides: updatedSlides } }
-      })
-    } catch (_) {
-      // Fall through to server upload even if local preview encoding fails.
-    }
-
+    setLocalPreview(uploadKey, file)
     setUploadingState((prev) => ({ ...prev, [uploadKey]: true }))
     try {
       const formData = new FormData()
       formData.append('image', file)
       const res = await api.post('/upload-image', formData)
-      const uploadedUrl = resolveUploadedAsset(res.data)
+      const uploadedUrl = storedUploadPath(res.data)
       if (uploadedUrl) {
         setSectionEdits((prev) => {
           const currentSlides = prev[secId]?.slides || [{}, {}, {}]
@@ -218,6 +226,8 @@ export default function AdvisorDashboard() {
           return { ...prev, [secId]: { ...(prev[secId] || {}), slides: updatedSlides } }
         })
         setMessage(`📸 Image uploaded successfully for Slide ${slideIndex + 1}!`)
+      } else {
+        setError('Upload succeeded but no image path was returned.')
       }
     } catch (err) {
       const fieldError = err.response?.data?.errors?.image?.[0]
@@ -230,25 +240,13 @@ export default function AdvisorDashboard() {
   const handleBoxImageUpload = async (secId, boxIndex, file) => {
     if (!file) return
     const uploadKey = `box-${secId}-${boxIndex}`
-
-    try {
-      const dataUrl = await fileToDataUrl(file)
-      setSectionEdits((prev) => {
-        const currentBoxes = prev[secId]?.boxes || prev[secId]?.items || [{}, {}, {}]
-        const updatedBoxes = [0, 1, 2].map((i) => ({ ...(currentBoxes[i] || {}) }))
-        updatedBoxes[boxIndex] = { ...updatedBoxes[boxIndex], image_url: dataUrl }
-        return { ...prev, [secId]: { ...(prev[secId] || {}), boxes: updatedBoxes } }
-      })
-    } catch (_) {
-      // Fall through to server upload even if local preview encoding fails.
-    }
-
+    setLocalPreview(uploadKey, file)
     setUploadingState((prev) => ({ ...prev, [uploadKey]: true }))
     try {
       const formData = new FormData()
       formData.append('image', file)
       const res = await api.post('/upload-image', formData)
-      const uploadedUrl = resolveUploadedAsset(res.data)
+      const uploadedUrl = storedUploadPath(res.data)
       if (uploadedUrl) {
         setSectionEdits((prev) => {
           const currentBoxes = prev[secId]?.boxes || prev[secId]?.items || [{}, {}, {}]
@@ -257,6 +255,8 @@ export default function AdvisorDashboard() {
           return { ...prev, [secId]: { ...(prev[secId] || {}), boxes: updatedBoxes } }
         })
         setMessage(`📸 Image uploaded successfully for Box ${boxIndex + 1}!`)
+      } else {
+        setError('Upload succeeded but no image path was returned.')
       }
     } catch (err) {
       const fieldError = err.response?.data?.errors?.image?.[0]
@@ -457,6 +457,11 @@ export default function AdvisorDashboard() {
   const handleBatchSubmit = async () => {
     if (checkedSectionIds.length === 0) {
       setError('Please select at least one section to edit and submit.')
+      return
+    }
+
+    if (Object.values(uploadingState).some(Boolean)) {
+      setError('Please wait for the image upload to finish before submitting.')
       return
     }
 
@@ -945,9 +950,9 @@ export default function AdvisorDashboard() {
                                               <label className="block text-xs font-extrabold text-[#0B1B3D]">
                                                 Background Image for Slide {slideIndex + 1}
                                               </label>
-                                              {slideImage && (
+                                              {displayImagePath(slideImage) && (
                                                 <span className="text-[11px] font-mono bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full truncate max-w-xs">
-                                                  {selectedLocalValue(slideImage, localImages) || slideImage}
+                                                  {selectedLocalValue(slideImage, localImages) || displayImagePath(slideImage)}
                                                 </span>
                                               )}
                                             </div>
@@ -972,9 +977,9 @@ export default function AdvisorDashboard() {
                                                 {uploadingState[`${secId}-${slideIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
                                                 )}
-                                                {editorPreviewSrc(slideImage, localImages) && (
+                                                {(localPreviewUrls[`${secId}-${slideIndex}`] || editorPreviewSrc(displayImagePath(slideImage), localImages)) && (
                                                   <img
-                                                    src={editorPreviewSrc(slideImage, localImages)}
+                                                    src={localPreviewUrls[`${secId}-${slideIndex}`] || editorPreviewSrc(displayImagePath(slideImage), localImages)}
                                                     alt={`Slide ${slideIndex + 1} preview`}
                                                     className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
                                                   />
@@ -1018,7 +1023,7 @@ export default function AdvisorDashboard() {
                                               </label>
                                               <input
                                                 type="text"
-                                                value={slideImage}
+                                                value={displayImagePath(slideImage)}
                                                 onChange={(e) => {
                                                   const updatedSlides = [...(values.slides || [{}, {}, {}])];
                                                   updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: e.target.value, image_url: e.target.value, id: slideIndex + 1 };
@@ -1201,9 +1206,9 @@ export default function AdvisorDashboard() {
                                                 {uploadingState[`box-${secId}-${boxIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
                                                 )}
-                                                {editorPreviewSrc(boxImage, localImages) && (
+                                                {(localPreviewUrls[`box-${secId}-${boxIndex}`] || editorPreviewSrc(displayImagePath(boxImage), localImages)) && (
                                                   <img
-                                                    src={editorPreviewSrc(boxImage, localImages)}
+                                                    src={localPreviewUrls[`box-${secId}-${boxIndex}`] || editorPreviewSrc(displayImagePath(boxImage), localImages)}
                                                     alt={`Box ${boxIndex + 1} preview`}
                                                     className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
                                                   />
@@ -1225,7 +1230,7 @@ export default function AdvisorDashboard() {
                                             </div>
                                             <input
                                               type="text"
-                                              value={boxImage}
+                                              value={displayImagePath(boxImage)}
                                               onChange={(e) => patchBox(secId, boxIndex, { image_url: e.target.value })}
                                               placeholder="intime-12 or /uploads/image.jpg"
                                               className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
