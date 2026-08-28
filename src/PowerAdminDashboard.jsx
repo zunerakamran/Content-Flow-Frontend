@@ -412,15 +412,16 @@ export default function PowerAdminDashboard() {
 
                         <form onSubmit={handleDeploySubmit} className="space-y-4">
                             <div>
-                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">cPanel Advisor Domain URL *</label>
+                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Advisor site URL (where template4/api.php lives) *</label>
                                 <input
                                     type="url"
                                     required
-                                    placeholder="https://advisor-domain.com"
+                                    placeholder="https://epatronus.space/template4"
                                     value={cpanelDomain}
                                     onChange={e => setCpanelDomain(e.target.value)}
                                     className="w-full text-sm p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E]"
                                 />
+                                <p className="text-[11px] text-gray-500 mt-1">Use the advisor template folder, e.g. https://epatronus.space/template4 — not the central hub.</p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">

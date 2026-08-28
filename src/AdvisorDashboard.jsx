@@ -146,6 +146,11 @@ export function parseJson(str) {
   try { return JSON.parse(str) } catch { return { heading: str } }
 }
 
+function isWhatWeDoSection(name) {
+  const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return key === 'whatwedo' || key === 'featurescarousel' || key === 'features'
+}
+
 export default function AdvisorDashboard() {
   const { user } = useAuth()
   const [pages, setPages] = useState([])
@@ -213,6 +218,45 @@ export default function AdvisorDashboard() {
           return { ...prev, [secId]: { ...(prev[secId] || {}), slides: updatedSlides } }
         })
         setMessage(`📸 Image uploaded successfully for Slide ${slideIndex + 1}!`)
+      }
+    } catch (err) {
+      const fieldError = err.response?.data?.errors?.image?.[0]
+      setError(fieldError || err.response?.data?.message || 'Failed to upload image.')
+    } finally {
+      setUploadingState((prev) => ({ ...prev, [uploadKey]: false }))
+    }
+  }
+
+  const handleBoxImageUpload = async (secId, boxIndex, file) => {
+    if (!file) return
+    const uploadKey = `box-${secId}-${boxIndex}`
+
+    try {
+      const dataUrl = await fileToDataUrl(file)
+      setSectionEdits((prev) => {
+        const currentBoxes = prev[secId]?.boxes || prev[secId]?.items || [{}, {}, {}]
+        const updatedBoxes = [0, 1, 2].map((i) => ({ ...(currentBoxes[i] || {}) }))
+        updatedBoxes[boxIndex] = { ...updatedBoxes[boxIndex], image_url: dataUrl }
+        return { ...prev, [secId]: { ...(prev[secId] || {}), boxes: updatedBoxes } }
+      })
+    } catch (_) {
+      // Fall through to server upload even if local preview encoding fails.
+    }
+
+    setUploadingState((prev) => ({ ...prev, [uploadKey]: true }))
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await api.post('/upload-image', formData)
+      const uploadedUrl = resolveUploadedAsset(res.data)
+      if (uploadedUrl) {
+        setSectionEdits((prev) => {
+          const currentBoxes = prev[secId]?.boxes || prev[secId]?.items || [{}, {}, {}]
+          const updatedBoxes = [0, 1, 2].map((i) => ({ ...(currentBoxes[i] || {}) }))
+          updatedBoxes[boxIndex] = { ...updatedBoxes[boxIndex], image_url: uploadedUrl }
+          return { ...prev, [secId]: { ...(prev[secId] || {}), boxes: updatedBoxes } }
+        })
+        setMessage(`📸 Image uploaded successfully for Box ${boxIndex + 1}!`)
       }
     } catch (err) {
       const fieldError = err.response?.data?.errors?.image?.[0]
@@ -399,6 +443,15 @@ export default function AdvisorDashboard() {
         [fieldKey]: value
       }
     }))
+  }
+
+  const patchBox = (secId, boxIndex, patch) => {
+    setSectionEdits((prev) => {
+      const source = prev[secId]?.boxes || prev[secId]?.items || [{}, {}, {}]
+      const boxes = [0, 1, 2].map((i) => ({ ...(source[i] || {}) }))
+      boxes[boxIndex] = { ...boxes[boxIndex], ...patch }
+      return { ...prev, [secId]: { ...(prev[secId] || {}), boxes } }
+    })
   }
 
   const handleBatchSubmit = async () => {
@@ -1079,6 +1132,150 @@ export default function AdvisorDashboard() {
                                     );
                                   })}
                                 </div>
+                              ) : isWhatWeDoSection(section.name) ? (
+                                <div className="space-y-8">
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">What we do</h4>
+                                    <p className="text-xs text-gray-600">Edit the red subheading, main heading, intro text, and the three service boxes.</p>
+                                  </div>
+
+                                  <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
+                                      <input
+                                        type="text"
+                                        value={values.subheading || values.eyebrow || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
+                                        placeholder="WHAT WE DO"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold tracking-wider uppercase"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Main Heading</label>
+                                      <input
+                                        type="text"
+                                        value={values.heading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'heading', e.target.value)}
+                                        placeholder="We are the best agency to improve your deals."
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none font-semibold text-[#0B1B3D]"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Text</label>
+                                      <textarea
+                                        rows={3}
+                                        value={values.text || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'text', e.target.value)}
+                                        placeholder="Section introduction..."
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {[0, 1, 2].map((boxIndex) => {
+                                    const box = (values.boxes && values.boxes[boxIndex]) || (values.items && values.items[boxIndex]) || {}
+                                    const boxImage = box.image_url || box.img || box.image || ''
+                                    return (
+                                      <div key={boxIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
+                                          <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">{boxIndex + 1}</span>
+                                          Box {boxIndex + 1}
+                                        </h5>
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                          <div className="md:col-span-2 space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
+                                            <label className="block text-xs font-extrabold text-[#0B1B3D]">Box Image</label>
+                                            <div className="grid md:grid-cols-2 gap-3">
+                                              <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">📁 Upload Custom Image</label>
+                                                <input
+                                                  type="file"
+                                                  accept="image/*"
+                                                  disabled={uploadingState[`box-${secId}-${boxIndex}`]}
+                                                  onChange={(e) => {
+                                                    if (e.target.files && e.target.files[0]) {
+                                                      handleBoxImageUpload(secId, boxIndex, e.target.files[0])
+                                                    }
+                                                  }}
+                                                  className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
+                                                />
+                                                {uploadingState[`box-${secId}-${boxIndex}`] && (
+                                                  <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
+                                                )}
+                                                {editorPreviewSrc(boxImage, localImages) && (
+                                                  <img
+                                                    src={editorPreviewSrc(boxImage, localImages)}
+                                                    alt={`Box ${boxIndex + 1} preview`}
+                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
+                                                  />
+                                                )}
+                                              </div>
+                                              <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
+                                                <select
+                                                  value={selectedLocalValue(boxImage, localImages)}
+                                                  onChange={(e) => patchBox(secId, boxIndex, { image_url: e.target.value })}
+                                                  className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
+                                                >
+                                                  <option value="">-- Choose Local Template Image --</option>
+                                                  {localImages.map(preset => (
+                                                    <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
+                                                  ))}
+                                                </select>
+                                              </div>
+                                            </div>
+                                            <input
+                                              type="text"
+                                              value={boxImage}
+                                              onChange={(e) => patchBox(secId, boxIndex, { image_url: e.target.value })}
+                                              placeholder="intime-12 or /uploads/image.jpg"
+                                              className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Heading</label>
+                                            <input
+                                              type="text"
+                                              value={box.heading || box.title || ''}
+                                              onChange={(e) => patchBox(secId, boxIndex, { heading: e.target.value })}
+                                              placeholder="Business & Strategy"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none font-semibold text-[#0B1B3D]"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Text</label>
+                                            <textarea
+                                              rows={2}
+                                              value={box.text || ''}
+                                              onChange={(e) => patchBox(secId, boxIndex, { text: e.target.value })}
+                                              placeholder="Box description..."
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Read more button</label>
+                                            <input
+                                              type="text"
+                                              value={box.button_text || 'Read more'}
+                                              onChange={(e) => patchBox(secId, boxIndex, { button_text: e.target.value })}
+                                              placeholder="Read more"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">URL</label>
+                                            <input
+                                              type="text"
+                                              value={box.button_url || box.url || ''}
+                                              onChange={(e) => patchBox(secId, boxIndex, { button_url: e.target.value })}
+                                              placeholder="#services"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
                               ) : (
                                 // Standard Section Editor
                                 <div className="grid md:grid-cols-2 gap-4">
@@ -1190,7 +1387,7 @@ export default function AdvisorDashboard() {
                               <SectionIframePreview
                                 sectionName={section.name}
                                 data={{ ...values, preview_slide: previewSlide[secId] ?? 0 }}
-                                height={520}
+                                height={isWhatWeDoSection(section.name) ? 720 : 520}
                                 borderColor="border-[#C8102E]"
                               />
                             </div>
