@@ -20,6 +20,18 @@ const MIME = {
   '.gif': 'image/gif',
 }
 
+function listLocalTemplateImages() {
+  if (!fs.existsSync(TEMPLATE4_IMAGES)) return []
+  return fs.readdirSync(TEMPLATE4_IMAGES)
+    .filter((name) => MIME[path.extname(name).toLowerCase()])
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+    .map((name) => ({
+      label: name.replace(/\.[^.]+$/, ''),
+      value: name.replace(/\.[^.]+$/, ''),
+      file: name,
+    }))
+}
+
 /**
  * Dev server plugin: serves /assets/intime/* from
  * template4 assets folder without needing files in /public.
@@ -35,7 +47,13 @@ function template4AssetsPlugin() {
     configureServer(server) {
       server.middlewares.use('/assets/intime', (req, res, next) => {
         if (!fs.existsSync(TEMPLATE4_IMAGES)) return next()
-        const filePath = path.join(TEMPLATE4_IMAGES, decodeURIComponent(req.url))
+        const urlPath = decodeURIComponent((req.url || '').split('?')[0] || '').replace(/^\//, '')
+        if (urlPath === 'index.json') {
+          res.setHeader('Content-Type', 'application/json')
+          res.end(JSON.stringify(listLocalTemplateImages()))
+          return
+        }
+        const filePath = path.join(TEMPLATE4_IMAGES, urlPath)
         if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
           const ext = path.extname(filePath).toLowerCase()
           res.setHeader('Content-Type', MIME[ext] || 'application/octet-stream')
@@ -76,6 +94,10 @@ function template4AssetsPlugin() {
       }
 
       copyDir(TEMPLATE4_IMAGES, destDir)
+      fs.writeFileSync(
+        path.join(destDir, 'index.json'),
+        JSON.stringify(listLocalTemplateImages())
+      )
       console.log(`✅ Copied template4 images → ${destDir}`)
     },
   }

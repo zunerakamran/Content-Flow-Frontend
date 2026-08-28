@@ -58,26 +58,73 @@ const LOCAL_TEMPLATE_IMAGES = [
   { label: 'testimonial-04', value: 'testimonial-04' },
 ]
 
-const LOCAL_IMAGE_VALUES = new Set(LOCAL_TEMPLATE_IMAGES.map((p) => p.value))
+const PNG_STEMS = new Set(['logo-dark', 'logo-light', 'logo-mobile', 'maps-point', 'placeholder'])
+
+LOCAL_TEMPLATE_IMAGES.forEach((item) => {
+  item.file = `${item.value}.${PNG_STEMS.has(item.value) ? 'png' : 'jpg'}`
+})
 
 function imageStem(path) {
   if (!path || typeof path !== 'string') return ''
   return path.split('/').pop().split('?')[0].replace(/\.[a-zA-Z0-9]+$/, '')
 }
 
-function selectedLocalValue(path) {
+function selectedLocalValue(path, catalog) {
   const stem = imageStem(path)
-  return LOCAL_IMAGE_VALUES.has(stem) ? stem : ''
+  return (catalog || []).some((p) => p.value === stem) ? stem : ''
 }
 
 function absoluteAssetUrl(url) {
   if (!url) return ''
-  if (/^(https?:|data:|blob:)/i.test(url)) return url
+  if (/^(data:|blob:)/i.test(url)) return url
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)/i.test(url) && url.includes('/uploads/')) {
+    const rest = url.split('/uploads/').pop()
+    return `${UPLOADS_ORIGIN}/uploads/${rest}`
+  }
+  if (/^(https?:)/i.test(url)) return url
   if (url.startsWith('/uploads') || url.includes('/uploads/')) {
     const path = url.startsWith('/') ? url : `/${url}`
     return `${UPLOADS_ORIGIN}${path}`
   }
   return url
+}
+
+function resolveUploadedAsset(data) {
+  if (data?.relative_url) return absoluteAssetUrl(data.relative_url)
+  if (data?.url) return absoluteAssetUrl(data.url)
+  return ''
+}
+
+function localThumbSrc(path, catalog) {
+  const stem = imageStem(path)
+  const hit = (catalog || []).find((p) => p.value === stem)
+  if (!hit) return ''
+  const file = hit.file || `${stem}.jpg`
+  const base = import.meta.env.BASE_URL || '/'
+  return `${base}assets/intime/${file}`.replace(/([^:]\/)\/+/g, '$1')
+}
+
+function editorPreviewSrc(slideImage, catalog) {
+  if (!slideImage) return ''
+  if (/^(data:|blob:)/i.test(slideImage) || slideImage.includes('/uploads') || /^https?:/i.test(slideImage)) {
+    return absoluteAssetUrl(slideImage)
+  }
+  return localThumbSrc(slideImage, catalog)
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result || ''))
+    reader.onerror = () => reject(reader.error)
+    reader.readAsDataURL(file)
+  })
+}
+
+function sanitizeSectionContent(content) {
+  if (!content || typeof content !== 'object') return content || {}
+  const { preview_slide, ...rest } = content
+  return rest
 }
 
 export function parseJson(str) {
@@ -109,29 +156,46 @@ export default function AdvisorDashboard() {
   const [secondaryColor, setSecondaryColor] = useState('#C8102E')
   const [isSubmittingTemplate, setIsSubmittingTemplate] = useState(false)
   const [uploadingState, setUploadingState] = useState({})
+  const [localImages, setLocalImages] = useState(LOCAL_TEMPLATE_IMAGES)
+  const [previewSlide, setPreviewSlide] = useState({})
+
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL || '/'
+    fetch(`${base}assets/intime/index.json`)
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((list) => {
+        if (Array.isArray(list) && list.length) setLocalImages(list)
+      })
+      .catch(() => {})
+  }, [])
 
   const handleSlideImageUpload = async (secId, slideIndex, file) => {
     if (!file) return
     const uploadKey = `${secId}-${slideIndex}`
-    const blobUrl = URL.createObjectURL(file)
+    setPreviewSlide((prev) => ({ ...prev, [secId]: slideIndex }))
 
-    setSectionEdits(prev => {
-      const currentSlides = prev[secId]?.slides || [{}, {}, {}]
-      const updatedSlides = [...currentSlides]
-          updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: blobUrl, image_url: blobUrl, id: slideIndex + 1 }
-      return { ...prev, [secId]: { ...(prev[secId] || {}), slides: updatedSlides } }
-    })
+    try {
+      const dataUrl = await fileToDataUrl(file)
+      setSectionEdits((prev) => {
+        const currentSlides = prev[secId]?.slides || [{}, {}, {}]
+        const updatedSlides = [...currentSlides]
+        updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: dataUrl, image_url: dataUrl, id: slideIndex + 1 }
+        return { ...prev, [secId]: { ...(prev[secId] || {}), slides: updatedSlides } }
+      })
+    } catch (_) {
+      // Fall through to server upload even if local preview encoding fails.
+    }
 
-    setUploadingState(prev => ({ ...prev, [uploadKey]: true }))
+    setUploadingState((prev) => ({ ...prev, [uploadKey]: true }))
     try {
       const formData = new FormData()
       formData.append('image', file)
       const res = await api.post('/upload-image', formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       })
-      const uploadedUrl = absoluteAssetUrl(res.data?.url || res.data?.relative_url)
+      const uploadedUrl = resolveUploadedAsset(res.data)
       if (uploadedUrl) {
-        setSectionEdits(prev => {
+        setSectionEdits((prev) => {
           const currentSlides = prev[secId]?.slides || [{}, {}, {}]
           const updatedSlides = [...currentSlides]
           updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: uploadedUrl, image_url: uploadedUrl, id: slideIndex + 1 }
@@ -142,7 +206,7 @@ export default function AdvisorDashboard() {
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to upload image.')
     } finally {
-      setUploadingState(prev => ({ ...prev, [uploadKey]: false }))
+      setUploadingState((prev) => ({ ...prev, [uploadKey]: false }))
     }
   }
 
@@ -337,7 +401,7 @@ export default function AdvisorDashboard() {
 
     const batchPayload = checkedSectionIds.map(secId => ({
       section_id: secId,
-      proposed_content: JSON.stringify(sectionEdits[secId] || {}, null, 2)
+      proposed_content: JSON.stringify(sanitizeSectionContent(sectionEdits[secId] || {}), null, 2)
     }))
 
     try {
@@ -818,7 +882,7 @@ export default function AdvisorDashboard() {
                                               </label>
                                               {slideImage && (
                                                 <span className="text-[11px] font-mono bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full truncate max-w-xs">
-                                                  {selectedLocalValue(slideImage) || slideImage}
+                                                  {selectedLocalValue(slideImage, localImages) || slideImage}
                                                 </span>
                                               )}
                                             </div>
@@ -843,9 +907,9 @@ export default function AdvisorDashboard() {
                                                 {uploadingState[`${secId}-${slideIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
                                                 )}
-                                                {slideImage && (slideImage.startsWith('blob:') || slideImage.includes('/uploads') || /^https?:/i.test(slideImage)) && (
+                                                {editorPreviewSrc(slideImage, localImages) && (
                                                   <img
-                                                    src={absoluteAssetUrl(slideImage)}
+                                                    src={editorPreviewSrc(slideImage, localImages)}
                                                     alt={`Slide ${slideIndex + 1} preview`}
                                                     className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
                                                   />
@@ -858,19 +922,27 @@ export default function AdvisorDashboard() {
                                                   🎨 Or Select Local Template Image
                                                 </label>
                                                 <select
-                                                  value={selectedLocalValue(slideImage)}
+                                                  value={selectedLocalValue(slideImage, localImages)}
                                                   onChange={(e) => {
                                                     const updatedSlides = [...(values.slides || [{}, {}, {}])];
                                                     updatedSlides[slideIndex] = { ...updatedSlides[slideIndex], bg: e.target.value, image_url: e.target.value, id: slideIndex + 1 };
                                                     handleFieldValueChange(secId, 'slides', updatedSlides);
+                                                    setPreviewSlide((prev) => ({ ...prev, [secId]: slideIndex }));
                                                   }}
                                                   className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
                                                 >
                                                   <option value="">-- Choose Local Template Image --</option>
-                                                  {LOCAL_TEMPLATE_IMAGES.map(preset => (
-                                                    <option key={preset.value} value={preset.value}>{preset.label}</option>
+                                                  {localImages.map(preset => (
+                                                    <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
                                                   ))}
                                                 </select>
+                                                {localThumbSrc(slideImage, localImages) && (
+                                                  <img
+                                                    src={localThumbSrc(slideImage, localImages)}
+                                                    alt={imageStem(slideImage)}
+                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
+                                                  />
+                                                )}
                                               </div>
                                             </div>
 
@@ -1042,13 +1114,13 @@ export default function AdvisorDashboard() {
                                     <label className="block text-xs font-bold text-gray-700 mb-1">Image</label>
                                     <div className="grid md:grid-cols-2 gap-3 mb-2">
                                       <select
-                                        value={selectedLocalValue(values.image_url)}
+                                        value={selectedLocalValue(values.image_url, localImages)}
                                         onChange={(e) => handleFieldValueChange(secId, 'image_url', e.target.value)}
                                         className="w-full text-xs p-2 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
                                       >
                                         <option value="">-- Choose Local Template Image --</option>
-                                        {LOCAL_TEMPLATE_IMAGES.map(preset => (
-                                          <option key={preset.value} value={preset.value}>{preset.label}</option>
+                                        {localImages.map(preset => (
+                                          <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
                                         ))}
                                       </select>
                                       <input
@@ -1059,6 +1131,13 @@ export default function AdvisorDashboard() {
                                         className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
                                       />
                                     </div>
+                                    {editorPreviewSrc(values.image_url, localImages) && (
+                                      <img
+                                        src={editorPreviewSrc(values.image_url, localImages)}
+                                        alt="Section image preview"
+                                        className="w-full h-28 object-cover rounded border border-gray-200"
+                                      />
+                                    )}
                                   </div>
                                   <div>
                                     <label className="block text-xs font-bold text-gray-700 mb-1">Button Text</label>
@@ -1098,7 +1177,7 @@ export default function AdvisorDashboard() {
                               {/* Real template4 component rendered inside an iframe via postMessage */}
                               <SectionIframePreview
                                 sectionName={section.name}
-                                data={values}
+                                data={{ ...values, preview_slide: previewSlide[secId] ?? 0 }}
                                 height={520}
                                 borderColor="border-[#C8102E]"
                               />
