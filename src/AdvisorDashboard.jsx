@@ -4,7 +4,35 @@ import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import SectionIframePreview from './SectionIframePreview'
 
-const UPLOADS_ORIGIN = String(api.defaults.baseURL || '').replace(/\/api\/?$/, '')
+const API_BASE = String(api.defaults.baseURL || '').replace(/\/$/, '')
+
+function isUploadedAsset(url) {
+  return typeof url === 'string' && (
+    url.startsWith('/uploaded-images') ||
+    url.includes('/uploaded-images/') ||
+    url.startsWith('/uploads') ||
+    url.includes('/uploads/')
+  )
+}
+
+function absoluteAssetUrl(url) {
+  if (!url) return ''
+  if (/^(data:|blob:)/i.test(url)) return url
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)/i.test(url) && isUploadedAsset(url)) {
+    const name = url.split('/').pop()
+    return `${API_BASE}/uploaded-images/${name}`
+  }
+  if (/^(https?:)/i.test(url)) return url
+  if (url.startsWith('/uploaded-images') || url.includes('/uploaded-images/')) {
+    const name = url.split('/').pop()
+    return `${API_BASE}/uploaded-images/${name}`
+  }
+  if (url.startsWith('/uploads') || url.includes('/uploads/')) {
+    const name = url.split('/').pop()
+    return `${API_BASE}/uploaded-images/${name}`
+  }
+  return url
+}
 
 const LOCAL_TEMPLATE_IMAGES = [
   { label: 'banner1', value: 'banner1' },
@@ -74,21 +102,6 @@ function selectedLocalValue(path, catalog) {
   return (catalog || []).some((p) => p.value === stem) ? stem : ''
 }
 
-function absoluteAssetUrl(url) {
-  if (!url) return ''
-  if (/^(data:|blob:)/i.test(url)) return url
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)/i.test(url) && url.includes('/uploads/')) {
-    const rest = url.split('/uploads/').pop()
-    return `${UPLOADS_ORIGIN}/uploads/${rest}`
-  }
-  if (/^(https?:)/i.test(url)) return url
-  if (url.startsWith('/uploads') || url.includes('/uploads/')) {
-    const path = url.startsWith('/') ? url : `/${url}`
-    return `${UPLOADS_ORIGIN}${path}`
-  }
-  return url
-}
-
 function resolveUploadedAsset(data) {
   if (data?.relative_url) return absoluteAssetUrl(data.relative_url)
   if (data?.url) return absoluteAssetUrl(data.url)
@@ -106,7 +119,7 @@ function localThumbSrc(path, catalog) {
 
 function editorPreviewSrc(slideImage, catalog) {
   if (!slideImage) return ''
-  if (/^(data:|blob:)/i.test(slideImage) || slideImage.includes('/uploads') || /^https?:/i.test(slideImage)) {
+  if (/^(data:|blob:)/i.test(slideImage) || isUploadedAsset(slideImage) || /^https?:/i.test(slideImage)) {
     return absoluteAssetUrl(slideImage)
   }
   return localThumbSrc(slideImage, catalog)
@@ -190,9 +203,7 @@ export default function AdvisorDashboard() {
     try {
       const formData = new FormData()
       formData.append('image', file)
-      const res = await api.post('/upload-image', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
+      const res = await api.post('/upload-image', formData)
       const uploadedUrl = resolveUploadedAsset(res.data)
       if (uploadedUrl) {
         setSectionEdits((prev) => {
@@ -204,7 +215,8 @@ export default function AdvisorDashboard() {
         setMessage(`📸 Image uploaded successfully for Slide ${slideIndex + 1}!`)
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to upload image.')
+      const fieldError = err.response?.data?.errors?.image?.[0]
+      setError(fieldError || err.response?.data?.message || 'Failed to upload image.')
     } finally {
       setUploadingState((prev) => ({ ...prev, [uploadKey]: false }))
     }
