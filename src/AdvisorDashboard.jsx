@@ -163,6 +163,35 @@ function isWhatWeDoSection(name) {
   return key === 'whatwedo' || key === 'featurescarousel' || key === 'features'
 }
 
+function isAboutSection(name) {
+  const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return key === 'aboutsection' || key === 'about' || key === 'aboutus'
+}
+
+function defaultAboutGauges() {
+  return [
+    { value: '50%', label: 'Business strategy growth' },
+    { value: '75%', label: 'Finance valuable ideas' },
+  ]
+}
+
+function normalizeAboutEditorContent(content) {
+  const c = content && typeof content === 'object' ? { ...content } : {}
+  const defaults = defaultAboutGauges()
+  const list = Array.isArray(c.gauges) && c.gauges.length
+    ? c.gauges
+    : (Array.isArray(c.stats) ? c.stats : [])
+  c.gauges = defaults.map((fallback, i) => ({
+    ...fallback,
+    ...(list[i] || {}),
+  }))
+  if (!c.eyebrow) c.eyebrow = 'ABOUT US'
+  if (!c.experience_years) c.experience_years = c.years || '10+'
+  if (!c.experience_label) c.experience_label = 'Years of Experience'
+  if (!c.image_url) c.image_url = c.image || c.img || ''
+  return c
+}
+
 export default function AdvisorDashboard() {
   const { user } = useAuth()
   const [pages, setPages] = useState([])
@@ -255,6 +284,33 @@ export default function AdvisorDashboard() {
           return { ...prev, [secId]: { ...(prev[secId] || {}), boxes: updatedBoxes } }
         })
         setMessage(`📸 Image uploaded successfully for Box ${boxIndex + 1}!`)
+      } else {
+        setError('Upload succeeded but no image path was returned.')
+      }
+    } catch (err) {
+      const fieldError = err.response?.data?.errors?.image?.[0]
+      setError(fieldError || err.response?.data?.message || 'Failed to upload image.')
+    } finally {
+      setUploadingState((prev) => ({ ...prev, [uploadKey]: false }))
+    }
+  }
+
+  const handleAboutImageUpload = async (secId, file) => {
+    if (!file) return
+    const uploadKey = `about-${secId}`
+    setLocalPreview(uploadKey, file)
+    setUploadingState((prev) => ({ ...prev, [uploadKey]: true }))
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await api.post('upload-image', formData)
+      const uploadedUrl = storedUploadPath(res.data)
+      if (uploadedUrl) {
+        setSectionEdits((prev) => ({
+          ...prev,
+          [secId]: { ...(prev[secId] || {}), image_url: uploadedUrl },
+        }))
+        setMessage('📸 About image uploaded successfully!')
       } else {
         setError('Upload succeeded but no image path was returned.')
       }
@@ -398,7 +454,8 @@ export default function AdvisorDashboard() {
     const initialEdits = {}
     sectionsForAdvisor.forEach(s => {
       if (lockedByMeIds.includes(s.id)) {
-        initialEdits[s.id] = parseJson(s.content)
+        const parsed = parseJson(s.content)
+        initialEdits[s.id] = isAboutSection(s.name) ? normalizeAboutEditorContent(parsed) : parsed
       }
     })
     setSectionEdits(initialEdits)
@@ -425,9 +482,10 @@ export default function AdvisorDashboard() {
       }
 
       setCheckedSectionIds(prev => [...new Set([...prev, section.id])])
+      const parsed = parseJson(section.content)
       setSectionEdits(prev => ({
         ...prev,
-        [section.id]: parseJson(section.content)
+        [section.id]: isAboutSection(section.name) ? normalizeAboutEditorContent(parsed) : parsed
       }))
       setMessage(`🔒 Section "${section.name}" locked for you. You can now edit its content.`)
     } catch (err) {
@@ -451,6 +509,15 @@ export default function AdvisorDashboard() {
       const boxes = [0, 1, 2].map((i) => ({ ...(source[i] || {}) }))
       boxes[boxIndex] = { ...boxes[boxIndex], ...patch }
       return { ...prev, [secId]: { ...(prev[secId] || {}), boxes } }
+    })
+  }
+
+  const patchGauge = (secId, index, patch) => {
+    setSectionEdits((prev) => {
+      const source = prev[secId]?.gauges || defaultAboutGauges()
+      const gauges = [0, 1].map((i) => ({ ...(source[i] || {}) }))
+      gauges[index] = { ...gauges[index], ...patch }
+      return { ...prev, [secId]: { ...(prev[secId] || {}), gauges } }
     })
   }
 
@@ -1281,6 +1348,165 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
+                              ) : isAboutSection(section.name) ? (
+                                <div className="space-y-8">
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">About Section</h4>
+                                    <p className="text-xs text-gray-600">Edit the red eyebrow, headings, body copy, two gauges, photo, and years-of-experience badge.</p>
+                                  </div>
+
+                                  <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Eyebrow (red)</label>
+                                      <input
+                                        type="text"
+                                        value={values.eyebrow || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'eyebrow', e.target.value)}
+                                        placeholder="ABOUT US"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold tracking-wider uppercase"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Main Heading</label>
+                                      <input
+                                        type="text"
+                                        value={values.heading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'heading', e.target.value)}
+                                        placeholder="Why will you choose our?"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none font-semibold text-[#0B1B3D]"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
+                                      <textarea
+                                        rows={2}
+                                        value={values.subheading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
+                                        placeholder="Our agency can only be as strong as our people..."
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Text</label>
+                                      <textarea
+                                        rows={3}
+                                        value={values.text || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'text', e.target.value)}
+                                        placeholder="Section introduction..."
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {[0, 1].map((gaugeIndex) => {
+                                    const gauge = (values.gauges && values.gauges[gaugeIndex]) || {}
+                                    return (
+                                      <div key={gaugeIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
+                                          <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">{gaugeIndex + 1}</span>
+                                          Gauge {gaugeIndex + 1}
+                                        </h5>
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Value</label>
+                                            <input
+                                              type="text"
+                                              value={gauge.value || ''}
+                                              onChange={(e) => patchGauge(secId, gaugeIndex, { value: e.target.value })}
+                                              placeholder={gaugeIndex === 0 ? '50%' : '75%'}
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Label</label>
+                                            <input
+                                              type="text"
+                                              value={gauge.label || ''}
+                                              onChange={(e) => patchGauge(secId, gaugeIndex, { label: e.target.value })}
+                                              placeholder={gaugeIndex === 0 ? 'Business strategy growth' : 'Finance valuable ideas'}
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+
+                                  <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-4">
+                                    <h5 className="text-sm font-bold text-[#0B1B3D]">Photo & experience badge</h5>
+                                    <div className="space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
+                                      <label className="block text-xs font-extrabold text-[#0B1B3D]">Section Image</label>
+                                      <div className="grid md:grid-cols-2 gap-3">
+                                        <div className="bg-gray-50 border p-2.5 rounded-md">
+                                          <label className="block text-[11px] font-bold text-gray-700 mb-1">📁 Upload Custom Image</label>
+                                          <input
+                                            type="file"
+                                            accept="image/*"
+                                            disabled={uploadingState[`about-${secId}`]}
+                                            onChange={(e) => {
+                                              if (e.target.files && e.target.files[0]) {
+                                                handleAboutImageUpload(secId, e.target.files[0])
+                                              }
+                                            }}
+                                            className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
+                                          />
+                                          {uploadingState[`about-${secId}`] && (
+                                            <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
+                                          )}
+                                          {(localPreviewUrls[`about-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages)) && (
+                                            <img
+                                              src={localPreviewUrls[`about-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages)}
+                                              alt="About preview"
+                                              className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
+                                            />
+                                          )}
+                                        </div>
+                                        <div className="bg-gray-50 border p-2.5 rounded-md">
+                                          <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
+                                          <select
+                                            value={selectedLocalValue(values.image_url, localImages)}
+                                            onChange={(e) => handleFieldValueChange(secId, 'image_url', e.target.value)}
+                                            className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
+                                          >
+                                            <option value="">-- Choose Local Template Image --</option>
+                                            {localImages.map(preset => (
+                                              <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      </div>
+                                      <input
+                                        type="text"
+                                        value={displayImagePath(values.image_url)}
+                                        onChange={(e) => handleFieldValueChange(secId, 'image_url', e.target.value)}
+                                        placeholder="intime-04 or /uploads/image.jpg"
+                                        className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                      />
+                                    </div>
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                      <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Years value</label>
+                                        <input
+                                          type="text"
+                                          value={values.experience_years || ''}
+                                          onChange={(e) => handleFieldValueChange(secId, 'experience_years', e.target.value)}
+                                          placeholder="10+"
+                                          className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Years label</label>
+                                        <input
+                                          type="text"
+                                          value={values.experience_label || ''}
+                                          onChange={(e) => handleFieldValueChange(secId, 'experience_label', e.target.value)}
+                                          placeholder="Years of Experience"
+                                          className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
                               ) : (
                                 // Standard Section Editor
                                 <div className="grid md:grid-cols-2 gap-4">
@@ -1392,7 +1618,7 @@ export default function AdvisorDashboard() {
                               <SectionIframePreview
                                 sectionName={section.name}
                                 data={{ ...values, preview_slide: previewSlide[secId] ?? 0 }}
-                                height={isWhatWeDoSection(section.name) ? 720 : 520}
+                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) ? 720 : 520}
                                 borderColor="border-[#C8102E]"
                               />
                             </div>
