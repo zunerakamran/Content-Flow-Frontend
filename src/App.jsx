@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
 import Login from './Login'
@@ -16,31 +16,41 @@ const PrivateRoute = ({ children, roles }) => {
   return children
 }
 
+const ROLE_DASHBOARDS = {
+  advisor: AdvisorDashboard,
+  approver: ApproverDashboard,
+  manager: ManagerDashboard,
+  power_admin: PowerAdminDashboard,
+  client_admin: ClientAdminDashboard,
+}
+
+const LegacyDashboardRedirect = () => {
+  const { role } = useParams()
+  return <Navigate to={`/${role || ''}`} replace />
+}
+
 const AppRoutes = () => {
   const { user, loading } = useAuth()
   if (loading) return <div className="flex items-center justify-center h-screen">Loading...</div>
 
   return (
     <Routes>
-      <Route path="/" element={!user ? <Login /> : <Navigate to={`/dashboard/${user.role}`} />} />
+      <Route path="/" element={!user ? <Login /> : <Navigate to={`/${user.role}`} replace />} />
 
-      <Route path="/dashboard/advisor" element={
-        <PrivateRoute roles={['advisor']}><AdvisorDashboard /></PrivateRoute>
-      } />
-      <Route path="/dashboard/approver" element={
-        <PrivateRoute roles={['approver']}><ApproverDashboard /></PrivateRoute>
-      } />
-      <Route path="/dashboard/manager" element={
-        <PrivateRoute roles={['manager']}><ManagerDashboard /></PrivateRoute>
-      } />
-      <Route path="/dashboard/power_admin" element={
-        <PrivateRoute roles={['power_admin']}><PowerAdminDashboard /></PrivateRoute>
-      } />
-      <Route path="/dashboard/client_admin" element={
-        <PrivateRoute roles={['client_admin']}><ClientAdminDashboard /></PrivateRoute>
-      } />
+      {Object.entries(ROLE_DASHBOARDS).map(([role, Dashboard]) => (
+        <Route
+          key={role}
+          path={`/${role}`}
+          element={(
+            <PrivateRoute roles={[role]}>
+              <Dashboard />
+            </PrivateRoute>
+          )}
+        />
+      ))}
 
-      <Route path="*" element={<Navigate to="/" />} />
+      <Route path="/dashboard/:role" element={<LegacyDashboardRedirect />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

@@ -16,7 +16,7 @@ export default function Login() {
         setError('')
         try {
             const user = await login(email, password)
-            navigate(`/dashboard/${user.role}`)
+            navigate(`/${user.role}`)
         } catch (err) {
             setError('Invalid email or password')
         } finally {
