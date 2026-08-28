@@ -216,7 +216,7 @@ export default function AdvisorDashboard() {
     try {
       const formData = new FormData()
       formData.append('image', file)
-      const res = await api.post('/upload-image', formData)
+      const res = await api.post('upload-image', formData)
       const uploadedUrl = storedUploadPath(res.data)
       if (uploadedUrl) {
         setSectionEdits((prev) => {
@@ -245,7 +245,7 @@ export default function AdvisorDashboard() {
     try {
       const formData = new FormData()
       formData.append('image', file)
-      const res = await api.post('/upload-image', formData)
+      const res = await api.post('upload-image', formData)
       const uploadedUrl = storedUploadPath(res.data)
       if (uploadedUrl) {
         setSectionEdits((prev) => {
