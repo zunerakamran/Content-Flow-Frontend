@@ -191,7 +191,7 @@ function displayImagePath(url) {
 
 function isHeroSection(name) {
   const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
-  return key === 'heroslider' || key === 'hero' || key.includes('heroslider')
+  return key === 'heroslider' || key === 'hero' || key === 'herosection' || key.includes('heroslider')
 }
 
 function isWhatWeDoSection(name) {
