@@ -215,8 +215,13 @@ function isFeaturedServicesSection(name) {
   return key === 'featuredservices' || key === 'services'
 }
 
+function isAnnualProgressionSection(name) {
+  const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return key === 'annualprogression' || key === 'progression' || key.includes('annual')
+}
+
 function isAdvisorVisibleSection(name) {
-  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name)
+  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name) || isAnnualProgressionSection(name)
 }
 
 function advisorSectionOrder(name) {
@@ -225,6 +230,7 @@ function advisorSectionOrder(name) {
   if (isAboutSection(name)) return 2
   if (isCompanyHistorySection(name)) return 3
   if (isFeaturedServicesSection(name)) return 4
+  if (isAnnualProgressionSection(name)) return 5
   return 99
 }
 
@@ -278,6 +284,63 @@ function normalizeFeaturedServicesEditorContent(content) {
         text: item.text || item.desc || fallback.text,
         button_text: item.button_text || item.read_more || fallback.button_text,
         button_url: item.button_url || item.url || item.link || (item.slug ? `#service-${item.slug}` : fallback.button_url),
+      }
+    }),
+  }
+}
+
+function parseProgressPct(value, fallback) {
+  const n = parseInt(String(value ?? '').replace(/[^0-9]/g, ''), 10)
+  if (Number.isNaN(n)) return fallback
+  return Math.min(100, Math.max(0, n))
+}
+
+function defaultAnnualProgressionBars() {
+  return [
+    { label: 'Business growth', year: '2018', pct: 70 },
+    { label: 'Investment growth', year: '2019', pct: 80 },
+    { label: 'Financial growth', year: '2020', pct: 90 },
+  ]
+}
+
+function defaultAnnualProgressionHighlights() {
+  return [
+    { icon: 'shield-alt', heading: 'Risk Free', text: 'We offer risk free business for tension free life.' },
+    { icon: 'chart-line', heading: 'Business Growth', text: 'We ensure the business growth without conditions.' },
+  ]
+}
+
+function normalizeAnnualProgressionEditorContent(content) {
+  const c = content && typeof content === 'object' ? content : {}
+  const legacy = Boolean(c.eyebrow && c.subheading && !c.text)
+  const barDefaults = defaultAnnualProgressionBars()
+  const highlightDefaults = defaultAnnualProgressionHighlights()
+  const barList = Array.isArray(c.bars) && c.bars.length
+    ? c.bars
+    : (Array.isArray(c.progress) ? c.progress : [])
+  const highlightList = Array.isArray(c.highlights) && c.highlights.length
+    ? c.highlights
+    : (Array.isArray(c.features) ? c.features : [])
+  return {
+    subheading: legacy ? (c.eyebrow || 'ANNUAL PROGRESSION') : (c.subheading || c.eyebrow || 'ANNUAL PROGRESSION'),
+    heading: c.heading || 'Our Business Growth is Really Incredible!',
+    text: legacy
+      ? (c.subheading || '')
+      : (c.text || 'We love what we do and we do it with passion. We value the experimentation, the reformation of the message, and the smart incentives.'),
+    bars: barDefaults.map((fallback, i) => {
+      const item = barList[i] && typeof barList[i] === 'object' ? barList[i] : {}
+      return {
+        label: item.label || item.heading || item.title || fallback.label,
+        year: item.year || fallback.year,
+        pct: parseProgressPct(item.pct ?? item.percent ?? item.value ?? item.percentage, fallback.pct),
+      }
+    }),
+    highlights: highlightDefaults.map((fallback, i) => {
+      const item = highlightList[i] && typeof highlightList[i] === 'object' ? highlightList[i] : {}
+      return {
+        icon: item.icon || fallback.icon,
+        heading: item.heading || item.title || fallback.heading,
+        text: item.text || item.desc || item.description || fallback.text,
       }
     }),
   }
@@ -763,7 +826,9 @@ export default function AdvisorDashboard() {
             ? normalizeCompanyHistoryEditorContent(parsed)
             : isFeaturedServicesSection(s.name)
               ? normalizeFeaturedServicesEditorContent(parsed)
-              : parsed
+              : isAnnualProgressionSection(s.name)
+                ? normalizeAnnualProgressionEditorContent(parsed)
+                : parsed
       }
     })
     setSectionEdits(initialEdits)
@@ -799,7 +864,9 @@ export default function AdvisorDashboard() {
             ? normalizeCompanyHistoryEditorContent(parsed)
             : isFeaturedServicesSection(section.name)
               ? normalizeFeaturedServicesEditorContent(parsed)
-              : parsed
+              : isAnnualProgressionSection(section.name)
+                ? normalizeAnnualProgressionEditorContent(parsed)
+                : parsed
       }))
       setMessage(`🔒 Section "${section.name}" locked for you. You can now edit its content.`)
     } catch (err) {
@@ -838,6 +905,24 @@ export default function AdvisorDashboard() {
       const boxes = defaultFeaturedServiceBoxes().map((_, i) => ({ ...(source[i] || {}) }))
       boxes[boxIndex] = { ...boxes[boxIndex], ...patch }
       return { ...prev, [secId]: { ...(prev[secId] || {}), boxes } }
+    })
+  }
+
+  const patchProgressBar = (secId, barIndex, patch) => {
+    setSectionEdits((prev) => {
+      const source = prev[secId]?.bars || prev[secId]?.progress || defaultAnnualProgressionBars()
+      const bars = defaultAnnualProgressionBars().map((_, i) => ({ ...(source[i] || {}) }))
+      bars[barIndex] = { ...bars[barIndex], ...patch }
+      return { ...prev, [secId]: { ...(prev[secId] || {}), bars } }
+    })
+  }
+
+  const patchProgressHighlight = (secId, highlightIndex, patch) => {
+    setSectionEdits((prev) => {
+      const source = prev[secId]?.highlights || prev[secId]?.features || defaultAnnualProgressionHighlights()
+      const highlights = defaultAnnualProgressionHighlights().map((_, i) => ({ ...(source[i] || {}) }))
+      highlights[highlightIndex] = { ...highlights[highlightIndex], ...patch }
+      return { ...prev, [secId]: { ...(prev[secId] || {}), highlights } }
     })
   }
 
@@ -898,7 +983,9 @@ export default function AdvisorDashboard() {
       const raw = sanitizeSectionContent(sectionEdits[secId] || {})
       const content = section && isFeaturedServicesSection(section.name)
         ? normalizeFeaturedServicesEditorContent(raw)
-        : raw
+        : section && isAnnualProgressionSection(section.name)
+          ? normalizeAnnualProgressionEditorContent(raw)
+          : raw
       return {
         section_id: secId,
         proposed_content: JSON.stringify(content, null, 2)
@@ -2159,6 +2246,150 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
+                              ) : isAnnualProgressionSection(section.name) ? (
+                                <div className="space-y-8">
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Annual Progression</h4>
+                                    <p className="text-xs text-gray-600">Edit the red subheading, heading, intro text, three progress bars, and two highlight cards.</p>
+                                  </div>
+
+                                  <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
+                                      <input
+                                        type="text"
+                                        value={values.subheading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
+                                        placeholder="ANNUAL PROGRESSION"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Heading</label>
+                                      <input
+                                        type="text"
+                                        value={values.heading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'heading', e.target.value)}
+                                        placeholder="Our Business Growth is Really Incredible!"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Text</label>
+                                      <textarea
+                                        rows={3}
+                                        value={values.text || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'text', e.target.value)}
+                                        placeholder="We love what we do and we do it with passion..."
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {[0, 1, 2].map((barIndex) => {
+                                    const bar = (values.bars && values.bars[barIndex]) || {}
+                                    return (
+                                      <div key={barIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
+                                          <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">{barIndex + 1}</span>
+                                          Progress bar {barIndex + 1}
+                                        </h5>
+                                        <div className="grid md:grid-cols-3 gap-4">
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Label</label>
+                                            <input
+                                              type="text"
+                                              value={bar.label || ''}
+                                              onChange={(e) => patchProgressBar(secId, barIndex, { label: e.target.value })}
+                                              placeholder="Business growth"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Year</label>
+                                            <input
+                                              type="text"
+                                              value={bar.year || ''}
+                                              onChange={(e) => patchProgressBar(secId, barIndex, { year: e.target.value })}
+                                              placeholder="2018"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Percent</label>
+                                            <input
+                                              type="number"
+                                              min="0"
+                                              max="100"
+                                              value={bar.pct ?? ''}
+                                              onChange={(e) => patchProgressBar(secId, barIndex, { pct: parseProgressPct(e.target.value, 0) })}
+                                              placeholder="70"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+
+                                  {[0, 1].map((highlightIndex) => {
+                                    const item = (values.highlights && values.highlights[highlightIndex]) || {}
+                                    return (
+                                      <div key={highlightIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
+                                          <span className="w-6 h-6 rounded-full bg-[#0B1B3D] text-white flex items-center justify-center text-xs">{highlightIndex + 1}</span>
+                                          Highlight {highlightIndex + 1}
+                                        </h5>
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-2">Icon</label>
+                                            <div className="grid grid-cols-6 sm:grid-cols-9 gap-2">
+                                              {SERVICE_ICON_OPTIONS.map((opt) => {
+                                                const selected = (item.icon || '') === opt.value
+                                                const Icon = opt.Icon
+                                                return (
+                                                  <button
+                                                    key={opt.value}
+                                                    type="button"
+                                                    title={opt.label}
+                                                    onClick={() => patchProgressHighlight(secId, highlightIndex, { icon: opt.value })}
+                                                    className={`h-10 rounded-lg border flex items-center justify-center transition ${
+                                                      selected
+                                                        ? 'border-[#0B1B3D] bg-[#0B1B3D] text-white'
+                                                        : 'border-gray-200 bg-white text-[#0B1B3D] hover:border-gray-400'
+                                                    }`}
+                                                  >
+                                                    <Icon size={16} />
+                                                  </button>
+                                                )
+                                              })}
+                                            </div>
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Heading</label>
+                                            <input
+                                              type="text"
+                                              value={item.heading || item.title || ''}
+                                              onChange={(e) => patchProgressHighlight(secId, highlightIndex, { heading: e.target.value })}
+                                              placeholder="Risk Free"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Text</label>
+                                            <textarea
+                                              rows={2}
+                                              value={item.text || ''}
+                                              onChange={(e) => patchProgressHighlight(secId, highlightIndex, { text: e.target.value })}
+                                              placeholder="Highlight description..."
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
                               ) : (
                                 // Standard Section Editor
                                 <div className="grid md:grid-cols-2 gap-4">
@@ -2276,10 +2507,12 @@ export default function AdvisorDashboard() {
                                       ? companyHistoryPreviewPayload(values)
                                       : isFeaturedServicesSection(section.name)
                                         ? normalizeFeaturedServicesEditorContent(values)
-                                        : values),
+                                        : isAnnualProgressionSection(section.name)
+                                          ? normalizeAnnualProgressionEditorContent(values)
+                                          : values),
                                   preview_slide: previewSlide[secId] ?? 0,
                                 }}
-                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) ? 720 : 520}
+                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) ? 720 : 520}
                                 borderColor="border-[#C8102E]"
                               />
                             </div>
