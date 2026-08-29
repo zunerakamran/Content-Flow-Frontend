@@ -3,6 +3,13 @@ import Navbar from './Navbar'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import { parseJson } from './utils/parseJson'
+import {
+  buildPreviewFromRequest,
+  isHistoricalRequest,
+  preferStoredPreview,
+  previewHasStoredSnapshot,
+  previewSidesMatch,
+} from './utils/changeRequestPreview'
 import SectionIframePreview from './SectionIframePreview'
 
 const ACTIVE_STATUSES = new Set(['pending', 'under_review', 'scheduled'])
@@ -74,10 +81,33 @@ const RequestCard = memo(function RequestCard({ req, user, onStatusChange, onMes
     setBusy('preview')
     onError('')
     try {
+      const storedPreview = buildPreviewFromRequest(req)
+      const historical = isHistoricalRequest(req)
+
+      if (historical && previewHasStoredSnapshot(storedPreview)) {
+        setPreviewData(storedPreview)
+        return
+      }
+
       const res = await api.get(`/change-requests/${req.id}/preview`)
-      setPreviewData(res.data)
+      let nextPreview = res.data
+
+      if (previewHasStoredSnapshot(storedPreview)) {
+        if (historical || previewSidesMatch(nextPreview)) {
+          nextPreview = preferStoredPreview(nextPreview, storedPreview)
+        }
+      } else if (historical && previewSidesMatch(nextPreview)) {
+        onError('Historical snapshot is unavailable for this request. Live content may have changed since submission.')
+      }
+
+      setPreviewData(nextPreview)
     } catch {
-      onError('Could not fetch request preview.')
+      const storedPreview = buildPreviewFromRequest(req)
+      if (previewHasStoredSnapshot(storedPreview)) {
+        setPreviewData(storedPreview)
+      } else {
+        onError('Could not fetch request preview.')
+      }
     } finally {
       setBusy(null)
     }
@@ -132,6 +162,8 @@ const RequestCard = memo(function RequestCard({ req, user, onStatusChange, onMes
     }
   }
 
+  const isHistorical = isHistoricalRequest(req)
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       <div className="p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4">
@@ -164,7 +196,7 @@ const RequestCard = memo(function RequestCard({ req, user, onStatusChange, onMes
             </button>
           )}
 
-          {(req.status === 'under_review' || req.status === 'pending' || isAssignedToMe) && (
+          {(req.status === 'under_review' || req.status === 'pending' || isAssignedToMe || isHistoricalRequest(req)) && (
             <button
               onClick={handleTogglePreview}
               disabled={busy === 'preview'}
@@ -233,8 +265,15 @@ const RequestCard = memo(function RequestCard({ req, user, onStatusChange, onMes
           <div className="flex items-center justify-between border-b pb-3 flex-wrap gap-2">
             <div>
               <h4 className="text-xs font-extrabold uppercase text-gray-500 tracking-wider">
-                Side-by-Side Comparison: Current Live Published vs Proposed Changes
+                {isHistorical
+                  ? 'Submission Snapshot: Live Published vs Proposed Draft'
+                  : 'Side-by-Side Comparison: Current Live Published vs Proposed Changes'}
               </h4>
+              {isHistorical && (
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Showing content as it existed when this request was submitted.
+                </p>
+              )}
               <a
                 href="https://epatronus.space/template4/"
                 target="_blank"
@@ -278,14 +317,14 @@ const RequestCard = memo(function RequestCard({ req, user, onStatusChange, onMes
                         sectionName={item.section_name}
                         data={curParsed}
                         height={480}
-                        label="Current Live Published Content"
+                        label={isHistorical ? 'Live Published Content (at submission)' : 'Current Live Published Content'}
                         borderColor="border-gray-300"
                       />
                       <SectionIframePreview
                         sectionName={item.section_name}
                         data={propParsed}
                         height={480}
-                        label="Proposed Draft Content"
+                        label={isHistorical ? 'Proposed Draft Content (at submission)' : 'Proposed Draft Content'}
                         borderColor="border-emerald-500"
                       />
                     </div>
@@ -310,14 +349,14 @@ const RequestCard = memo(function RequestCard({ req, user, onStatusChange, onMes
                 sectionName={req.section?.name}
                 data={parseJson(previewData.current_content)}
                 height={480}
-                label="Current Live Published Content"
+                label={isHistorical ? 'Live Published Content (at submission)' : 'Current Live Published Content'}
                 borderColor="border-gray-300"
               />
               <SectionIframePreview
                 sectionName={req.section?.name}
                 data={parseJson(previewData.proposed_content)}
                 height={480}
-                label="Proposed Draft Content"
+                label={isHistorical ? 'Proposed Draft Content (at submission)' : 'Proposed Draft Content'}
                 borderColor="border-emerald-500"
               />
             </div>

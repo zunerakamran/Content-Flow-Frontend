@@ -1809,7 +1809,8 @@ export default function AdvisorDashboard() {
                         : raw
       return {
         section_id: secId,
-        proposed_content: JSON.stringify(content, null, 2)
+        current_content: section?.content || '',
+        proposed_content: JSON.stringify(content, null, 2),
       }
     })
 
