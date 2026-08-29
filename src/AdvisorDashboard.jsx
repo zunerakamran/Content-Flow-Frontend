@@ -225,8 +225,13 @@ function isPortfolioSection(name) {
   return key === 'portfoliosection' || key === 'portfolio' || key.includes('portfolio')
 }
 
+function isBranchesSection(name) {
+  const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return key === 'branchesandappointment' || key.includes('branch') || key.includes('appointment')
+}
+
 function isAdvisorVisibleSection(name) {
-  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name) || isAnnualProgressionSection(name) || isPortfolioSection(name)
+  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name) || isAnnualProgressionSection(name) || isPortfolioSection(name) || isBranchesSection(name)
 }
 
 function advisorSectionOrder(name) {
@@ -237,6 +242,7 @@ function advisorSectionOrder(name) {
   if (isFeaturedServicesSection(name)) return 4
   if (isAnnualProgressionSection(name)) return 5
   if (isPortfolioSection(name)) return 6
+  if (isBranchesSection(name)) return 7
   return 99
 }
 
@@ -405,6 +411,63 @@ function portfolioPreviewPayload(values) {
         img: absImage || image,
       }
     }),
+  })
+}
+
+function defaultBranchItems() {
+  return [
+    { name: 'Sydney (Head Office)', address: '1 Epping Road, North Ryde, NSW 2113', phone: '+61 2 9870 7689', email: 'email@example.com' },
+    { name: 'Brisbane', address: 'Level 28, 400 George Street, Brisbane, QLD 4000', phone: '+61 2 9870 7689', email: 'email@example.com' },
+    { name: 'Hobart', address: '85 Macquarie Finoa Street, Hobart, TAS 7000', phone: '+61 2 9870 7689', email: 'email@example.com' },
+    { name: 'Melbourne', address: 'Level 5, 4 Freshwater Place, Southbank, VIC 3006', phone: '+61 2 9870 7689', email: 'email@example.com' },
+  ]
+}
+
+function normalizeBranchesEditorContent(content) {
+  const c = content && typeof content === 'object' ? content : {}
+  const legacyLabel = Boolean(c.eyebrow)
+  const defaults = defaultBranchItems()
+  const list = Array.isArray(c.items) && c.items.length
+    ? c.items
+    : (Array.isArray(c.branches) && c.branches.length ? c.branches : (Array.isArray(c.offices) ? c.offices : []))
+  return {
+    subheading: legacyLabel ? (c.eyebrow || 'GET IN TOUCH') : (c.subheading || 'GET IN TOUCH'),
+    heading: c.heading || 'We are Connected All Time to Help Your Business!',
+    text: legacyLabel
+      ? (c.text || c.subheading || 'We understand the importance of approaching each work integrally and believe in the power of simple and easy communication.')
+      : (c.text || 'We understand the importance of approaching each work integrally and believe in the power of simple and easy communication.'),
+    form_heading: c.form_heading || 'Book an appionment',
+    button_text: c.button_text || 'SEND YOUR MESSAGE',
+    branches_label: c.branches_label || 'Main Branches:',
+    stat_value: c.stat_value || '12+',
+    stat_label: c.stat_label || 'Branches',
+    map_image: c.map_image || c.image_url || c.image || c.img || 'maps-point.png',
+    image_preview: c.image_preview || '',
+    items: defaults.map((fallback, i) => {
+      const item = list[i] && typeof list[i] === 'object' ? list[i] : {}
+      return {
+        name: item.name || item.heading || item.title || fallback.name,
+        address: item.address || fallback.address,
+        phone: item.phone || item.tel || fallback.phone,
+        email: item.email || fallback.email,
+      }
+    }),
+  }
+}
+
+function branchesPreviewPayload(values) {
+  const normalized = normalizeBranchesEditorContent(values || {})
+  const preview = normalized.image_preview || ''
+  const image = preview || normalized.map_image || ''
+  const absImage = /^data:|^blob:/i.test(image)
+    ? image
+    : (isUploadedAsset(image) ? absoluteAssetUrl(image) : image)
+  return withAbsoluteUploadUrls({
+    ...normalized,
+    map_image: absImage || image,
+    image_url: absImage || image,
+    image: absImage || image,
+    image_preview: preview || undefined,
   })
 }
 
@@ -804,6 +867,59 @@ export default function AdvisorDashboard() {
     }
   }
 
+  const handleBranchesMapUpload = async (secId, file) => {
+    if (!file) return
+    const uploadKey = `branches-map-${secId}`
+    setLocalPreview(uploadKey, file)
+    setUploadingState((prev) => ({ ...prev, [uploadKey]: true }))
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+      reader.onerror = () => resolve('')
+      reader.readAsDataURL(file)
+    })
+    if (dataUrl) {
+      setSectionEdits((prev) => ({
+        ...prev,
+        [secId]: {
+          ...(prev[secId] || {}),
+          map_image: dataUrl,
+          image_url: dataUrl,
+          image: dataUrl,
+          img: dataUrl,
+          image_preview: dataUrl,
+        },
+      }))
+    }
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await api.post('upload-image', formData)
+      const uploadedUrl = storedUploadPath(res.data)
+      if (uploadedUrl) {
+        setSectionEdits((prev) => ({
+          ...prev,
+          [secId]: {
+            ...(prev[secId] || {}),
+            map_image: uploadedUrl,
+            image_url: uploadedUrl,
+            image: uploadedUrl,
+            img: uploadedUrl,
+            image_preview: dataUrl || prev[secId]?.image_preview,
+          },
+        }))
+        setMessage('📸 Map image uploaded successfully!')
+      } else {
+        setError('Upload succeeded but no image path was returned.')
+      }
+    } catch (err) {
+      const fieldError = err.response?.data?.errors?.image?.[0]
+      setError(fieldError || err.response?.data?.message || 'Failed to upload image.')
+    } finally {
+      setUploadingState((prev) => ({ ...prev, [uploadKey]: false }))
+    }
+  }
+
   const fetchTemplateRequests = () => {
     api.get('/template-requests')
       .then(res => setTemplateRequests(res.data))
@@ -947,7 +1063,9 @@ export default function AdvisorDashboard() {
                 ? normalizeAnnualProgressionEditorContent(parsed)
                 : isPortfolioSection(s.name)
                   ? normalizePortfolioEditorContent(parsed)
-                  : parsed
+                  : isBranchesSection(s.name)
+                    ? normalizeBranchesEditorContent(parsed)
+                    : parsed
       }
     })
     setSectionEdits(initialEdits)
@@ -987,7 +1105,9 @@ export default function AdvisorDashboard() {
                 ? normalizeAnnualProgressionEditorContent(parsed)
                 : isPortfolioSection(section.name)
                   ? normalizePortfolioEditorContent(parsed)
-                  : parsed
+                  : isBranchesSection(section.name)
+                    ? normalizeBranchesEditorContent(parsed)
+                    : parsed
       }))
       setMessage(`🔒 Section "${section.name}" locked for you. You can now edit its content.`)
     } catch (err) {
@@ -999,6 +1119,12 @@ export default function AdvisorDashboard() {
     setSectionEdits(prev => {
       const current = { ...(prev[sectionId] || {}), [fieldKey]: value }
       if (fieldKey === 'image_url') {
+        current.image = value
+        current.img = value
+        if (!/^data:|^blob:/i.test(value || '')) current.image_preview = ''
+      }
+      if (fieldKey === 'map_image') {
+        current.image_url = value
         current.image = value
         current.img = value
         if (!/^data:|^blob:/i.test(value || '')) current.image_preview = ''
@@ -1057,6 +1183,15 @@ export default function AdvisorDashboard() {
         items[itemIndex].image = patch.image_url
         items[itemIndex].img = patch.image_url
       }
+      return { ...prev, [secId]: { ...(prev[secId] || {}), items } }
+    })
+  }
+
+  const patchBranch = (secId, itemIndex, patch) => {
+    setSectionEdits((prev) => {
+      const source = prev[secId]?.items || prev[secId]?.branches || defaultBranchItems()
+      const items = defaultBranchItems().map((_, i) => ({ ...(source[i] || {}) }))
+      items[itemIndex] = { ...items[itemIndex], ...patch }
       return { ...prev, [secId]: { ...(prev[secId] || {}), items } }
     })
   }
@@ -1122,7 +1257,9 @@ export default function AdvisorDashboard() {
           ? normalizeAnnualProgressionEditorContent(raw)
           : section && isPortfolioSection(section.name)
             ? normalizePortfolioEditorContent(raw)
-            : raw
+            : section && isBranchesSection(section.name)
+              ? normalizeBranchesEditorContent(raw)
+              : raw
       return {
         section_id: secId,
         proposed_content: JSON.stringify(content, null, 2)
@@ -2661,6 +2798,199 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
+                              ) : isBranchesSection(section.name) ? (
+                                <div className="space-y-8">
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Branches and Appointment</h4>
+                                    <p className="text-xs text-gray-600">Edit the heading copy, map image, form labels, stats overlay, and the four branch cards.</p>
+                                  </div>
+
+                                  <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
+                                      <input
+                                        type="text"
+                                        value={values.subheading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
+                                        placeholder="GET IN TOUCH"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Heading</label>
+                                      <input
+                                        type="text"
+                                        value={values.heading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'heading', e.target.value)}
+                                        placeholder="We are Connected All Time to Help Your Business!"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Text</label>
+                                      <textarea
+                                        rows={3}
+                                        value={values.text || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'text', e.target.value)}
+                                        placeholder="We understand the importance of approaching each work integrally..."
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Form heading</label>
+                                      <input
+                                        type="text"
+                                        value={values.form_heading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'form_heading', e.target.value)}
+                                        placeholder="Book an appionment"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Button text</label>
+                                      <input
+                                        type="text"
+                                        value={values.button_text || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'button_text', e.target.value)}
+                                        placeholder="SEND YOUR MESSAGE"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Branches label</label>
+                                      <input
+                                        type="text"
+                                        value={values.branches_label || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'branches_label', e.target.value)}
+                                        placeholder="Main Branches:"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Stat value</label>
+                                      <input
+                                        type="text"
+                                        value={values.stat_value || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'stat_value', e.target.value)}
+                                        placeholder="12+"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Stat label</label>
+                                      <input
+                                        type="text"
+                                        value={values.stat_label || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'stat_label', e.target.value)}
+                                        placeholder="Branches"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2 space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
+                                      <label className="block text-xs font-extrabold text-[#0B1B3D]">Map image</label>
+                                      <div className="grid md:grid-cols-2 gap-3">
+                                        <div className="bg-gray-50 border p-2.5 rounded-md">
+                                          <label className="block text-[11px] font-bold text-gray-700 mb-1">📁 Upload Custom Image</label>
+                                          <input
+                                            type="file"
+                                            accept="image/*"
+                                            disabled={uploadingState[`branches-map-${secId}`]}
+                                            onChange={(e) => {
+                                              if (e.target.files && e.target.files[0]) {
+                                                handleBranchesMapUpload(secId, e.target.files[0])
+                                              }
+                                            }}
+                                            className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
+                                          />
+                                          {uploadingState[`branches-map-${secId}`] && (
+                                            <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
+                                          )}
+                                          {(localPreviewUrls[`branches-map-${secId}`] || editorPreviewSrc(displayImagePath(values.map_image), localImages)) && (
+                                            <img
+                                              src={localPreviewUrls[`branches-map-${secId}`] || editorPreviewSrc(displayImagePath(values.map_image), localImages)}
+                                              alt="Map preview"
+                                              className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
+                                            />
+                                          )}
+                                        </div>
+                                        <div className="bg-gray-50 border p-2.5 rounded-md">
+                                          <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
+                                          <select
+                                            value={selectedLocalValue(values.map_image, localImages)}
+                                            onChange={(e) => handleFieldValueChange(secId, 'map_image', e.target.value)}
+                                            className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
+                                          >
+                                            <option value="">-- Choose Local Template Image --</option>
+                                            {localImages.map(preset => (
+                                              <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      </div>
+                                      <input
+                                        type="text"
+                                        value={displayImagePath(values.map_image)}
+                                        onChange={(e) => handleFieldValueChange(secId, 'map_image', e.target.value)}
+                                        placeholder="maps-point or /uploads/image.jpg"
+                                        className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {[0, 1, 2, 3].map((itemIndex) => {
+                                    const item = (values.items && values.items[itemIndex]) || {}
+                                    return (
+                                      <div key={itemIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
+                                          <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">{itemIndex + 1}</span>
+                                          Branch {itemIndex + 1}
+                                        </h5>
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Name</label>
+                                            <input
+                                              type="text"
+                                              value={item.name || item.heading || ''}
+                                              onChange={(e) => patchBranch(secId, itemIndex, { name: e.target.value })}
+                                              placeholder="Sydney (Head Office)"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Address</label>
+                                            <textarea
+                                              rows={2}
+                                              value={item.address || ''}
+                                              onChange={(e) => patchBranch(secId, itemIndex, { address: e.target.value })}
+                                              placeholder="1 Epping Road, North Ryde, NSW 2113"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Phone</label>
+                                            <input
+                                              type="text"
+                                              value={item.phone || ''}
+                                              onChange={(e) => patchBranch(secId, itemIndex, { phone: e.target.value })}
+                                              placeholder="+61 2 9870 7689"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Email</label>
+                                            <input
+                                              type="text"
+                                              value={item.email || ''}
+                                              onChange={(e) => patchBranch(secId, itemIndex, { email: e.target.value })}
+                                              placeholder="email@example.com"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
                               ) : (
                                 // Standard Section Editor
                                 <div className="grid md:grid-cols-2 gap-4">
@@ -2782,10 +3112,12 @@ export default function AdvisorDashboard() {
                                           ? normalizeAnnualProgressionEditorContent(values)
                                           : isPortfolioSection(section.name)
                                             ? portfolioPreviewPayload(values)
-                                            : values),
+                                            : isBranchesSection(section.name)
+                                              ? branchesPreviewPayload(values)
+                                              : values),
                                   preview_slide: previewSlide[secId] ?? 0,
                                 }}
-                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) || isPortfolioSection(section.name) ? 720 : 520}
+                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) || isPortfolioSection(section.name) || isBranchesSection(section.name) ? 720 : 520}
                                 borderColor="border-[#C8102E]"
                               />
                             </div>
