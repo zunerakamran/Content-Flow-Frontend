@@ -220,8 +220,13 @@ function isAnnualProgressionSection(name) {
   return key === 'annualprogression' || key === 'progression' || key.includes('annual')
 }
 
+function isPortfolioSection(name) {
+  const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return key === 'portfoliosection' || key === 'portfolio' || key.includes('portfolio')
+}
+
 function isAdvisorVisibleSection(name) {
-  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name) || isAnnualProgressionSection(name)
+  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name) || isAnnualProgressionSection(name) || isPortfolioSection(name)
 }
 
 function advisorSectionOrder(name) {
@@ -231,6 +236,7 @@ function advisorSectionOrder(name) {
   if (isCompanyHistorySection(name)) return 3
   if (isFeaturedServicesSection(name)) return 4
   if (isAnnualProgressionSection(name)) return 5
+  if (isPortfolioSection(name)) return 6
   return 99
 }
 
@@ -344,6 +350,62 @@ function normalizeAnnualProgressionEditorContent(content) {
       }
     }),
   }
+}
+
+function defaultPortfolioItems() {
+  return [
+    { heading: 'Market Expansion', category: 'Business Strategy', image_url: 'intime-12.jpg', button_text: 'Read more', button_url: '#portfolio' },
+    { heading: 'Business Growth', category: 'Investment', image_url: 'intime-11.jpg', button_text: 'Read more', button_url: '#portfolio' },
+    { heading: 'Tax Management', category: 'Tax Consulting', image_url: 'intime-08.jpg', button_text: 'Read more', button_url: '#portfolio' },
+    { heading: 'Investment Policy', category: 'Business Strategy', image_url: 'intime-10.jpg', button_text: 'Read more', button_url: '#portfolio' },
+    { heading: 'Manage Investment', category: 'Investment', image_url: 'intime-04.jpg', button_text: 'Read more', button_url: '#portfolio' },
+    { heading: 'Financial Advices', category: 'Tax Consulting', image_url: 'intime-01.jpg', button_text: 'Read more', button_url: '#portfolio' },
+  ]
+}
+
+function normalizePortfolioEditorContent(content) {
+  const c = content && typeof content === 'object' ? content : {}
+  const legacy = Boolean(c.eyebrow && c.subheading && !c.items)
+  const defaults = defaultPortfolioItems()
+  const list = Array.isArray(c.items) && c.items.length
+    ? c.items
+    : (Array.isArray(c.projects) && c.projects.length ? c.projects : (Array.isArray(c.boxes) ? c.boxes : []))
+  return {
+    subheading: legacy ? (c.eyebrow || 'COMPLETED PROJECTS') : (c.subheading || c.eyebrow || 'COMPLETED PROJECTS'),
+    heading: c.heading || 'You can check our projects as inspirations.',
+    items: defaults.map((fallback, i) => {
+      const item = list[i] && typeof list[i] === 'object' ? list[i] : {}
+      return {
+        heading: item.heading || item.title || fallback.heading,
+        category: item.category || item.cat || item.caption || fallback.category,
+        image_url: item.image_url || item.image || item.img || fallback.image_url,
+        image_preview: item.image_preview || '',
+        button_text: item.button_text || item.read_more || fallback.button_text,
+        button_url: item.button_url || item.url || item.link || fallback.button_url,
+      }
+    }),
+  }
+}
+
+function portfolioPreviewPayload(values) {
+  const normalized = normalizePortfolioEditorContent(values || {})
+  return withAbsoluteUploadUrls({
+    ...normalized,
+    items: (normalized.items || []).map((item) => {
+      const preview = item.image_preview || ''
+      const image = preview || item.image_url || ''
+      const absImage = /^data:|^blob:/i.test(image)
+        ? image
+        : (isUploadedAsset(image) ? absoluteAssetUrl(image) : image)
+      return {
+        ...item,
+        image_preview: preview || undefined,
+        image_url: absImage || image,
+        image: absImage || image,
+        img: absImage || image,
+      }
+    }),
+  })
 }
 
 function defaultAboutGauges() {
@@ -636,6 +698,61 @@ export default function AdvisorDashboard() {
     }
   }
 
+  const handlePortfolioItemImageUpload = async (secId, itemIndex, file) => {
+    if (!file) return
+    const uploadKey = `portfolio-${secId}-${itemIndex}`
+    setLocalPreview(uploadKey, file)
+    setUploadingState((prev) => ({ ...prev, [uploadKey]: true }))
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+      reader.onerror = () => resolve('')
+      reader.readAsDataURL(file)
+    })
+    if (dataUrl) {
+      setSectionEdits((prev) => {
+        const source = prev[secId]?.items || prev[secId]?.projects || defaultPortfolioItems()
+        const items = defaultPortfolioItems().map((_, i) => ({ ...(source[i] || {}) }))
+        items[itemIndex] = {
+          ...items[itemIndex],
+          image_url: dataUrl,
+          image: dataUrl,
+          img: dataUrl,
+          image_preview: dataUrl,
+        }
+        return { ...prev, [secId]: { ...(prev[secId] || {}), items } }
+      })
+    }
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await api.post('upload-image', formData)
+      const uploadedUrl = storedUploadPath(res.data)
+      if (uploadedUrl) {
+        setSectionEdits((prev) => {
+          const source = prev[secId]?.items || prev[secId]?.projects || defaultPortfolioItems()
+          const items = defaultPortfolioItems().map((_, i) => ({ ...(source[i] || {}) }))
+          items[itemIndex] = {
+            ...items[itemIndex],
+            image_url: uploadedUrl,
+            image: uploadedUrl,
+            img: uploadedUrl,
+            image_preview: dataUrl || items[itemIndex].image_preview,
+          }
+          return { ...prev, [secId]: { ...(prev[secId] || {}), items } }
+        })
+        setMessage(`📸 Image uploaded successfully for Project ${itemIndex + 1}!`)
+      } else {
+        setError('Upload succeeded but no image path was returned.')
+      }
+    } catch (err) {
+      const fieldError = err.response?.data?.errors?.image?.[0]
+      setError(fieldError || err.response?.data?.message || 'Failed to upload image.')
+    } finally {
+      setUploadingState((prev) => ({ ...prev, [uploadKey]: false }))
+    }
+  }
+
   const handleAboutImageUpload = async (secId, file) => {
     if (!file) return
     const uploadKey = `about-${secId}`
@@ -828,7 +945,9 @@ export default function AdvisorDashboard() {
               ? normalizeFeaturedServicesEditorContent(parsed)
               : isAnnualProgressionSection(s.name)
                 ? normalizeAnnualProgressionEditorContent(parsed)
-                : parsed
+                : isPortfolioSection(s.name)
+                  ? normalizePortfolioEditorContent(parsed)
+                  : parsed
       }
     })
     setSectionEdits(initialEdits)
@@ -866,7 +985,9 @@ export default function AdvisorDashboard() {
               ? normalizeFeaturedServicesEditorContent(parsed)
               : isAnnualProgressionSection(section.name)
                 ? normalizeAnnualProgressionEditorContent(parsed)
-                : parsed
+                : isPortfolioSection(section.name)
+                  ? normalizePortfolioEditorContent(parsed)
+                  : parsed
       }))
       setMessage(`🔒 Section "${section.name}" locked for you. You can now edit its content.`)
     } catch (err) {
@@ -923,6 +1044,20 @@ export default function AdvisorDashboard() {
       const highlights = defaultAnnualProgressionHighlights().map((_, i) => ({ ...(source[i] || {}) }))
       highlights[highlightIndex] = { ...highlights[highlightIndex], ...patch }
       return { ...prev, [secId]: { ...(prev[secId] || {}), highlights } }
+    })
+  }
+
+  const patchPortfolioItem = (secId, itemIndex, patch) => {
+    setSectionEdits((prev) => {
+      const source = prev[secId]?.items || prev[secId]?.projects || defaultPortfolioItems()
+      const items = defaultPortfolioItems().map((_, i) => ({ ...(source[i] || {}) }))
+      items[itemIndex] = { ...items[itemIndex], ...patch }
+      if (patch.image_url && !/^data:|^blob:/i.test(patch.image_url)) {
+        items[itemIndex].image_preview = ''
+        items[itemIndex].image = patch.image_url
+        items[itemIndex].img = patch.image_url
+      }
+      return { ...prev, [secId]: { ...(prev[secId] || {}), items } }
     })
   }
 
@@ -985,7 +1120,9 @@ export default function AdvisorDashboard() {
         ? normalizeFeaturedServicesEditorContent(raw)
         : section && isAnnualProgressionSection(section.name)
           ? normalizeAnnualProgressionEditorContent(raw)
-          : raw
+          : section && isPortfolioSection(section.name)
+            ? normalizePortfolioEditorContent(raw)
+            : raw
       return {
         section_id: secId,
         proposed_content: JSON.stringify(content, null, 2)
@@ -2390,6 +2527,140 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
+                              ) : isPortfolioSection(section.name) ? (
+                                <div className="space-y-8">
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Portfolio Section</h4>
+                                    <p className="text-xs text-gray-600">Edit the red subheading, heading, and the six project cards (image, category, heading, button).</p>
+                                  </div>
+
+                                  <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
+                                      <input
+                                        type="text"
+                                        value={values.subheading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
+                                        placeholder="COMPLETED PROJECTS"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Heading</label>
+                                      <input
+                                        type="text"
+                                        value={values.heading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'heading', e.target.value)}
+                                        placeholder="You can check our projects as inspirations."
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {[0, 1, 2, 3, 4, 5].map((itemIndex) => {
+                                    const item = (values.items && values.items[itemIndex]) || {}
+                                    const itemImage = item.image_url || item.img || item.image || ''
+                                    return (
+                                      <div key={itemIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
+                                          <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">{itemIndex + 1}</span>
+                                          Project {itemIndex + 1}
+                                        </h5>
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                          <div className="md:col-span-2 space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
+                                            <label className="block text-xs font-extrabold text-[#0B1B3D]">Image</label>
+                                            <div className="grid md:grid-cols-2 gap-3">
+                                              <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">📁 Upload Custom Image</label>
+                                                <input
+                                                  type="file"
+                                                  accept="image/*"
+                                                  disabled={uploadingState[`portfolio-${secId}-${itemIndex}`]}
+                                                  onChange={(e) => {
+                                                    if (e.target.files && e.target.files[0]) {
+                                                      handlePortfolioItemImageUpload(secId, itemIndex, e.target.files[0])
+                                                    }
+                                                  }}
+                                                  className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
+                                                />
+                                                {uploadingState[`portfolio-${secId}-${itemIndex}`] && (
+                                                  <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
+                                                )}
+                                                {(localPreviewUrls[`portfolio-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(itemImage), localImages)) && (
+                                                  <img
+                                                    src={localPreviewUrls[`portfolio-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(itemImage), localImages)}
+                                                    alt={`Project ${itemIndex + 1} preview`}
+                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
+                                                  />
+                                                )}
+                                              </div>
+                                              <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
+                                                <select
+                                                  value={selectedLocalValue(itemImage, localImages)}
+                                                  onChange={(e) => patchPortfolioItem(secId, itemIndex, { image_url: e.target.value })}
+                                                  className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
+                                                >
+                                                  <option value="">-- Choose Local Template Image --</option>
+                                                  {localImages.map(preset => (
+                                                    <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
+                                                  ))}
+                                                </select>
+                                              </div>
+                                            </div>
+                                            <input
+                                              type="text"
+                                              value={displayImagePath(itemImage)}
+                                              onChange={(e) => patchPortfolioItem(secId, itemIndex, { image_url: e.target.value })}
+                                              placeholder="intime-12 or /uploads/image.jpg"
+                                              className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Category</label>
+                                            <input
+                                              type="text"
+                                              value={item.category || item.cat || ''}
+                                              onChange={(e) => patchPortfolioItem(secId, itemIndex, { category: e.target.value })}
+                                              placeholder="Business Strategy"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Heading</label>
+                                            <input
+                                              type="text"
+                                              value={item.heading || item.title || ''}
+                                              onChange={(e) => patchPortfolioItem(secId, itemIndex, { heading: e.target.value })}
+                                              placeholder="Market Expansion"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Button text</label>
+                                            <input
+                                              type="text"
+                                              value={item.button_text || ''}
+                                              onChange={(e) => patchPortfolioItem(secId, itemIndex, { button_text: e.target.value })}
+                                              placeholder="Read more"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Button URL</label>
+                                            <input
+                                              type="text"
+                                              value={item.button_url || item.url || ''}
+                                              onChange={(e) => patchPortfolioItem(secId, itemIndex, { button_url: e.target.value })}
+                                              placeholder="#portfolio"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
                               ) : (
                                 // Standard Section Editor
                                 <div className="grid md:grid-cols-2 gap-4">
@@ -2509,10 +2780,12 @@ export default function AdvisorDashboard() {
                                         ? normalizeFeaturedServicesEditorContent(values)
                                         : isAnnualProgressionSection(section.name)
                                           ? normalizeAnnualProgressionEditorContent(values)
-                                          : values),
+                                          : isPortfolioSection(section.name)
+                                            ? portfolioPreviewPayload(values)
+                                            : values),
                                   preview_slide: previewSlide[secId] ?? 0,
                                 }}
-                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) ? 720 : 520}
+                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) || isPortfolioSection(section.name) ? 720 : 520}
                                 borderColor="border-[#C8102E]"
                               />
                             </div>
