@@ -3,6 +3,26 @@ import Navbar from './Navbar'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import SectionIframePreview from './SectionIframePreview'
+import {
+  FaBalanceScale,
+  FaBriefcase,
+  FaBuilding,
+  FaChartLine,
+  FaChartPie,
+  FaCoins,
+  FaComments,
+  FaFileInvoiceDollar,
+  FaGlobe,
+  FaHandHoldingUsd,
+  FaHandshake,
+  FaLandmark,
+  FaLightbulb,
+  FaPercentage,
+  FaSeedling,
+  FaShieldAlt,
+  FaTasks,
+  FaUsers,
+} from 'react-icons/fa'
 
 const API_BASE = String(api.defaults.baseURL || '').replace(/\/$/, '')
 
@@ -190,8 +210,13 @@ function isCompanyHistorySection(name) {
   return key === 'companyhistory' || key === 'history' || key.includes('history')
 }
 
+function isFeaturedServicesSection(name) {
+  const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return key === 'featuredservices' || key === 'services'
+}
+
 function isAdvisorVisibleSection(name) {
-  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name)
+  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name)
 }
 
 function advisorSectionOrder(name) {
@@ -199,7 +224,66 @@ function advisorSectionOrder(name) {
   if (isWhatWeDoSection(name)) return 1
   if (isAboutSection(name)) return 2
   if (isCompanyHistorySection(name)) return 3
+  if (isFeaturedServicesSection(name)) return 4
   return 99
+}
+
+const SERVICE_ICON_OPTIONS = [
+  { value: 'chart-pie', label: 'Chart pie', Icon: FaChartPie },
+  { value: 'tasks', label: 'Tasks', Icon: FaTasks },
+  { value: 'landmark', label: 'Landmark', Icon: FaLandmark },
+  { value: 'coins', label: 'Coins', Icon: FaCoins },
+  { value: 'holding', label: 'Holding', Icon: FaHandHoldingUsd },
+  { value: 'seedling', label: 'Seedling', Icon: FaSeedling },
+  { value: 'briefcase', label: 'Briefcase', Icon: FaBriefcase },
+  { value: 'chart-line', label: 'Chart line', Icon: FaChartLine },
+  { value: 'handshake', label: 'Handshake', Icon: FaHandshake },
+  { value: 'building', label: 'Building', Icon: FaBuilding },
+  { value: 'users', label: 'Users', Icon: FaUsers },
+  { value: 'shield-alt', label: 'Shield', Icon: FaShieldAlt },
+  { value: 'lightbulb', label: 'Lightbulb', Icon: FaLightbulb },
+  { value: 'file-invoice-dollar', label: 'Invoice', Icon: FaFileInvoiceDollar },
+  { value: 'percentage', label: 'Percentage', Icon: FaPercentage },
+  { value: 'globe', label: 'Globe', Icon: FaGlobe },
+  { value: 'comments', label: 'Comments', Icon: FaComments },
+  { value: 'balance-scale', label: 'Balance', Icon: FaBalanceScale },
+]
+
+function defaultFeaturedServiceBoxes() {
+  return [
+    { icon: 'chart-pie', heading: 'Strategy & Planning', text: 'Collaborate Consulting exists to find the place where being seeming disparate interests meet.', button_text: 'Read more', button_url: '#service-strategy-planning' },
+    { icon: 'tasks', heading: 'Program Manager', text: 'Collaborate Consulting exists to find the place where being seeming disparate interests meet.', button_text: 'Read more', button_url: '#service-program-manager' },
+    { icon: 'landmark', heading: 'Tax Management', text: 'Collaborate Consulting exists to find the place where being seeming disparate interests meet.', button_text: 'Read more', button_url: '#service-tax-management' },
+    { icon: 'coins', heading: 'Investment Policy', text: 'Collaborate Consulting exists to find the place where being seeming disparate interests meet.', button_text: 'Read more', button_url: '#service-investment-policy' },
+    { icon: 'holding', heading: 'Financial Advices', text: 'Collaborate Consulting exists to find the place where being seeming disparate interests meet.', button_text: 'Read more', button_url: '#service-financial-advices' },
+    { icon: 'seedling', heading: 'Business Growth Plan', text: 'Collaborate Consulting exists to find the place where being seeming disparate interests meet.', button_text: 'Read more', button_url: '#service-business-growth-plan' },
+  ]
+}
+
+function normalizeFeaturedServicesEditorContent(content) {
+  const c = content && typeof content === 'object' ? { ...content } : {}
+  const defaults = defaultFeaturedServiceBoxes()
+  const legacy = Boolean(c.eyebrow && c.subheading && !c.text && !c.boxes)
+  const list = Array.isArray(c.boxes) && c.boxes.length
+    ? c.boxes
+    : (Array.isArray(c.items) ? c.items : [])
+  const originalSubheading = c.subheading
+  c.subheading = legacy ? (c.eyebrow || 'FEATURED SERVICES') : (c.subheading || c.eyebrow || 'FEATURED SERVICES')
+  c.text = legacy ? (originalSubheading || '') : (c.text || 'Provide users with appropriate view and access permissions to requests, problems, changes, contracts, assets, solutions')
+  if (!c.heading) c.heading = 'We help to get Solutions!'
+  c.boxes = defaults.map((fallback, i) => {
+    const item = list[i] && typeof list[i] === 'object' ? list[i] : {}
+    return {
+      ...fallback,
+      ...item,
+      icon: item.icon || fallback.icon,
+      heading: item.heading || item.title || fallback.heading,
+      text: item.text || item.desc || fallback.text,
+      button_text: item.button_text || item.read_more || fallback.button_text,
+      button_url: item.button_url || item.url || item.link || (item.slug ? `#service-${item.slug}` : fallback.button_url),
+    }
+  })
+  return c
 }
 
 function defaultAboutGauges() {
@@ -678,7 +762,11 @@ export default function AdvisorDashboard() {
         const parsed = parseJson(s.content)
         initialEdits[s.id] = isAboutSection(s.name)
           ? normalizeAboutEditorContent(parsed)
-          : (isCompanyHistorySection(s.name) ? normalizeCompanyHistoryEditorContent(parsed) : parsed)
+          : isCompanyHistorySection(s.name)
+            ? normalizeCompanyHistoryEditorContent(parsed)
+            : isFeaturedServicesSection(s.name)
+              ? normalizeFeaturedServicesEditorContent(parsed)
+              : parsed
       }
     })
     setSectionEdits(initialEdits)
@@ -710,7 +798,11 @@ export default function AdvisorDashboard() {
         ...prev,
         [section.id]: isAboutSection(section.name)
           ? normalizeAboutEditorContent(parsed)
-          : (isCompanyHistorySection(section.name) ? normalizeCompanyHistoryEditorContent(parsed) : parsed)
+          : isCompanyHistorySection(section.name)
+            ? normalizeCompanyHistoryEditorContent(parsed)
+            : isFeaturedServicesSection(section.name)
+              ? normalizeFeaturedServicesEditorContent(parsed)
+              : parsed
       }))
       setMessage(`🔒 Section "${section.name}" locked for you. You can now edit its content.`)
     } catch (err) {
@@ -738,6 +830,15 @@ export default function AdvisorDashboard() {
     setSectionEdits((prev) => {
       const source = prev[secId]?.boxes || prev[secId]?.items || [{}, {}, {}]
       const boxes = [0, 1, 2].map((i) => ({ ...(source[i] || {}) }))
+      boxes[boxIndex] = { ...boxes[boxIndex], ...patch }
+      return { ...prev, [secId]: { ...(prev[secId] || {}), boxes } }
+    })
+  }
+
+  const patchServiceBox = (secId, boxIndex, patch) => {
+    setSectionEdits((prev) => {
+      const source = prev[secId]?.boxes || prev[secId]?.items || defaultFeaturedServiceBoxes()
+      const boxes = defaultFeaturedServiceBoxes().map((_, i) => ({ ...(source[i] || {}) }))
       boxes[boxIndex] = { ...boxes[boxIndex], ...patch }
       return { ...prev, [secId]: { ...(prev[secId] || {}), boxes } }
     })
@@ -1306,6 +1407,13 @@ export default function AdvisorDashboard() {
                                                 {uploadingState[`${secId}-${slideIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
                                                 )}
+                                                {(localPreviewUrls[`${secId}-${slideIndex}`] || editorPreviewSrc(displayImagePath(slideImage), localImages)) && (
+                                                  <img
+                                                    src={localPreviewUrls[`${secId}-${slideIndex}`] || editorPreviewSrc(displayImagePath(slideImage), localImages)}
+                                                    alt={`Slide ${slideIndex + 1} preview`}
+                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
+                                                  />
+                                                )}
                                               </div>
 
                                               {/* 2. Select Local Template Image */}
@@ -1328,6 +1436,13 @@ export default function AdvisorDashboard() {
                                                     <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
                                                   ))}
                                                 </select>
+                                                {localThumbSrc(slideImage, localImages) && (
+                                                  <img
+                                                    src={localThumbSrc(slideImage, localImages)}
+                                                    alt={imageStem(slideImage)}
+                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
+                                                  />
+                                                )}
                                               </div>
                                             </div>
 
@@ -1467,7 +1582,7 @@ export default function AdvisorDashboard() {
                                         value={values.subheading || values.eyebrow || ''}
                                         onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
                                         placeholder="WHAT WE DO"
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold tracking-wider uppercase"
                                       />
                                     </div>
                                     <div className="md:col-span-2">
@@ -1520,6 +1635,13 @@ export default function AdvisorDashboard() {
                                                 />
                                                 {uploadingState[`box-${secId}-${boxIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
+                                                )}
+                                                {(localPreviewUrls[`box-${secId}-${boxIndex}`] || editorPreviewSrc(displayImagePath(boxImage), localImages)) && (
+                                                  <img
+                                                    src={localPreviewUrls[`box-${secId}-${boxIndex}`] || editorPreviewSrc(displayImagePath(boxImage), localImages)}
+                                                    alt={`Box ${boxIndex + 1} preview`}
+                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
+                                                  />
                                                 )}
                                               </div>
                                               <div className="bg-gray-50 border p-2.5 rounded-md">
@@ -1606,7 +1728,7 @@ export default function AdvisorDashboard() {
                                         value={values.eyebrow || ''}
                                         onChange={(e) => handleFieldValueChange(secId, 'eyebrow', e.target.value)}
                                         placeholder="ABOUT US"
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold tracking-wider uppercase"
                                       />
                                     </div>
                                     <div className="md:col-span-2">
@@ -1668,6 +1790,13 @@ export default function AdvisorDashboard() {
                                           />
                                           {uploadingState[`about-${secId}`] && (
                                             <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
+                                          )}
+                                          {(localPreviewUrls[`about-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages)) && (
+                                            <img
+                                              src={localPreviewUrls[`about-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages)}
+                                              alt="About preview"
+                                              className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
+                                            />
                                           )}
                                         </div>
                                         <div className="bg-gray-50 border p-2.5 rounded-md">
@@ -1769,7 +1898,7 @@ export default function AdvisorDashboard() {
                                         value={values.subheading || values.eyebrow || ''}
                                         onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
                                         placeholder="OUR JOURNEY"
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold tracking-wider uppercase"
                                       />
                                     </div>
                                     <div className="md:col-span-2">
@@ -1821,7 +1950,7 @@ export default function AdvisorDashboard() {
                                               value={yearItem.red_text || ''}
                                               onChange={(e) => patchYear(secId, yearIndex, { red_text: e.target.value })}
                                               placeholder="2020 Milestone"
-                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold"
                                             />
                                           </div>
                                           <div className="md:col-span-2">
@@ -1863,6 +1992,13 @@ export default function AdvisorDashboard() {
                                                 {uploadingState[`year-${secId}-${yearIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
                                                 )}
+                                                {(localPreviewUrls[`year-${secId}-${yearIndex}`] || editorPreviewSrc(displayImagePath(yearImage), localImages)) && (
+                                                  <img
+                                                    src={localPreviewUrls[`year-${secId}-${yearIndex}`] || editorPreviewSrc(displayImagePath(yearImage), localImages)}
+                                                    alt={`Year ${yearIndex + 1} preview`}
+                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
+                                                  />
+                                                )}
                                               </div>
                                               <div className="bg-gray-50 border p-2.5 rounded-md">
                                                 <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
@@ -1893,6 +2029,124 @@ export default function AdvisorDashboard() {
                                               value={yearItem.text || ''}
                                               onChange={(e) => patchYear(secId, yearIndex, { text: e.target.value })}
                                               placeholder="Milestone description..."
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
+                              ) : isFeaturedServicesSection(section.name) ? (
+                                <div className="space-y-8">
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Featured Services</h4>
+                                    <p className="text-xs text-gray-600">Edit the red subheading, heading, intro text, and the six service boxes (icon, heading, text, button).</p>
+                                  </div>
+
+                                  <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
+                                      <input
+                                        type="text"
+                                        value={values.subheading || values.eyebrow || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
+                                        placeholder="FEATURED SERVICES"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Heading</label>
+                                      <input
+                                        type="text"
+                                        value={values.heading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'heading', e.target.value)}
+                                        placeholder="We help to get Solutions!"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Text</label>
+                                      <textarea
+                                        rows={3}
+                                        value={values.text || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'text', e.target.value)}
+                                        placeholder="Provide users with appropriate view and access permissions..."
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {[0, 1, 2, 3, 4, 5].map((boxIndex) => {
+                                    const box = (values.boxes && values.boxes[boxIndex]) || {}
+                                    return (
+                                      <div key={boxIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
+                                          <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">{boxIndex + 1}</span>
+                                          Box {boxIndex + 1}
+                                        </h5>
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-2">Icon</label>
+                                            <div className="grid grid-cols-6 sm:grid-cols-9 gap-2">
+                                              {SERVICE_ICON_OPTIONS.map((opt) => {
+                                                const selected = (box.icon || '') === opt.value
+                                                const Icon = opt.Icon
+                                                return (
+                                                  <button
+                                                    key={opt.value}
+                                                    type="button"
+                                                    title={opt.label}
+                                                    onClick={() => patchServiceBox(secId, boxIndex, { icon: opt.value })}
+                                                    className={`h-10 rounded-lg border flex items-center justify-center transition ${
+                                                      selected
+                                                        ? 'border-[#0B1B3D] bg-[#0B1B3D] text-white'
+                                                        : 'border-gray-200 bg-white text-[#0B1B3D] hover:border-gray-400'
+                                                    }`}
+                                                  >
+                                                    <Icon size={16} />
+                                                  </button>
+                                                )
+                                              })}
+                                            </div>
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Heading</label>
+                                            <input
+                                              type="text"
+                                              value={box.heading || box.title || ''}
+                                              onChange={(e) => patchServiceBox(secId, boxIndex, { heading: e.target.value })}
+                                              placeholder="Strategy & Planning"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Text</label>
+                                            <textarea
+                                              rows={2}
+                                              value={box.text || ''}
+                                              onChange={(e) => patchServiceBox(secId, boxIndex, { text: e.target.value })}
+                                              placeholder="Box description..."
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Button text</label>
+                                            <input
+                                              type="text"
+                                              value={box.button_text || ''}
+                                              onChange={(e) => patchServiceBox(secId, boxIndex, { button_text: e.target.value })}
+                                              placeholder="Read more"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Button URL</label>
+                                            <input
+                                              type="text"
+                                              value={box.button_url || box.url || ''}
+                                              onChange={(e) => patchServiceBox(secId, boxIndex, { button_url: e.target.value })}
+                                              placeholder="#services"
                                               className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                             />
                                           </div>
@@ -2014,10 +2268,14 @@ export default function AdvisorDashboard() {
                                 data={{
                                   ...(isAboutSection(section.name)
                                     ? aboutPreviewPayload(values)
-                                    : (isCompanyHistorySection(section.name) ? companyHistoryPreviewPayload(values) : values)),
+                                    : isCompanyHistorySection(section.name)
+                                      ? companyHistoryPreviewPayload(values)
+                                      : isFeaturedServicesSection(section.name)
+                                        ? normalizeFeaturedServicesEditorContent(values)
+                                        : values),
                                   preview_slide: previewSlide[secId] ?? 0,
                                 }}
-                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) ? 720 : 520}
+                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) ? 720 : 520}
                                 borderColor="border-[#C8102E]"
                               />
                             </div>
