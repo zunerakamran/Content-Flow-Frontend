@@ -261,29 +261,26 @@ function defaultFeaturedServiceBoxes() {
 }
 
 function normalizeFeaturedServicesEditorContent(content) {
-  const c = content && typeof content === 'object' ? { ...content } : {}
+  const c = content && typeof content === 'object' ? content : {}
   const defaults = defaultFeaturedServiceBoxes()
-  const legacy = Boolean(c.eyebrow && c.subheading && !c.text && !c.boxes)
   const list = Array.isArray(c.boxes) && c.boxes.length
     ? c.boxes
     : (Array.isArray(c.items) ? c.items : [])
-  const originalSubheading = c.subheading
-  c.subheading = legacy ? (c.eyebrow || 'FEATURED SERVICES') : (c.subheading || c.eyebrow || 'FEATURED SERVICES')
-  c.text = legacy ? (originalSubheading || '') : (c.text || 'Provide users with appropriate view and access permissions to requests, problems, changes, contracts, assets, solutions')
-  if (!c.heading) c.heading = 'We help to get Solutions!'
-  c.boxes = defaults.map((fallback, i) => {
-    const item = list[i] && typeof list[i] === 'object' ? list[i] : {}
-    return {
-      ...fallback,
-      ...item,
-      icon: item.icon || fallback.icon,
-      heading: item.heading || item.title || fallback.heading,
-      text: item.text || item.desc || fallback.text,
-      button_text: item.button_text || item.read_more || fallback.button_text,
-      button_url: item.button_url || item.url || item.link || (item.slug ? `#service-${item.slug}` : fallback.button_url),
-    }
-  })
-  return c
+  return {
+    subheading: c.subheading || 'FEATURED SERVICES',
+    heading: c.heading || 'We help to get Solutions!',
+    text: c.text || 'Provide users with appropriate view and access permissions to requests, problems, changes, contracts, assets, solutions',
+    boxes: defaults.map((fallback, i) => {
+      const item = list[i] && typeof list[i] === 'object' ? list[i] : {}
+      return {
+        icon: item.icon || fallback.icon,
+        heading: item.heading || item.title || fallback.heading,
+        text: item.text || item.desc || fallback.text,
+        button_text: item.button_text || item.read_more || fallback.button_text,
+        button_url: item.button_url || item.url || item.link || (item.slug ? `#service-${item.slug}` : fallback.button_url),
+      }
+    }),
+  }
 }
 
 function defaultAboutGauges() {
@@ -896,10 +893,17 @@ export default function AdvisorDashboard() {
     setError('')
     setIsSubmitting(true)
 
-    const batchPayload = checkedSectionIds.map(secId => ({
-      section_id: secId,
-      proposed_content: JSON.stringify(sanitizeSectionContent(sectionEdits[secId] || {}), null, 2)
-    }))
+    const batchPayload = checkedSectionIds.map(secId => {
+      const section = sections.find(s => s.id === secId)
+      const raw = sanitizeSectionContent(sectionEdits[secId] || {})
+      const content = section && isFeaturedServicesSection(section.name)
+        ? normalizeFeaturedServicesEditorContent(raw)
+        : raw
+      return {
+        section_id: secId,
+        proposed_content: JSON.stringify(content, null, 2)
+      }
+    })
 
     try {
       await api.post('/change-requests', { section_edits: batchPayload })
@@ -2049,7 +2053,7 @@ export default function AdvisorDashboard() {
                                       <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
                                       <input
                                         type="text"
-                                        value={values.subheading || values.eyebrow || ''}
+                                        value={values.subheading || ''}
                                         onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
                                         placeholder="FEATURED SERVICES"
                                         className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
