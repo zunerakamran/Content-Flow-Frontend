@@ -2324,13 +2324,6 @@ export default function AdvisorDashboard() {
                                                 {uploadingState[`${secId}-${slideIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
                                                 )}
-                                                {(localPreviewUrls[`${secId}-${slideIndex}`] || editorPreviewSrc(displayImagePath(slideImage), localImages)) && (
-                                                  <img
-                                                    src={localPreviewUrls[`${secId}-${slideIndex}`] || editorPreviewSrc(displayImagePath(slideImage), localImages)}
-                                                    alt={`Slide ${slideIndex + 1} preview`}
-                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
-                                                  />
-                                                )}
                                               </div>
 
                                               {/* 2. Select Local Template Image */}
@@ -2353,13 +2346,6 @@ export default function AdvisorDashboard() {
                                                     <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
                                                   ))}
                                                 </select>
-                                                {localThumbSrc(slideImage, localImages) && (
-                                                  <img
-                                                    src={localThumbSrc(slideImage, localImages)}
-                                                    alt={imageStem(slideImage)}
-                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
-                                                  />
-                                                )}
                                               </div>
                                             </div>
 
@@ -2486,20 +2472,20 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isWhatWeDoSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">What we do</h4>
-                                    <p className="text-xs text-gray-600">Edit the red subheading, main heading, intro text, and the three service boxes.</p>
+                                    <p className="text-xs text-gray-600">Edit the subheading, main heading, intro text, and the three service boxes.</p>
                                   </div>
 
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
                                       <input
                                         type="text"
                                         value={values.subheading || values.eyebrow || ''}
                                         onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
                                         placeholder="WHAT WE DO"
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold tracking-wider uppercase"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                       />
                                     </div>
                                     <div className="md:col-span-2">
@@ -2552,13 +2538,6 @@ export default function AdvisorDashboard() {
                                                 />
                                                 {uploadingState[`box-${secId}-${boxIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
-                                                )}
-                                                {(localPreviewUrls[`box-${secId}-${boxIndex}`] || editorPreviewSrc(displayImagePath(boxImage), localImages)) && (
-                                                  <img
-                                                    src={localPreviewUrls[`box-${secId}-${boxIndex}`] || editorPreviewSrc(displayImagePath(boxImage), localImages)}
-                                                    alt={`Box ${boxIndex + 1} preview`}
-                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
-                                                  />
                                                 )}
                                               </div>
                                               <div className="bg-gray-50 border p-2.5 rounded-md">
@@ -2630,22 +2609,22 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isAboutSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">About Section</h4>
                                     <p className="text-xs text-gray-600">
-                                      This section has no button. Edit the headings, photo (upload or pick), two percentage + text items, and the red box.
+                                      This section has no button. Edit the headings, photo (upload or pick), two percentage + text items, and the highlight box.
                                     </p>
                                   </div>
 
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
                                       <input
                                         type="text"
                                         value={values.eyebrow || ''}
                                         onChange={(e) => handleFieldValueChange(secId, 'eyebrow', e.target.value)}
                                         placeholder="ABOUT US"
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold tracking-wider uppercase"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                       />
                                     </div>
                                     <div className="md:col-span-2">
@@ -2708,13 +2687,6 @@ export default function AdvisorDashboard() {
                                           {uploadingState[`about-${secId}`] && (
                                             <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
                                           )}
-                                          {(localPreviewUrls[`about-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages)) && (
-                                            <img
-                                              src={localPreviewUrls[`about-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages)}
-                                              alt="About preview"
-                                              className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
-                                            />
-                                          )}
                                         </div>
                                         <div className="bg-gray-50 border p-2.5 rounded-md">
                                           <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
@@ -2775,10 +2747,10 @@ export default function AdvisorDashboard() {
                                   })}
 
                                   <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                    <h5 className="text-sm font-bold text-[#0B1B3D] mb-4">Red box</h5>
+                                    <h5 className="text-sm font-bold text-[#0B1B3D] mb-4">Highlight box</h5>
                                     <div className="grid md:grid-cols-2 gap-4">
                                       <div>
-                                        <label className="block text-xs font-bold text-gray-700 mb-1">Number in red box</label>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Highlight number</label>
                                         <input
                                           type="text"
                                           value={values.experience_years || ''}
@@ -2788,7 +2760,7 @@ export default function AdvisorDashboard() {
                                         />
                                       </div>
                                       <div>
-                                        <label className="block text-xs font-bold text-gray-700 mb-1">Text in red box</label>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Highlight text</label>
                                         <input
                                           type="text"
                                           value={values.experience_label || ''}
@@ -2802,20 +2774,20 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isCompanyHistorySection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Company History</h4>
-                                    <p className="text-xs text-gray-600">Edit the red subheading, heading, intro text, and the six year milestones.</p>
+                                    <p className="text-xs text-gray-600">Edit the subheading, heading, intro text, and the six year milestones.</p>
                                   </div>
 
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
                                       <input
                                         type="text"
                                         value={values.subheading || values.eyebrow || ''}
                                         onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
                                         placeholder="OUR JOURNEY"
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold tracking-wider uppercase"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                       />
                                     </div>
                                     <div className="md:col-span-2">
@@ -2861,13 +2833,13 @@ export default function AdvisorDashboard() {
                                             />
                                           </div>
                                           <div>
-                                            <label className="block text-xs font-bold text-gray-700 mb-1">Red text</label>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Milestone badge</label>
                                             <input
                                               type="text"
                                               value={yearItem.red_text || ''}
                                               onChange={(e) => patchYear(secId, yearIndex, { red_text: e.target.value })}
                                               placeholder="2020 Milestone"
-                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none text-[#C8102E] font-bold"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                             />
                                           </div>
                                           <div className="md:col-span-2">
@@ -2909,13 +2881,6 @@ export default function AdvisorDashboard() {
                                                 {uploadingState[`year-${secId}-${yearIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
                                                 )}
-                                                {(localPreviewUrls[`year-${secId}-${yearIndex}`] || editorPreviewSrc(displayImagePath(yearImage), localImages)) && (
-                                                  <img
-                                                    src={localPreviewUrls[`year-${secId}-${yearIndex}`] || editorPreviewSrc(displayImagePath(yearImage), localImages)}
-                                                    alt={`Year ${yearIndex + 1} preview`}
-                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
-                                                  />
-                                                )}
                                               </div>
                                               <div className="bg-gray-50 border p-2.5 rounded-md">
                                                 <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
@@ -2956,14 +2921,14 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isFeaturedServicesSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Featured Services</h4>
-                                    <p className="text-xs text-gray-600">Edit the red subheading, heading, intro text, and the six service boxes (icon, heading, text, button).</p>
+                                    <p className="text-xs text-gray-600">Edit the subheading, heading, intro text, and the six service boxes (icon, heading, text, button).</p>
                                   </div>
 
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
                                       <input
                                         type="text"
                                         value={values.subheading || ''}
@@ -3074,14 +3039,14 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isAnnualProgressionSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Annual Progression</h4>
-                                    <p className="text-xs text-gray-600">Edit the red subheading, heading, intro text, three progress bars, and two highlight cards.</p>
+                                    <p className="text-xs text-gray-600">Edit the subheading, heading, intro text, three progress bars, and two highlight cards.</p>
                                   </div>
 
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
                                       <input
                                         type="text"
                                         value={values.subheading || ''}
@@ -3218,14 +3183,14 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isPortfolioSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Portfolio Section</h4>
-                                    <p className="text-xs text-gray-600">Edit the red subheading, heading, and the six project cards (image, category, heading, button).</p>
+                                    <p className="text-xs text-gray-600">Edit the subheading, heading, and the six project cards (image, category, heading, button).</p>
                                   </div>
 
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
                                       <input
                                         type="text"
                                         value={values.subheading || ''}
@@ -3274,13 +3239,6 @@ export default function AdvisorDashboard() {
                                                 />
                                                 {uploadingState[`portfolio-${secId}-${itemIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
-                                                )}
-                                                {(localPreviewUrls[`portfolio-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(itemImage), localImages)) && (
-                                                  <img
-                                                    src={localPreviewUrls[`portfolio-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(itemImage), localImages)}
-                                                    alt={`Project ${itemIndex + 1} preview`}
-                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
-                                                  />
                                                 )}
                                               </div>
                                               <div className="bg-gray-50 border p-2.5 rounded-md">
@@ -3352,14 +3310,14 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isBranchesSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Branches and Appointment</h4>
                                     <p className="text-xs text-gray-600">Edit the heading copy, map image, form labels, stats overlay, and the four branch cards.</p>
                                   </div>
 
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading (red)</label>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
                                       <input
                                         type="text"
                                         value={values.subheading || ''}
@@ -3457,13 +3415,6 @@ export default function AdvisorDashboard() {
                                           {uploadingState[`branches-map-${secId}`] && (
                                             <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
                                           )}
-                                          {(localPreviewUrls[`branches-map-${secId}`] || editorPreviewSrc(displayImagePath(values.map_image), localImages)) && (
-                                            <img
-                                              src={localPreviewUrls[`branches-map-${secId}`] || editorPreviewSrc(displayImagePath(values.map_image), localImages)}
-                                              alt="Map preview"
-                                              className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
-                                            />
-                                          )}
                                         </div>
                                         <div className="bg-gray-50 border p-2.5 rounded-md">
                                           <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
@@ -3545,7 +3496,7 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isCounterStatsSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Counter Stats</h4>
                                     <p className="text-xs text-gray-600">Edit the four stat cards shown in the red gradient band — icon, number, label, and description.</p>
                                   </div>
@@ -3620,14 +3571,14 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isTestimonialsSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Testimonials Carousel</h4>
                                     <p className="text-xs text-gray-600">Edit the section heading, side image, and three client testimonial slides.</p>
                                   </div>
 
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Eyebrow (red tagline)</label>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Eyebrow</label>
                                       <input
                                         type="text"
                                         value={values.eyebrow || ''}
@@ -3647,7 +3598,7 @@ export default function AdvisorDashboard() {
                                       />
                                     </div>
                                     <div className="md:col-span-2">
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Reviews label (red)</label>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Reviews label</label>
                                       <input
                                         type="text"
                                         value={values.subheading || ''}
@@ -3674,13 +3625,6 @@ export default function AdvisorDashboard() {
                                           />
                                           {uploadingState[`testimonials-side-${secId}`] && (
                                             <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
-                                          )}
-                                          {(localPreviewUrls[`testimonials-side-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages)) && (
-                                            <img
-                                              src={localPreviewUrls[`testimonials-side-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages)}
-                                              alt="Side image preview"
-                                              className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
-                                            />
                                           )}
                                         </div>
                                         <div className="bg-gray-50 border p-2.5 rounded-md">
@@ -3765,13 +3709,6 @@ export default function AdvisorDashboard() {
                                                 {uploadingState[`testimonial-${secId}-${itemIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
                                                 )}
-                                                {(localPreviewUrls[`testimonial-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(item.image_url), localImages)) && (
-                                                  <img
-                                                    src={localPreviewUrls[`testimonial-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(item.image_url), localImages)}
-                                                    alt={`Testimonial ${itemIndex + 1} avatar`}
-                                                    className="mt-2 w-16 h-16 rounded-full object-cover border border-gray-200"
-                                                  />
-                                                )}
                                               </div>
                                               <div className="bg-gray-50 border p-2.5 rounded-md">
                                                 <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
@@ -3802,14 +3739,14 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isLatestNewsSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Latest News</h4>
                                     <p className="text-xs text-gray-600">Edit the section heading and three blog post cards with date, author, category, title, excerpt, and image.</p>
                                   </div>
 
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Eyebrow (red tagline)</label>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Eyebrow</label>
                                       <input
                                         type="text"
                                         value={values.eyebrow || ''}
@@ -3938,13 +3875,6 @@ export default function AdvisorDashboard() {
                                                 {uploadingState[`latestnews-${secId}-${itemIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
                                                 )}
-                                                {(localPreviewUrls[`latestnews-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(item.image_url), localImages)) && (
-                                                  <img
-                                                    src={localPreviewUrls[`latestnews-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(item.image_url), localImages)}
-                                                    alt={`News post ${itemIndex + 1}`}
-                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
-                                                  />
-                                                )}
                                               </div>
                                               <div className="bg-gray-50 border p-2.5 rounded-md">
                                                 <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
@@ -3975,7 +3905,7 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isClientLogosSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Client Logos</h4>
                                     <p className="text-xs text-gray-600">Edit the five client logos shown in the grey band. Use a text label or upload a logo image for each slot.</p>
                                   </div>
@@ -4018,13 +3948,6 @@ export default function AdvisorDashboard() {
                                                 {uploadingState[`clientlogo-${secId}-${itemIndex}`] && (
                                                   <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
                                                 )}
-                                                {(localPreviewUrls[`clientlogo-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(item.image_url), localImages)) && (
-                                                  <img
-                                                    src={localPreviewUrls[`clientlogo-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(item.image_url), localImages)}
-                                                    alt={`Logo ${itemIndex + 1}`}
-                                                    className="mt-2 h-10 w-auto max-w-[140px] object-contain"
-                                                  />
-                                                )}
                                               </div>
                                               <div className="bg-gray-50 border p-2.5 rounded-md">
                                                 <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
@@ -4055,7 +3978,7 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isCtaBannerSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">CTA Banner</h4>
                                     <p className="text-xs text-gray-600">Edit the dark call-to-action strip — heading, supporting text, and button label/link.</p>
                                   </div>
@@ -4167,13 +4090,6 @@ export default function AdvisorDashboard() {
                                         className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
                                       />
                                     </div>
-                                    {editorPreviewSrc(values.image_url, localImages) && (
-                                      <img
-                                        src={editorPreviewSrc(values.image_url, localImages)}
-                                        alt="Section image preview"
-                                        className="w-full h-28 object-cover rounded border border-gray-200"
-                                      />
-                                    )}
                                   </div>
                                   <div>
                                     <label className="block text-xs font-bold text-gray-700 mb-1">Button Text</label>
