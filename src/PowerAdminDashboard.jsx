@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import Navbar from './Navbar'
 import api from './api/axios'
+import { sectionDisplayName } from './utils/sectionDisplay'
 
 export default function PowerAdminDashboard() {
     const [requests, setRequests] = useState([])
@@ -27,6 +28,13 @@ export default function PowerAdminDashboard() {
     const [templateThumb, setTemplateThumb] = useState('')
     const [templateIsActive, setTemplateIsActive] = useState(true)
     const [isSavingTemplate, setIsSavingTemplate] = useState(false)
+
+    // Deployment Section Management
+    const [sectionManageRequest, setSectionManageRequest] = useState(null)
+    const [deploymentSections, setDeploymentSections] = useState([])
+    const [sectionDrafts, setSectionDrafts] = useState({})
+    const [isLoadingSections, setIsLoadingSections] = useState(false)
+    const [isSavingSections, setIsSavingSections] = useState(false)
 
     const fetchRequests = () => api.get('/template-requests').then(res => setRequests(res.data)).catch(() => {})
     const fetchTemplates = () => api.get('/templates?all=1').then(res => setTemplates(res.data)).catch(() => {})
@@ -133,6 +141,72 @@ export default function PowerAdminDashboard() {
             fetchTemplates()
         } catch (err) {
             setError(err.response?.data?.message || 'Failed to delete template.')
+        }
+    }
+
+    const openSectionManageModal = async (req) => {
+        setSectionManageRequest(req)
+        setDeploymentSections([])
+        setSectionDrafts({})
+        setIsLoadingSections(true)
+        setMessage('')
+        setError('')
+        try {
+            const res = await api.get(`/template-requests/${req.id}/sections`)
+            const list = Array.isArray(res.data?.sections) ? res.data.sections : []
+            setDeploymentSections(list)
+            const drafts = {}
+            list.forEach((section) => {
+                drafts[section.id] = {
+                    name: section.name || '',
+                    display_name: section.display_name || '',
+                    is_visible: section.is_visible !== false,
+                }
+            })
+            setSectionDrafts(drafts)
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to load deployment sections.')
+            setSectionManageRequest(null)
+        } finally {
+            setIsLoadingSections(false)
+        }
+    }
+
+    const handleSectionDraftChange = (sectionId, field, value) => {
+        setSectionDrafts(prev => ({
+            ...prev,
+            [sectionId]: {
+                ...prev[sectionId],
+                [field]: value,
+            },
+        }))
+    }
+
+    const handleSaveDeploymentSections = async (e) => {
+        e.preventDefault()
+        if (!sectionManageRequest) return
+        setIsSavingSections(true)
+        setMessage('')
+        setError('')
+        try {
+            const payload = deploymentSections.map((section) => {
+                const draft = sectionDrafts[section.id] || {}
+                return {
+                    id: section.id,
+                    name: draft.name?.trim() || section.name,
+                    display_name: draft.display_name?.trim() || null,
+                    is_visible: draft.is_visible !== false,
+                }
+            })
+            await api.put(`/template-requests/${sectionManageRequest.id}/sections`, { sections: payload })
+            setMessage(`Section settings saved for ${sectionManageRequest.domain_name || sectionManageRequest.domain}. Hidden sections will no longer appear on the deployed site.`)
+            setSectionManageRequest(null)
+            setDeploymentSections([])
+            setSectionDrafts({})
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to save section settings.')
+        } finally {
+            setIsSavingSections(false)
         }
     }
 
@@ -285,12 +359,22 @@ export default function PowerAdminDashboard() {
                                     </td>
                                     <td className="px-6 py-4">{statusBadge(req.status)}</td>
                                     <td className="px-6 py-4 text-right">
-                                        <button
-                                            onClick={() => openDeployModal(req)}
-                                            className="bg-[#0B1B3D] text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-slate-800 transition shadow-sm"
-                                        >
-                                            {req.status === 'deployed' ? '⚙️ Update Deployment' : '🚀 Deploy to cPanel'}
-                                        </button>
+                                        <div className="flex items-center justify-end gap-2 flex-wrap">
+                                            {req.status === 'deployed' && (
+                                                <button
+                                                    onClick={() => openSectionManageModal(req)}
+                                                    className="bg-white border border-[#0B1B3D] text-[#0B1B3D] text-xs font-bold px-4 py-2 rounded-lg hover:bg-slate-50 transition shadow-sm"
+                                                >
+                                                    📋 Manage Sections
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => openDeployModal(req)}
+                                                className="bg-[#0B1B3D] text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-slate-800 transition shadow-sm"
+                                            >
+                                                {req.status === 'deployed' ? '⚙️ Update Deployment' : '🚀 Deploy to cPanel'}
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                             ))}
@@ -394,6 +478,104 @@ export default function PowerAdminDashboard() {
                                 </button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Deployment Section Management Modal */}
+            {sectionManageRequest && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+                    <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-xl border border-gray-200 space-y-4 max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between border-b pb-3">
+                            <div>
+                                <h3 className="text-lg font-bold text-[#0B1B3D]">📋 Manage Deployment Sections</h3>
+                                <p className="text-xs text-gray-500 mt-0.5">
+                                    {sectionManageRequest.advisor?.name || 'Advisor'} — {sectionManageRequest.domain_name || sectionManageRequest.domain}
+                                    {sectionManageRequest.cpanel_domain && (
+                                        <> · <a href={sectionManageRequest.cpanel_domain} target="_blank" rel="noopener noreferrer" className="text-[#C8102E] hover:underline">{sectionManageRequest.cpanel_domain}</a></>
+                                    )}
+                                </p>
+                            </div>
+                            <button onClick={() => setSectionManageRequest(null)} className="text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
+                        </div>
+
+                        <p className="text-xs text-gray-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
+                            Rename sections or hide them from the live deployed site. Hidden sections stay in the database but will not appear on the advisor&apos;s public website.
+                        </p>
+
+                        {isLoadingSections ? (
+                            <div className="py-12 text-center text-gray-400 text-sm">Loading sections…</div>
+                        ) : deploymentSections.length === 0 ? (
+                            <div className="py-12 text-center text-gray-400 text-sm">No sections found for this deployment.</div>
+                        ) : (
+                            <form onSubmit={handleSaveDeploymentSections} className="space-y-3">
+                                {deploymentSections.map((section) => {
+                                    const draft = sectionDrafts[section.id] || {}
+                                    return (
+                                        <div
+                                            key={section.id}
+                                            className={`border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 ${draft.is_visible === false ? 'bg-gray-50 border-gray-200 opacity-75' : 'bg-white border-gray-200'}`}
+                                        >
+                                            <div className="flex-1 space-y-2 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-[10px] font-mono font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
+                                                        {sectionDisplayName(section)}
+                                                    </span>
+                                                    {draft.is_visible === false && (
+                                                        <span className="text-[10px] font-extrabold bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full uppercase">Hidden on site</span>
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Section Name (template key)</label>
+                                                    <input
+                                                        type="text"
+                                                        value={draft.name ?? section.name}
+                                                        onChange={e => handleSectionDraftChange(section.id, 'name', e.target.value)}
+                                                        className="w-full text-sm p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E] font-semibold"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Display Label (optional)</label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder={section.name}
+                                                        value={draft.display_name ?? ''}
+                                                        onChange={e => handleSectionDraftChange(section.id, 'display_name', e.target.value)}
+                                                        className="w-full text-sm p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E]"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <label className="flex items-center gap-2 cursor-pointer shrink-0 sm:flex-col sm:items-center">
+                                                <span className="text-[10px] font-bold text-gray-500 uppercase">Visible on site</span>
+                                                <input
+                                                    type="checkbox"
+                                                    checked={draft.is_visible !== false}
+                                                    onChange={e => handleSectionDraftChange(section.id, 'is_visible', e.target.checked)}
+                                                    className="w-5 h-5 text-[#C8102E] rounded border-gray-300 focus:ring-[#C8102E]"
+                                                />
+                                            </label>
+                                        </div>
+                                    )
+                                })}
+
+                                <div className="pt-3 flex items-center justify-end gap-3 border-t sticky bottom-0 bg-white">
+                                    <button
+                                        type="button"
+                                        onClick={() => setSectionManageRequest(null)}
+                                        className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        disabled={isSavingSections}
+                                        className="px-5 py-2 text-xs font-bold bg-[#0B1B3D] text-white rounded-lg hover:bg-slate-800 transition disabled:opacity-50 shadow-md"
+                                    >
+                                        {isSavingSections ? 'Saving & Syncing…' : 'Save Section Settings'}
+                                    </button>
+                                </div>
+                            </form>
+                        )}
                     </div>
                 </div>
             )}
@@ -505,4 +687,4 @@ export default function PowerAdminDashboard() {
             )}
         </div>
     )
-}
+}

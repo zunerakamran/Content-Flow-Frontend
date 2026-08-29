@@ -4,6 +4,7 @@ import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import SectionIframePreview from './SectionIframePreview'
 import { parseJson } from './utils/parseJson'
+import { sectionDisplayName } from './utils/sectionDisplay'
 import {
   FaBalanceScale,
   FaBriefcase,
@@ -1551,12 +1552,12 @@ export default function AdvisorDashboard() {
     setError('')
 
     if (!isChecked) {
-      setError(`Cannot unlock section "${section.name}". Sections remain locked until submitted or reviewed by an approver.`)
+      setError(`Cannot unlock section "${sectionDisplayName(section)}". Sections remain locked until submitted or reviewed by an approver.`)
       return
     }
 
     if (section.is_locked && section.locked_by !== user?.id) {
-      setError(`Section "${section.name}" is locked by ${section.locked_by_user?.name || 'another advisor'}.`)
+      setError(`Section "${sectionDisplayName(section)}" is locked by ${section.locked_by_user?.name || 'another advisor'}.`)
       return
     }
 
@@ -1594,7 +1595,7 @@ export default function AdvisorDashboard() {
                               ? normalizeCtaBannerEditorContent(parsed)
                               : parsed
       }))
-      setMessage(`🔒 Section "${section.name}" locked for you. You can now edit its content.`)
+      setMessage(`🔒 Section "${sectionDisplayName(section)}" locked for you. You can now edit its content.`)
     } catch (err) {
       setError(err.response?.data?.message || 'Could not lock section.')
     }
@@ -2194,7 +2195,12 @@ export default function AdvisorDashboard() {
                           />
                           <div className="flex-1">
                             <div className="font-bold text-[#0B1B3D] text-sm flex items-center justify-between">
-                              <span>{section.name}</span>
+                              <span className="flex items-center gap-2">
+                                {sectionDisplayName(section)}
+                                {section.is_visible === false && (
+                                  <span className="text-[10px] bg-gray-200 text-gray-600 font-bold px-2 py-0.5 rounded">Hidden on site</span>
+                                )}
+                              </span>
                               {isLockedByOther && (
                                 <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded">
                                   🔒 Locked by {section.locked_by_user?.name || 'Other'}
@@ -2247,7 +2253,7 @@ export default function AdvisorDashboard() {
                           <div className="bg-slate-50 border-b px-6 py-4 flex items-center justify-between">
                             <div className="flex items-center gap-3">
                               <span className="w-3 h-3 rounded-full bg-[#C8102E]"></span>
-                              <h3 className="text-base font-bold text-[#0B1B3D]">Editing: {section.name}</h3>
+                              <h3 className="text-base font-bold text-[#0B1B3D]">Editing: {sectionDisplayName(section)}</h3>
                             </div>
                             <div className="flex items-center gap-2 bg-white border p-1 rounded-lg">
                               <button
@@ -4053,7 +4059,7 @@ export default function AdvisorDashboard() {
                                   Live Template Preview — reflects your current edits
                                 </span>
                                 <span className="text-[11px] text-gray-400 font-mono">
-                                  {section.name}
+                                  {sectionDisplayName(section)}
                                 </span>
                               </div>
 
