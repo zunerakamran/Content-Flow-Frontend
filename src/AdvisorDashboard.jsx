@@ -243,8 +243,13 @@ function isTestimonialsSection(name) {
   return key === 'testimonialscarousel' || key === 'testimonials' || key.includes('testimonial')
 }
 
+function isLatestNewsSection(name) {
+  const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return key === 'latestnews' || key === 'news' || key.includes('latestnews')
+}
+
 function isAdvisorVisibleSection(name) {
-  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name) || isAnnualProgressionSection(name) || isPortfolioSection(name) || isBranchesSection(name) || isCounterStatsSection(name) || isTestimonialsSection(name)
+  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name) || isAnnualProgressionSection(name) || isPortfolioSection(name) || isBranchesSection(name) || isCounterStatsSection(name) || isTestimonialsSection(name) || isLatestNewsSection(name)
 }
 
 function advisorSectionOrder(name) {
@@ -258,6 +263,7 @@ function advisorSectionOrder(name) {
   if (isBranchesSection(name)) return 7
   if (isCounterStatsSection(name)) return 8
   if (isTestimonialsSection(name)) return 9
+  if (isLatestNewsSection(name)) return 10
   return 99
 }
 
@@ -571,6 +577,62 @@ function testimonialsPreviewPayload(values) {
     image: absSide || sideImage,
     img: absSide || sideImage,
     image_preview: sidePreview || undefined,
+    items: (normalized.items || []).map((item) => {
+      const preview = item.image_preview || ''
+      const image = preview || item.image_url || ''
+      const absImage = /^data:|^blob:/i.test(image)
+        ? image
+        : (isUploadedAsset(image) ? absoluteAssetUrl(image) : image)
+      return {
+        ...item,
+        image_preview: preview || undefined,
+        image_url: absImage || image,
+        image: absImage || image,
+        img: absImage || image,
+      }
+    }),
+  })
+}
+
+function defaultLatestNewsItems() {
+  return [
+    { date: '10', month: 'Nov, 20', author: 'John Doe', cat: 'Consulting', title: 'We would love to share a similar experience', excerpt: 'The theory was first published in 2008 a press released under the name of Cliff Arnall, who at the time was a tutor at the…', image_url: 'intime-03.jpg', button_text: 'Read more', button_url: '#news' },
+    { date: '06', month: 'Nov, 20', author: 'John Doe', cat: 'HR Consulting', title: 'We glad to discuss your organisation situation.', excerpt: 'The theory was first published in 2008 a press released under the name of Cliff Arnall, who at the time was a tutor at the…', image_url: 'intime-02.jpg', button_text: 'Read more', button_url: '#news' },
+    { date: '20', month: 'Oct, 20', author: 'John Doe', cat: 'Consulting', title: 'In this context our main approach was to build.', excerpt: 'The theory was first published in 2008 a press released under the name of Cliff Arnall, who at the time was a tutor at the…', image_url: 'intime-05.jpg', button_text: 'Read more', button_url: '#news' },
+  ]
+}
+
+function normalizeLatestNewsEditorContent(content) {
+  const c = content && typeof content === 'object' ? content : {}
+  const defaults = defaultLatestNewsItems()
+  const list = Array.isArray(c.items) && c.items.length
+    ? c.items
+    : (Array.isArray(c.posts) && c.posts.length ? c.posts : [])
+  return {
+    eyebrow: c.eyebrow || c.tagline || 'OUR LATEST NEWS',
+    heading: c.heading || 'Learn about our latest news from blog.',
+    items: defaults.map((fallback, i) => {
+      const item = list[i] && typeof list[i] === 'object' ? list[i] : {}
+      return {
+        date: item.date || item.day || fallback.date,
+        month: item.month || item.month_label || fallback.month,
+        author: item.author || item.by || fallback.author,
+        cat: item.cat || item.category || item.tag || fallback.cat,
+        title: item.title || item.heading || fallback.title,
+        excerpt: item.excerpt || item.text || item.desc || item.description || fallback.excerpt,
+        image_url: item.image_url || item.image || item.img || fallback.image_url,
+        image_preview: item.image_preview || '',
+        button_text: item.button_text || item.read_more || fallback.button_text,
+        button_url: item.button_url || item.url || item.link || fallback.button_url,
+      }
+    }),
+  }
+}
+
+function latestNewsPreviewPayload(values) {
+  const normalized = normalizeLatestNewsEditorContent(values || {})
+  return withAbsoluteUploadUrls({
+    ...normalized,
     items: (normalized.items || []).map((item) => {
       const preview = item.image_preview || ''
       const image = preview || item.image_url || ''
@@ -1039,6 +1101,61 @@ export default function AdvisorDashboard() {
     }
   }
 
+  const handleLatestNewsItemImageUpload = async (secId, itemIndex, file) => {
+    if (!file) return
+    const uploadKey = `latestnews-${secId}-${itemIndex}`
+    setLocalPreview(uploadKey, file)
+    setUploadingState((prev) => ({ ...prev, [uploadKey]: true }))
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+      reader.onerror = () => resolve('')
+      reader.readAsDataURL(file)
+    })
+    if (dataUrl) {
+      setSectionEdits((prev) => {
+        const source = prev[secId]?.items || prev[secId]?.posts || defaultLatestNewsItems()
+        const items = defaultLatestNewsItems().map((_, i) => ({ ...(source[i] || {}) }))
+        items[itemIndex] = {
+          ...items[itemIndex],
+          image_url: dataUrl,
+          image: dataUrl,
+          img: dataUrl,
+          image_preview: dataUrl,
+        }
+        return { ...prev, [secId]: { ...(prev[secId] || {}), items } }
+      })
+    }
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await api.post('upload-image', formData)
+      const uploadedUrl = storedUploadPath(res.data)
+      if (uploadedUrl) {
+        setSectionEdits((prev) => {
+          const source = prev[secId]?.items || prev[secId]?.posts || defaultLatestNewsItems()
+          const items = defaultLatestNewsItems().map((_, i) => ({ ...(source[i] || {}) }))
+          items[itemIndex] = {
+            ...items[itemIndex],
+            image_url: uploadedUrl,
+            image: uploadedUrl,
+            img: uploadedUrl,
+            image_preview: dataUrl || items[itemIndex].image_preview,
+          }
+          return { ...prev, [secId]: { ...(prev[secId] || {}), items } }
+        })
+        setMessage(`📸 Image uploaded successfully for News Post ${itemIndex + 1}!`)
+      } else {
+        setError('Upload succeeded but no image path was returned.')
+      }
+    } catch (err) {
+      const fieldError = err.response?.data?.errors?.image?.[0]
+      setError(fieldError || err.response?.data?.message || 'Failed to upload image.')
+    } finally {
+      setUploadingState((prev) => ({ ...prev, [uploadKey]: false }))
+    }
+  }
+
   const handleAboutImageUpload = async (secId, file) => {
     if (!file) return
     const uploadKey = `about-${secId}`
@@ -1292,7 +1409,9 @@ export default function AdvisorDashboard() {
                       ? normalizeCounterStatsEditorContent(parsed)
                       : isTestimonialsSection(s.name)
                         ? normalizeTestimonialsEditorContent(parsed)
-                        : parsed
+                        : isLatestNewsSection(s.name)
+                          ? normalizeLatestNewsEditorContent(parsed)
+                          : parsed
       }
     })
     setSectionEdits(initialEdits)
@@ -1338,7 +1457,9 @@ export default function AdvisorDashboard() {
                       ? normalizeCounterStatsEditorContent(parsed)
                       : isTestimonialsSection(section.name)
                         ? normalizeTestimonialsEditorContent(parsed)
-                        : parsed
+                        : isLatestNewsSection(section.name)
+                          ? normalizeLatestNewsEditorContent(parsed)
+                          : parsed
       }))
       setMessage(`🔒 Section "${section.name}" locked for you. You can now edit its content.`)
     } catch (err) {
@@ -1450,6 +1571,20 @@ export default function AdvisorDashboard() {
     })
   }
 
+  const patchNewsItem = (secId, itemIndex, patch) => {
+    setSectionEdits((prev) => {
+      const source = prev[secId]?.items || prev[secId]?.posts || defaultLatestNewsItems()
+      const items = defaultLatestNewsItems().map((_, i) => ({ ...(source[i] || {}) }))
+      items[itemIndex] = { ...items[itemIndex], ...patch }
+      if (patch.image_url && !/^data:|^blob:/i.test(patch.image_url)) {
+        items[itemIndex].image_preview = ''
+        items[itemIndex].image = patch.image_url
+        items[itemIndex].img = patch.image_url
+      }
+      return { ...prev, [secId]: { ...(prev[secId] || {}), items } }
+    })
+  }
+
   const patchYear = (secId, yearIndex, patch) => {
     setSectionEdits((prev) => {
       const source = prev[secId]?.years || prev[secId]?.items || defaultCompanyHistoryYears()
@@ -1517,7 +1652,9 @@ export default function AdvisorDashboard() {
                 ? normalizeCounterStatsEditorContent(raw)
                 : section && isTestimonialsSection(section.name)
                   ? normalizeTestimonialsEditorContent(raw)
-                  : raw
+                  : section && isLatestNewsSection(section.name)
+                    ? normalizeLatestNewsEditorContent(raw)
+                    : raw
       return {
         section_id: secId,
         proposed_content: JSON.stringify(content, null, 2)
@@ -3506,6 +3643,179 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
+                              ) : isLatestNewsSection(section.name) ? (
+                                <div className="space-y-8">
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Latest News</h4>
+                                    <p className="text-xs text-gray-600">Edit the section heading and three blog post cards with date, author, category, title, excerpt, and image.</p>
+                                  </div>
+
+                                  <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Eyebrow (red tagline)</label>
+                                      <input
+                                        type="text"
+                                        value={values.eyebrow || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'eyebrow', e.target.value)}
+                                        placeholder="OUR LATEST NEWS"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Heading</label>
+                                      <input
+                                        type="text"
+                                        value={values.heading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'heading', e.target.value)}
+                                        placeholder="Learn about our latest news from blog."
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {[0, 1, 2].map((itemIndex) => {
+                                    const item = (values.items && values.items[itemIndex]) || {}
+                                    return (
+                                      <div key={itemIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
+                                          <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">{itemIndex + 1}</span>
+                                          News Post {itemIndex + 1}
+                                        </h5>
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Date (day)</label>
+                                            <input
+                                              type="text"
+                                              value={item.date || item.day || ''}
+                                              onChange={(e) => patchNewsItem(secId, itemIndex, { date: e.target.value })}
+                                              placeholder="10"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Month label</label>
+                                            <input
+                                              type="text"
+                                              value={item.month || ''}
+                                              onChange={(e) => patchNewsItem(secId, itemIndex, { month: e.target.value })}
+                                              placeholder="Nov, 20"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Author</label>
+                                            <input
+                                              type="text"
+                                              value={item.author || ''}
+                                              onChange={(e) => patchNewsItem(secId, itemIndex, { author: e.target.value })}
+                                              placeholder="John Doe"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Category</label>
+                                            <input
+                                              type="text"
+                                              value={item.cat || item.category || ''}
+                                              onChange={(e) => patchNewsItem(secId, itemIndex, { cat: e.target.value })}
+                                              placeholder="Consulting"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Title</label>
+                                            <input
+                                              type="text"
+                                              value={item.title || item.heading || ''}
+                                              onChange={(e) => patchNewsItem(secId, itemIndex, { title: e.target.value })}
+                                              placeholder="We would love to share a similar experience"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Excerpt</label>
+                                            <textarea
+                                              rows={3}
+                                              value={item.excerpt || item.text || ''}
+                                              onChange={(e) => patchNewsItem(secId, itemIndex, { excerpt: e.target.value })}
+                                              placeholder="The theory was first published in 2008..."
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Button text</label>
+                                            <input
+                                              type="text"
+                                              value={item.button_text || ''}
+                                              onChange={(e) => patchNewsItem(secId, itemIndex, { button_text: e.target.value })}
+                                              placeholder="Read more"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Button URL</label>
+                                            <input
+                                              type="text"
+                                              value={item.button_url || item.url || ''}
+                                              onChange={(e) => patchNewsItem(secId, itemIndex, { button_url: e.target.value })}
+                                              placeholder="#news"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2 space-y-3 bg-white p-3 border border-gray-200 rounded-lg">
+                                            <label className="block text-xs font-extrabold text-[#0B1B3D]">Featured image</label>
+                                            <div className="grid md:grid-cols-2 gap-3">
+                                              <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">📁 Upload Custom Image</label>
+                                                <input
+                                                  type="file"
+                                                  accept="image/*"
+                                                  disabled={uploadingState[`latestnews-${secId}-${itemIndex}`]}
+                                                  onChange={(e) => {
+                                                    if (e.target.files && e.target.files[0]) {
+                                                      handleLatestNewsItemImageUpload(secId, itemIndex, e.target.files[0])
+                                                    }
+                                                  }}
+                                                  className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
+                                                />
+                                                {uploadingState[`latestnews-${secId}-${itemIndex}`] && (
+                                                  <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
+                                                )}
+                                                {(localPreviewUrls[`latestnews-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(item.image_url), localImages)) && (
+                                                  <img
+                                                    src={localPreviewUrls[`latestnews-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(item.image_url), localImages)}
+                                                    alt={`News post ${itemIndex + 1}`}
+                                                    className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
+                                                  />
+                                                )}
+                                              </div>
+                                              <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
+                                                <select
+                                                  value={selectedLocalValue(item.image_url, localImages)}
+                                                  onChange={(e) => patchNewsItem(secId, itemIndex, { image_url: e.target.value })}
+                                                  className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
+                                                >
+                                                  <option value="">-- Choose Local Template Image --</option>
+                                                  {localImages.map(preset => (
+                                                    <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
+                                                  ))}
+                                                </select>
+                                              </div>
+                                            </div>
+                                            <input
+                                              type="text"
+                                              value={displayImagePath(item.image_url)}
+                                              onChange={(e) => patchNewsItem(secId, itemIndex, { image_url: e.target.value })}
+                                              placeholder="intime-03 or /uploads/image.jpg"
+                                              className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
                               ) : (
                                 // Standard Section Editor
                                 <div className="grid md:grid-cols-2 gap-4">
@@ -3633,10 +3943,12 @@ export default function AdvisorDashboard() {
                                                 ? normalizeCounterStatsEditorContent(values)
                                                 : isTestimonialsSection(section.name)
                                                   ? testimonialsPreviewPayload(values)
-                                                  : values),
+                                                  : isLatestNewsSection(section.name)
+                                                    ? latestNewsPreviewPayload(values)
+                                                    : values),
                                   preview_slide: previewSlide[secId] ?? 0,
                                 }}
-                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) || isPortfolioSection(section.name) || isBranchesSection(section.name) || isCounterStatsSection(section.name) || isTestimonialsSection(section.name) ? 720 : 520}
+                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) || isPortfolioSection(section.name) || isBranchesSection(section.name) || isCounterStatsSection(section.name) || isTestimonialsSection(section.name) || isLatestNewsSection(section.name) ? 720 : 520}
                                 borderColor="border-[#C8102E]"
                               />
                             </div>
