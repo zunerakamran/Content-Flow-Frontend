@@ -248,8 +248,13 @@ function isLatestNewsSection(name) {
   return key === 'latestnews' || key === 'news' || key.includes('latestnews')
 }
 
+function isClientLogosSection(name) {
+  const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return key === 'clientlogos' || key.includes('clientlogo')
+}
+
 function isAdvisorVisibleSection(name) {
-  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name) || isAnnualProgressionSection(name) || isPortfolioSection(name) || isBranchesSection(name) || isCounterStatsSection(name) || isTestimonialsSection(name) || isLatestNewsSection(name)
+  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name) || isAnnualProgressionSection(name) || isPortfolioSection(name) || isBranchesSection(name) || isCounterStatsSection(name) || isTestimonialsSection(name) || isLatestNewsSection(name) || isClientLogosSection(name)
 }
 
 function advisorSectionOrder(name) {
@@ -264,6 +269,7 @@ function advisorSectionOrder(name) {
   if (isCounterStatsSection(name)) return 8
   if (isTestimonialsSection(name)) return 9
   if (isLatestNewsSection(name)) return 10
+  if (isClientLogosSection(name)) return 11
   return 99
 }
 
@@ -645,6 +651,57 @@ function latestNewsPreviewPayload(values) {
         image_url: absImage || image,
         image: absImage || image,
         img: absImage || image,
+      }
+    }),
+  })
+}
+
+function defaultClientLogoItems() {
+  return [
+    { name: 'slack', image_url: '' },
+    { name: 'Google', image_url: '' },
+    { name: 'envato', image_url: '' },
+    { name: 'Sketch', image_url: '' },
+    { name: 'Figma', image_url: '' },
+  ]
+}
+
+function normalizeClientLogosEditorContent(content) {
+  const c = content && typeof content === 'object' ? content : {}
+  const defaults = defaultClientLogoItems()
+  const list = Array.isArray(c.items) && c.items.length
+    ? c.items
+    : (Array.isArray(c.logos) && c.logos.length ? c.logos : [])
+  return {
+    items: defaults.map((fallback, i) => {
+      const raw = list[i]
+      const item = typeof raw === 'string' ? { name: raw } : (raw && typeof raw === 'object' ? raw : {})
+      return {
+        name: item.name || item.label || item.title || item.text || fallback.name,
+        image_url: item.image_url || item.image || item.img || item.logo || fallback.image_url,
+        image_preview: item.image_preview || '',
+      }
+    }),
+  }
+}
+
+function clientLogosPreviewPayload(values) {
+  const normalized = normalizeClientLogosEditorContent(values || {})
+  return withAbsoluteUploadUrls({
+    ...normalized,
+    items: (normalized.items || []).map((item) => {
+      const preview = item.image_preview || ''
+      const image = preview || item.image_url || ''
+      const absImage = /^data:|^blob:/i.test(image)
+        ? image
+        : (isUploadedAsset(image) ? absoluteAssetUrl(image) : image)
+      return {
+        ...item,
+        image_preview: preview || undefined,
+        image_url: absImage || image,
+        image: absImage || image,
+        img: absImage || image,
+        logo: absImage || image,
       }
     }),
   })
@@ -1156,6 +1213,63 @@ export default function AdvisorDashboard() {
     }
   }
 
+  const handleClientLogoImageUpload = async (secId, itemIndex, file) => {
+    if (!file) return
+    const uploadKey = `clientlogo-${secId}-${itemIndex}`
+    setLocalPreview(uploadKey, file)
+    setUploadingState((prev) => ({ ...prev, [uploadKey]: true }))
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+      reader.onerror = () => resolve('')
+      reader.readAsDataURL(file)
+    })
+    if (dataUrl) {
+      setSectionEdits((prev) => {
+        const source = prev[secId]?.items || prev[secId]?.logos || defaultClientLogoItems()
+        const items = defaultClientLogoItems().map((_, i) => ({ ...(source[i] || {}) }))
+        items[itemIndex] = {
+          ...items[itemIndex],
+          image_url: dataUrl,
+          image: dataUrl,
+          img: dataUrl,
+          logo: dataUrl,
+          image_preview: dataUrl,
+        }
+        return { ...prev, [secId]: { ...(prev[secId] || {}), items } }
+      })
+    }
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await api.post('upload-image', formData)
+      const uploadedUrl = storedUploadPath(res.data)
+      if (uploadedUrl) {
+        setSectionEdits((prev) => {
+          const source = prev[secId]?.items || prev[secId]?.logos || defaultClientLogoItems()
+          const items = defaultClientLogoItems().map((_, i) => ({ ...(source[i] || {}) }))
+          items[itemIndex] = {
+            ...items[itemIndex],
+            image_url: uploadedUrl,
+            image: uploadedUrl,
+            img: uploadedUrl,
+            logo: uploadedUrl,
+            image_preview: dataUrl || items[itemIndex].image_preview,
+          }
+          return { ...prev, [secId]: { ...(prev[secId] || {}), items } }
+        })
+        setMessage(`📸 Logo uploaded successfully for Logo ${itemIndex + 1}!`)
+      } else {
+        setError('Upload succeeded but no image path was returned.')
+      }
+    } catch (err) {
+      const fieldError = err.response?.data?.errors?.image?.[0]
+      setError(fieldError || err.response?.data?.message || 'Failed to upload image.')
+    } finally {
+      setUploadingState((prev) => ({ ...prev, [uploadKey]: false }))
+    }
+  }
+
   const handleAboutImageUpload = async (secId, file) => {
     if (!file) return
     const uploadKey = `about-${secId}`
@@ -1411,7 +1525,9 @@ export default function AdvisorDashboard() {
                         ? normalizeTestimonialsEditorContent(parsed)
                         : isLatestNewsSection(s.name)
                           ? normalizeLatestNewsEditorContent(parsed)
-                          : parsed
+                          : isClientLogosSection(s.name)
+                            ? normalizeClientLogosEditorContent(parsed)
+                            : parsed
       }
     })
     setSectionEdits(initialEdits)
@@ -1459,7 +1575,9 @@ export default function AdvisorDashboard() {
                         ? normalizeTestimonialsEditorContent(parsed)
                         : isLatestNewsSection(section.name)
                           ? normalizeLatestNewsEditorContent(parsed)
-                          : parsed
+                          : isClientLogosSection(section.name)
+                            ? normalizeClientLogosEditorContent(parsed)
+                            : parsed
       }))
       setMessage(`🔒 Section "${section.name}" locked for you. You can now edit its content.`)
     } catch (err) {
@@ -1585,6 +1703,21 @@ export default function AdvisorDashboard() {
     })
   }
 
+  const patchClientLogo = (secId, itemIndex, patch) => {
+    setSectionEdits((prev) => {
+      const source = prev[secId]?.items || prev[secId]?.logos || defaultClientLogoItems()
+      const items = defaultClientLogoItems().map((_, i) => ({ ...(source[i] || {}) }))
+      items[itemIndex] = { ...items[itemIndex], ...patch }
+      if (patch.image_url && !/^data:|^blob:/i.test(patch.image_url)) {
+        items[itemIndex].image_preview = ''
+        items[itemIndex].image = patch.image_url
+        items[itemIndex].img = patch.image_url
+        items[itemIndex].logo = patch.image_url
+      }
+      return { ...prev, [secId]: { ...(prev[secId] || {}), items } }
+    })
+  }
+
   const patchYear = (secId, yearIndex, patch) => {
     setSectionEdits((prev) => {
       const source = prev[secId]?.years || prev[secId]?.items || defaultCompanyHistoryYears()
@@ -1654,7 +1787,9 @@ export default function AdvisorDashboard() {
                   ? normalizeTestimonialsEditorContent(raw)
                   : section && isLatestNewsSection(section.name)
                     ? normalizeLatestNewsEditorContent(raw)
-                    : raw
+                    : section && isClientLogosSection(section.name)
+                      ? normalizeClientLogosEditorContent(raw)
+                      : raw
       return {
         section_id: secId,
         proposed_content: JSON.stringify(content, null, 2)
@@ -3816,6 +3951,86 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
+                              ) : isClientLogosSection(section.name) ? (
+                                <div className="space-y-8">
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Client Logos</h4>
+                                    <p className="text-xs text-gray-600">Edit the five client logos shown in the grey band. Use a text label or upload a logo image for each slot.</p>
+                                  </div>
+
+                                  {[0, 1, 2, 3, 4].map((itemIndex) => {
+                                    const item = (values.items && values.items[itemIndex]) || {}
+                                    return (
+                                      <div key={itemIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
+                                          <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">{itemIndex + 1}</span>
+                                          Logo {itemIndex + 1}
+                                        </h5>
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Text label (shown when no image)</label>
+                                            <input
+                                              type="text"
+                                              value={item.name || item.label || ''}
+                                              onChange={(e) => patchClientLogo(secId, itemIndex, { name: e.target.value })}
+                                              placeholder="Google"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2 space-y-3 bg-white p-3 border border-gray-200 rounded-lg">
+                                            <label className="block text-xs font-extrabold text-[#0B1B3D]">Logo image (optional)</label>
+                                            <div className="grid md:grid-cols-2 gap-3">
+                                              <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">📁 Upload Custom Image</label>
+                                                <input
+                                                  type="file"
+                                                  accept="image/*"
+                                                  disabled={uploadingState[`clientlogo-${secId}-${itemIndex}`]}
+                                                  onChange={(e) => {
+                                                    if (e.target.files && e.target.files[0]) {
+                                                      handleClientLogoImageUpload(secId, itemIndex, e.target.files[0])
+                                                    }
+                                                  }}
+                                                  className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
+                                                />
+                                                {uploadingState[`clientlogo-${secId}-${itemIndex}`] && (
+                                                  <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
+                                                )}
+                                                {(localPreviewUrls[`clientlogo-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(item.image_url), localImages)) && (
+                                                  <img
+                                                    src={localPreviewUrls[`clientlogo-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(item.image_url), localImages)}
+                                                    alt={`Logo ${itemIndex + 1}`}
+                                                    className="mt-2 h-10 w-auto max-w-[140px] object-contain"
+                                                  />
+                                                )}
+                                              </div>
+                                              <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
+                                                <select
+                                                  value={selectedLocalValue(item.image_url, localImages)}
+                                                  onChange={(e) => patchClientLogo(secId, itemIndex, { image_url: e.target.value })}
+                                                  className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
+                                                >
+                                                  <option value="">-- Choose Local Template Image --</option>
+                                                  {localImages.map(preset => (
+                                                    <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
+                                                  ))}
+                                                </select>
+                                              </div>
+                                            </div>
+                                            <input
+                                              type="text"
+                                              value={displayImagePath(item.image_url)}
+                                              onChange={(e) => patchClientLogo(secId, itemIndex, { image_url: e.target.value })}
+                                              placeholder="logo.png or /uploads/image.jpg"
+                                              className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
                               ) : (
                                 // Standard Section Editor
                                 <div className="grid md:grid-cols-2 gap-4">
@@ -3945,10 +4160,12 @@ export default function AdvisorDashboard() {
                                                   ? testimonialsPreviewPayload(values)
                                                   : isLatestNewsSection(section.name)
                                                     ? latestNewsPreviewPayload(values)
-                                                    : values),
+                                                    : isClientLogosSection(section.name)
+                                                      ? clientLogosPreviewPayload(values)
+                                                      : values),
                                   preview_slide: previewSlide[secId] ?? 0,
                                 }}
-                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) || isPortfolioSection(section.name) || isBranchesSection(section.name) || isCounterStatsSection(section.name) || isTestimonialsSection(section.name) || isLatestNewsSection(section.name) ? 720 : 520}
+                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) || isPortfolioSection(section.name) || isBranchesSection(section.name) || isCounterStatsSection(section.name) || isTestimonialsSection(section.name) || isLatestNewsSection(section.name) || isClientLogosSection(section.name) ? 720 : 520}
                                 borderColor="border-[#C8102E]"
                               />
                             </div>
