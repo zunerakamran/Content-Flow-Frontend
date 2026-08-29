@@ -3,6 +3,7 @@ import Navbar from './Navbar'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import SectionIframePreview from './SectionIframePreview'
+import { parseJson } from './utils/parseJson'
 import {
   FaBalanceScale,
   FaBriefcase,
@@ -185,12 +186,6 @@ function sanitizeSectionContent(content) {
 function displayImagePath(url) {
   if (!url || /^data:/i.test(url)) return ''
   return url
-}
-
-export function parseJson(str) {
-  if (!str) return {}
-  if (typeof str === 'object') return str
-  try { return JSON.parse(str) } catch { return { heading: str } }
 }
 
 function isHeroSection(name) {

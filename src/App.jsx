@@ -1,12 +1,20 @@
+import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 
 import Login from './Login'
-import AdvisorDashboard from './AdvisorDashboard'
-import ApproverDashboard from './ApproverDashboard'
-import ManagerDashboard from './ManagerDashboard'
-import PowerAdminDashboard from './PowerAdminDashboard'
-import ClientAdminDashboard from './ClientAdminDashboard'
+
+const AdvisorDashboard = lazy(() => import('./AdvisorDashboard'))
+const ApproverDashboard = lazy(() => import('./ApproverDashboard'))
+const ManagerDashboard = lazy(() => import('./ManagerDashboard'))
+const PowerAdminDashboard = lazy(() => import('./PowerAdminDashboard'))
+const ClientAdminDashboard = lazy(() => import('./ClientAdminDashboard'))
+
+const DashboardFallback = () => (
+  <div className="flex items-center justify-center h-screen text-gray-500 text-sm font-semibold">
+    Loading dashboard…
+  </div>
+)
 
 const PrivateRoute = ({ children, roles }) => {
   const { user, loading } = useAuth()
@@ -43,7 +51,9 @@ const AppRoutes = () => {
           path={`/${role}`}
           element={(
             <PrivateRoute roles={[role]}>
-              <Dashboard />
+              <Suspense fallback={<DashboardFallback />}>
+                <Dashboard />
+              </Suspense>
             </PrivateRoute>
           )}
         />
