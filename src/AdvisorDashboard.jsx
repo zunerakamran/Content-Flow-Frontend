@@ -238,8 +238,13 @@ function isCounterStatsSection(name) {
   return key === 'counterstats' || key === 'stats' || key.includes('counter')
 }
 
+function isTestimonialsSection(name) {
+  const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return key === 'testimonialscarousel' || key === 'testimonials' || key.includes('testimonial')
+}
+
 function isAdvisorVisibleSection(name) {
-  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name) || isAnnualProgressionSection(name) || isPortfolioSection(name) || isBranchesSection(name) || isCounterStatsSection(name)
+  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name) || isAnnualProgressionSection(name) || isPortfolioSection(name) || isBranchesSection(name) || isCounterStatsSection(name) || isTestimonialsSection(name)
 }
 
 function advisorSectionOrder(name) {
@@ -252,6 +257,7 @@ function advisorSectionOrder(name) {
   if (isPortfolioSection(name)) return 6
   if (isBranchesSection(name)) return 7
   if (isCounterStatsSection(name)) return 8
+  if (isTestimonialsSection(name)) return 9
   return 99
 }
 
@@ -515,6 +521,71 @@ function normalizeCounterStatsEditorContent(content) {
       }
     }),
   }
+}
+
+function defaultTestimonialItems() {
+  return [
+    { quote: 'Working with several word press themes and templates the last years, I only can say this is the best in every level. I use it for my company and the reviews that I have already are all excellent.', name: 'Alina Lora', role: 'Former Manager, Intime', image_url: 'testimonial-01.jpg' },
+    { quote: 'This is one of the BEST THEMES I have ever worked with. The extra bells and whistles added to it are amazing. Elementor features add extra flavor. The customer support is very responsive.', name: 'Rohan Jho', role: 'Former Manager, Intime', image_url: 'testimonial-02.jpg' },
+    { quote: 'Great theme, one of the best I have worked with in a while. Full featured and great support for the minor issues I had which were really my not being skilled/experienced enough.', name: 'Donald Frew', role: 'Former Manager, Intime', image_url: 'testimonial-03.jpg' },
+  ]
+}
+
+function normalizeTestimonialsEditorContent(content) {
+  const c = content && typeof content === 'object' ? content : {}
+  const defaults = defaultTestimonialItems()
+  const list = Array.isArray(c.items) && c.items.length
+    ? c.items
+    : (Array.isArray(c.testimonials) && c.testimonials.length ? c.testimonials : [])
+  const legacyThin = Boolean(c.eyebrow && c.heading && !list.length)
+  const reviewsLabel = c.reviews_label || c.label || (legacyThin && String(c.subheading || '').length > 40 ? 'Clients Reviews:' : (c.subheading || 'Clients Reviews:'))
+  return {
+    eyebrow: c.eyebrow || c.tagline || "CLIENT'S TESTIMONIALS",
+    heading: c.heading || "We are Very Happy to Get Our Client's Reviews.",
+    subheading: reviewsLabel,
+    image_url: c.image_url || c.image || c.img || c.side_image || 'intime-17.jpg',
+    image_preview: c.image_preview || '',
+    items: defaults.map((fallback, i) => {
+      const item = list[i] && typeof list[i] === 'object' ? list[i] : {}
+      return {
+        quote: item.quote || item.text || item.review || fallback.quote,
+        name: item.name || item.title || item.author || fallback.name,
+        role: item.role || item.position || item.job || item.desc || fallback.role,
+        image_url: item.image_url || item.image || item.img || item.avatar || fallback.image_url,
+        image_preview: item.image_preview || '',
+      }
+    }),
+  }
+}
+
+function testimonialsPreviewPayload(values) {
+  const normalized = normalizeTestimonialsEditorContent(values || {})
+  const sidePreview = normalized.image_preview || ''
+  const sideImage = sidePreview || normalized.image_url || ''
+  const absSide = /^data:|^blob:/i.test(sideImage)
+    ? sideImage
+    : (isUploadedAsset(sideImage) ? absoluteAssetUrl(sideImage) : sideImage)
+  return withAbsoluteUploadUrls({
+    ...normalized,
+    image_url: absSide || sideImage,
+    image: absSide || sideImage,
+    img: absSide || sideImage,
+    image_preview: sidePreview || undefined,
+    items: (normalized.items || []).map((item) => {
+      const preview = item.image_preview || ''
+      const image = preview || item.image_url || ''
+      const absImage = /^data:|^blob:/i.test(image)
+        ? image
+        : (isUploadedAsset(image) ? absoluteAssetUrl(image) : image)
+      return {
+        ...item,
+        image_preview: preview || undefined,
+        image_url: absImage || image,
+        image: absImage || image,
+        img: absImage || image,
+      }
+    }),
+  })
 }
 
 function defaultAboutGauges() {
@@ -862,6 +933,112 @@ export default function AdvisorDashboard() {
     }
   }
 
+  const handleTestimonialsSideImageUpload = async (secId, file) => {
+    if (!file) return
+    const uploadKey = `testimonials-side-${secId}`
+    setLocalPreview(uploadKey, file)
+    setUploadingState((prev) => ({ ...prev, [uploadKey]: true }))
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+      reader.onerror = () => resolve('')
+      reader.readAsDataURL(file)
+    })
+    if (dataUrl) {
+      setSectionEdits((prev) => ({
+        ...prev,
+        [secId]: {
+          ...(prev[secId] || {}),
+          image_url: dataUrl,
+          image: dataUrl,
+          img: dataUrl,
+          image_preview: dataUrl,
+        },
+      }))
+    }
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await api.post('upload-image', formData)
+      const uploadedUrl = storedUploadPath(res.data)
+      if (uploadedUrl) {
+        setSectionEdits((prev) => ({
+          ...prev,
+          [secId]: {
+            ...(prev[secId] || {}),
+            image_url: uploadedUrl,
+            image: uploadedUrl,
+            img: uploadedUrl,
+            image_preview: dataUrl || prev[secId]?.image_preview,
+          },
+        }))
+        setMessage('📸 Side image uploaded successfully!')
+      } else {
+        setError('Upload succeeded but no image path was returned.')
+      }
+    } catch (err) {
+      const fieldError = err.response?.data?.errors?.image?.[0]
+      setError(fieldError || err.response?.data?.message || 'Failed to upload image.')
+    } finally {
+      setUploadingState((prev) => ({ ...prev, [uploadKey]: false }))
+    }
+  }
+
+  const handleTestimonialItemImageUpload = async (secId, itemIndex, file) => {
+    if (!file) return
+    const uploadKey = `testimonial-${secId}-${itemIndex}`
+    setLocalPreview(uploadKey, file)
+    setUploadingState((prev) => ({ ...prev, [uploadKey]: true }))
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+      reader.onerror = () => resolve('')
+      reader.readAsDataURL(file)
+    })
+    if (dataUrl) {
+      setSectionEdits((prev) => {
+        const source = prev[secId]?.items || prev[secId]?.testimonials || defaultTestimonialItems()
+        const items = defaultTestimonialItems().map((_, i) => ({ ...(source[i] || {}) }))
+        items[itemIndex] = {
+          ...items[itemIndex],
+          image_url: dataUrl,
+          image: dataUrl,
+          img: dataUrl,
+          image_preview: dataUrl,
+        }
+        return { ...prev, [secId]: { ...(prev[secId] || {}), items } }
+      })
+    }
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await api.post('upload-image', formData)
+      const uploadedUrl = storedUploadPath(res.data)
+      if (uploadedUrl) {
+        setSectionEdits((prev) => {
+          const source = prev[secId]?.items || prev[secId]?.testimonials || defaultTestimonialItems()
+          const items = defaultTestimonialItems().map((_, i) => ({ ...(source[i] || {}) }))
+          items[itemIndex] = {
+            ...items[itemIndex],
+            image_url: uploadedUrl,
+            image: uploadedUrl,
+            img: uploadedUrl,
+            image_preview: dataUrl || items[itemIndex].image_preview,
+          }
+          return { ...prev, [secId]: { ...(prev[secId] || {}), items } }
+        })
+        setMessage(`📸 Avatar uploaded successfully for Testimonial ${itemIndex + 1}!`)
+      } else {
+        setError('Upload succeeded but no image path was returned.')
+      }
+    } catch (err) {
+      const fieldError = err.response?.data?.errors?.image?.[0]
+      setError(fieldError || err.response?.data?.message || 'Failed to upload image.')
+    } finally {
+      setUploadingState((prev) => ({ ...prev, [uploadKey]: false }))
+    }
+  }
+
   const handleAboutImageUpload = async (secId, file) => {
     if (!file) return
     const uploadKey = `about-${secId}`
@@ -1113,7 +1290,9 @@ export default function AdvisorDashboard() {
                     ? normalizeBranchesEditorContent(parsed)
                     : isCounterStatsSection(s.name)
                       ? normalizeCounterStatsEditorContent(parsed)
-                      : parsed
+                      : isTestimonialsSection(s.name)
+                        ? normalizeTestimonialsEditorContent(parsed)
+                        : parsed
       }
     })
     setSectionEdits(initialEdits)
@@ -1157,7 +1336,9 @@ export default function AdvisorDashboard() {
                     ? normalizeBranchesEditorContent(parsed)
                     : isCounterStatsSection(section.name)
                       ? normalizeCounterStatsEditorContent(parsed)
-                      : parsed
+                      : isTestimonialsSection(section.name)
+                        ? normalizeTestimonialsEditorContent(parsed)
+                        : parsed
       }))
       setMessage(`🔒 Section "${section.name}" locked for you. You can now edit its content.`)
     } catch (err) {
@@ -1255,6 +1436,20 @@ export default function AdvisorDashboard() {
     })
   }
 
+  const patchTestimonialItem = (secId, itemIndex, patch) => {
+    setSectionEdits((prev) => {
+      const source = prev[secId]?.items || prev[secId]?.testimonials || defaultTestimonialItems()
+      const items = defaultTestimonialItems().map((_, i) => ({ ...(source[i] || {}) }))
+      items[itemIndex] = { ...items[itemIndex], ...patch }
+      if (patch.image_url && !/^data:|^blob:/i.test(patch.image_url)) {
+        items[itemIndex].image_preview = ''
+        items[itemIndex].image = patch.image_url
+        items[itemIndex].img = patch.image_url
+      }
+      return { ...prev, [secId]: { ...(prev[secId] || {}), items } }
+    })
+  }
+
   const patchYear = (secId, yearIndex, patch) => {
     setSectionEdits((prev) => {
       const source = prev[secId]?.years || prev[secId]?.items || defaultCompanyHistoryYears()
@@ -1320,7 +1515,9 @@ export default function AdvisorDashboard() {
               ? normalizeBranchesEditorContent(raw)
               : section && isCounterStatsSection(section.name)
                 ? normalizeCounterStatsEditorContent(raw)
-                : raw
+                : section && isTestimonialsSection(section.name)
+                  ? normalizeTestimonialsEditorContent(raw)
+                  : raw
       return {
         section_id: secId,
         proposed_content: JSON.stringify(content, null, 2)
@@ -3127,6 +3324,188 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
+                              ) : isTestimonialsSection(section.name) ? (
+                                <div className="space-y-8">
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Testimonials Carousel</h4>
+                                    <p className="text-xs text-gray-600">Edit the section heading, side image, and three client testimonial slides.</p>
+                                  </div>
+
+                                  <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Eyebrow (red tagline)</label>
+                                      <input
+                                        type="text"
+                                        value={values.eyebrow || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'eyebrow', e.target.value)}
+                                        placeholder="CLIENT'S TESTIMONIALS"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Heading</label>
+                                      <input
+                                        type="text"
+                                        value={values.heading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'heading', e.target.value)}
+                                        placeholder="We are Very Happy to Get Our Client's Reviews."
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Reviews label (red)</label>
+                                      <input
+                                        type="text"
+                                        value={values.subheading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
+                                        placeholder="Clients Reviews:"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2 space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
+                                      <label className="block text-xs font-extrabold text-[#0B1B3D]">Side image (right column)</label>
+                                      <div className="grid md:grid-cols-2 gap-3">
+                                        <div className="bg-gray-50 border p-2.5 rounded-md">
+                                          <label className="block text-[11px] font-bold text-gray-700 mb-1">📁 Upload Custom Image</label>
+                                          <input
+                                            type="file"
+                                            accept="image/*"
+                                            disabled={uploadingState[`testimonials-side-${secId}`]}
+                                            onChange={(e) => {
+                                              if (e.target.files && e.target.files[0]) {
+                                                handleTestimonialsSideImageUpload(secId, e.target.files[0])
+                                              }
+                                            }}
+                                            className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
+                                          />
+                                          {uploadingState[`testimonials-side-${secId}`] && (
+                                            <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
+                                          )}
+                                          {(localPreviewUrls[`testimonials-side-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages)) && (
+                                            <img
+                                              src={localPreviewUrls[`testimonials-side-${secId}`] || editorPreviewSrc(displayImagePath(values.image_url), localImages)}
+                                              alt="Side image preview"
+                                              className="mt-2 w-full h-24 object-cover rounded border border-gray-200"
+                                            />
+                                          )}
+                                        </div>
+                                        <div className="bg-gray-50 border p-2.5 rounded-md">
+                                          <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
+                                          <select
+                                            value={selectedLocalValue(values.image_url, localImages)}
+                                            onChange={(e) => handleFieldValueChange(secId, 'image_url', e.target.value)}
+                                            className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
+                                          >
+                                            <option value="">-- Choose Local Template Image --</option>
+                                            {localImages.map(preset => (
+                                              <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      </div>
+                                      <input
+                                        type="text"
+                                        value={displayImagePath(values.image_url)}
+                                        onChange={(e) => handleFieldValueChange(secId, 'image_url', e.target.value)}
+                                        placeholder="intime-17 or /uploads/image.jpg"
+                                        className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {[0, 1, 2].map((itemIndex) => {
+                                    const item = (values.items && values.items[itemIndex]) || {}
+                                    return (
+                                      <div key={itemIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
+                                          <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">{itemIndex + 1}</span>
+                                          Testimonial {itemIndex + 1}
+                                        </h5>
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Quote</label>
+                                            <textarea
+                                              rows={3}
+                                              value={item.quote || item.text || ''}
+                                              onChange={(e) => patchTestimonialItem(secId, itemIndex, { quote: e.target.value })}
+                                              placeholder="Working with several word press themes..."
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Name</label>
+                                            <input
+                                              type="text"
+                                              value={item.name || item.title || ''}
+                                              onChange={(e) => patchTestimonialItem(secId, itemIndex, { name: e.target.value })}
+                                              placeholder="Alina Lora"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Role</label>
+                                            <input
+                                              type="text"
+                                              value={item.role || item.position || ''}
+                                              onChange={(e) => patchTestimonialItem(secId, itemIndex, { role: e.target.value })}
+                                              placeholder="Former Manager, Intime"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2 space-y-3 bg-white p-3 border border-gray-200 rounded-lg">
+                                            <label className="block text-xs font-extrabold text-[#0B1B3D]">Avatar image</label>
+                                            <div className="grid md:grid-cols-2 gap-3">
+                                              <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">📁 Upload Custom Image</label>
+                                                <input
+                                                  type="file"
+                                                  accept="image/*"
+                                                  disabled={uploadingState[`testimonial-${secId}-${itemIndex}`]}
+                                                  onChange={(e) => {
+                                                    if (e.target.files && e.target.files[0]) {
+                                                      handleTestimonialItemImageUpload(secId, itemIndex, e.target.files[0])
+                                                    }
+                                                  }}
+                                                  className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
+                                                />
+                                                {uploadingState[`testimonial-${secId}-${itemIndex}`] && (
+                                                  <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
+                                                )}
+                                                {(localPreviewUrls[`testimonial-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(item.image_url), localImages)) && (
+                                                  <img
+                                                    src={localPreviewUrls[`testimonial-${secId}-${itemIndex}`] || editorPreviewSrc(displayImagePath(item.image_url), localImages)}
+                                                    alt={`Testimonial ${itemIndex + 1} avatar`}
+                                                    className="mt-2 w-16 h-16 rounded-full object-cover border border-gray-200"
+                                                  />
+                                                )}
+                                              </div>
+                                              <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
+                                                <select
+                                                  value={selectedLocalValue(item.image_url, localImages)}
+                                                  onChange={(e) => patchTestimonialItem(secId, itemIndex, { image_url: e.target.value })}
+                                                  className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
+                                                >
+                                                  <option value="">-- Choose Local Template Image --</option>
+                                                  {localImages.map(preset => (
+                                                    <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
+                                                  ))}
+                                                </select>
+                                              </div>
+                                            </div>
+                                            <input
+                                              type="text"
+                                              value={displayImagePath(item.image_url)}
+                                              onChange={(e) => patchTestimonialItem(secId, itemIndex, { image_url: e.target.value })}
+                                              placeholder="testimonial-01 or /uploads/image.jpg"
+                                              className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
                               ) : (
                                 // Standard Section Editor
                                 <div className="grid md:grid-cols-2 gap-4">
@@ -3252,10 +3631,12 @@ export default function AdvisorDashboard() {
                                               ? branchesPreviewPayload(values)
                                               : isCounterStatsSection(section.name)
                                                 ? normalizeCounterStatsEditorContent(values)
-                                                : values),
+                                                : isTestimonialsSection(section.name)
+                                                  ? testimonialsPreviewPayload(values)
+                                                  : values),
                                   preview_slide: previewSlide[secId] ?? 0,
                                 }}
-                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) || isPortfolioSection(section.name) || isBranchesSection(section.name) || isCounterStatsSection(section.name) ? 720 : 520}
+                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) || isPortfolioSection(section.name) || isBranchesSection(section.name) || isCounterStatsSection(section.name) || isTestimonialsSection(section.name) ? 720 : 520}
                                 borderColor="border-[#C8102E]"
                               />
                             </div>
