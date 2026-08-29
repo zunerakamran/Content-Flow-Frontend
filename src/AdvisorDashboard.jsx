@@ -4,7 +4,7 @@ import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import SectionIframePreview from './SectionIframePreview'
 import { parseJson } from './utils/parseJson'
-import { sectionDisplayName } from './utils/sectionDisplay'
+import { sectionDisplayName, sectionTemplateKey } from './utils/sectionDisplay'
 import {
   FaBalanceScale,
   FaBriefcase,
@@ -1510,7 +1510,7 @@ export default function AdvisorDashboard() {
     setSections(sectionsForAdvisor)
 
     const lockedByMeIds = sectionsForAdvisor
-      .filter(s => s.is_locked && s.locked_by === user?.id && isAdvisorVisibleSection(s.name))
+      .filter(s => s.is_locked && s.locked_by === user?.id && isAdvisorVisibleSection(sectionTemplateKey(s)))
       .map(s => s.id)
 
     setCheckedSectionIds(lockedByMeIds)
@@ -1519,27 +1519,27 @@ export default function AdvisorDashboard() {
     sectionsForAdvisor.forEach(s => {
       if (lockedByMeIds.includes(s.id)) {
         const parsed = parseJson(s.content)
-        initialEdits[s.id] = isAboutSection(s.name)
+        initialEdits[s.id] = isAboutSection(sectionTemplateKey(s))
           ? normalizeAboutEditorContent(parsed)
-          : isCompanyHistorySection(s.name)
+          : isCompanyHistorySection(sectionTemplateKey(s))
             ? normalizeCompanyHistoryEditorContent(parsed)
-            : isFeaturedServicesSection(s.name)
+            : isFeaturedServicesSection(sectionTemplateKey(s))
               ? normalizeFeaturedServicesEditorContent(parsed)
-              : isAnnualProgressionSection(s.name)
+              : isAnnualProgressionSection(sectionTemplateKey(s))
                 ? normalizeAnnualProgressionEditorContent(parsed)
-                : isPortfolioSection(s.name)
+                : isPortfolioSection(sectionTemplateKey(s))
                   ? normalizePortfolioEditorContent(parsed)
-                  : isBranchesSection(s.name)
+                  : isBranchesSection(sectionTemplateKey(s))
                     ? normalizeBranchesEditorContent(parsed)
-                    : isCounterStatsSection(s.name)
+                    : isCounterStatsSection(sectionTemplateKey(s))
                       ? normalizeCounterStatsEditorContent(parsed)
-                      : isTestimonialsSection(s.name)
+                      : isTestimonialsSection(sectionTemplateKey(s))
                         ? normalizeTestimonialsEditorContent(parsed)
-                        : isLatestNewsSection(s.name)
+                        : isLatestNewsSection(sectionTemplateKey(s))
                           ? normalizeLatestNewsEditorContent(parsed)
-                          : isClientLogosSection(s.name)
+                          : isClientLogosSection(sectionTemplateKey(s))
                             ? normalizeClientLogosEditorContent(parsed)
-                            : isCtaBannerSection(s.name)
+                            : isCtaBannerSection(sectionTemplateKey(s))
                               ? normalizeCtaBannerEditorContent(parsed)
                               : parsed
       }
@@ -1571,27 +1571,27 @@ export default function AdvisorDashboard() {
       const parsed = parseJson(section.content)
       setSectionEdits(prev => ({
         ...prev,
-        [section.id]: isAboutSection(section.name)
+        [section.id]: isAboutSection(sectionTemplateKey(section))
           ? normalizeAboutEditorContent(parsed)
-          : isCompanyHistorySection(section.name)
+          : isCompanyHistorySection(sectionTemplateKey(section))
             ? normalizeCompanyHistoryEditorContent(parsed)
-            : isFeaturedServicesSection(section.name)
+            : isFeaturedServicesSection(sectionTemplateKey(section))
               ? normalizeFeaturedServicesEditorContent(parsed)
-              : isAnnualProgressionSection(section.name)
+              : isAnnualProgressionSection(sectionTemplateKey(section))
                 ? normalizeAnnualProgressionEditorContent(parsed)
-                : isPortfolioSection(section.name)
+                : isPortfolioSection(sectionTemplateKey(section))
                   ? normalizePortfolioEditorContent(parsed)
-                  : isBranchesSection(section.name)
+                  : isBranchesSection(sectionTemplateKey(section))
                     ? normalizeBranchesEditorContent(parsed)
-                    : isCounterStatsSection(section.name)
+                    : isCounterStatsSection(sectionTemplateKey(section))
                       ? normalizeCounterStatsEditorContent(parsed)
-                      : isTestimonialsSection(section.name)
+                      : isTestimonialsSection(sectionTemplateKey(section))
                         ? normalizeTestimonialsEditorContent(parsed)
-                        : isLatestNewsSection(section.name)
+                        : isLatestNewsSection(sectionTemplateKey(section))
                           ? normalizeLatestNewsEditorContent(parsed)
-                          : isClientLogosSection(section.name)
+                          : isClientLogosSection(sectionTemplateKey(section))
                             ? normalizeClientLogosEditorContent(parsed)
-                            : isCtaBannerSection(section.name)
+                            : isCtaBannerSection(sectionTemplateKey(section))
                               ? normalizeCtaBannerEditorContent(parsed)
                               : parsed
       }))
@@ -1789,23 +1789,23 @@ export default function AdvisorDashboard() {
     const batchPayload = checkedSectionIds.map(secId => {
       const section = sections.find(s => s.id === secId)
       const raw = sanitizeSectionContent(sectionEdits[secId] || {})
-      const content = section && isFeaturedServicesSection(section.name)
+      const content = section && isFeaturedServicesSection(sectionTemplateKey(section))
         ? normalizeFeaturedServicesEditorContent(raw)
-        : section && isAnnualProgressionSection(section.name)
+        : section && isAnnualProgressionSection(sectionTemplateKey(section))
           ? normalizeAnnualProgressionEditorContent(raw)
-          : section && isPortfolioSection(section.name)
+          : section && isPortfolioSection(sectionTemplateKey(section))
             ? normalizePortfolioEditorContent(raw)
-            : section && isBranchesSection(section.name)
+            : section && isBranchesSection(sectionTemplateKey(section))
               ? normalizeBranchesEditorContent(raw)
-              : section && isCounterStatsSection(section.name)
+              : section && isCounterStatsSection(sectionTemplateKey(section))
                 ? normalizeCounterStatsEditorContent(raw)
-                : section && isTestimonialsSection(section.name)
+                : section && isTestimonialsSection(sectionTemplateKey(section))
                   ? normalizeTestimonialsEditorContent(raw)
-                  : section && isLatestNewsSection(section.name)
+                  : section && isLatestNewsSection(sectionTemplateKey(section))
                     ? normalizeLatestNewsEditorContent(raw)
-                    : section && isClientLogosSection(section.name)
+                    : section && isClientLogosSection(sectionTemplateKey(section))
                       ? normalizeClientLogosEditorContent(raw)
-                      : section && isCtaBannerSection(section.name)
+                      : section && isCtaBannerSection(sectionTemplateKey(section))
                         ? normalizeCtaBannerEditorContent(raw)
                         : raw
       return {
@@ -1840,8 +1840,8 @@ export default function AdvisorDashboard() {
   const rejectedRequest = templateRequests.find(r => r.status === 'rejected')
   const isSiteDeployed = Boolean(deployedRequest)
   const visibleSections = [...sections]
-    .filter((s) => isAdvisorVisibleSection(s.name))
-    .sort((a, b) => advisorSectionOrder(a.name) - advisorSectionOrder(b.name))
+    .filter((s) => isAdvisorVisibleSection(sectionTemplateKey(s)))
+    .sort((a, b) => advisorSectionOrder(sectionTemplateKey(a)) - advisorSectionOrder(sectionTemplateKey(b)))
 
   return (
     <div className="min-h-screen bg-gray-100 font-sans text-gray-800">
@@ -2275,7 +2275,7 @@ export default function AdvisorDashboard() {
 
                           {!isPreview ? (
                             <div className="p-6">
-                              {section.name === 'Hero Slider' ? (
+                              {isHeroSection(sectionTemplateKey(section)) ? (
                                 // Hero Slider - 3 Slides Editor
                                 <div className="space-y-8">
                                   {[0, 1, 2].map((slideIndex) => {
@@ -2467,7 +2467,7 @@ export default function AdvisorDashboard() {
                                     );
                                   })}
                                 </div>
-                              ) : isWhatWeDoSection(section.name) ? (
+                              ) : isWhatWeDoSection(sectionTemplateKey(section)) ? (
                                 <div className="space-y-8">
 
                                   <div className="grid md:grid-cols-2 gap-4">
@@ -2600,7 +2600,7 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
-                              ) : isAboutSection(section.name) ? (
+                              ) : isAboutSection(sectionTemplateKey(section)) ? (
                                 <div className="space-y-8">
 
                                   <div className="grid md:grid-cols-2 gap-4">
@@ -2759,7 +2759,7 @@ export default function AdvisorDashboard() {
                                     </div>
                                   </div>
                                 </div>
-                              ) : isCompanyHistorySection(section.name) ? (
+                              ) : isCompanyHistorySection(sectionTemplateKey(section)) ? (
                                 <div className="space-y-8">
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
@@ -2901,7 +2901,7 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
-                              ) : isFeaturedServicesSection(section.name) ? (
+                              ) : isFeaturedServicesSection(sectionTemplateKey(section)) ? (
                                 <div className="space-y-8">
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
@@ -3014,7 +3014,7 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
-                              ) : isAnnualProgressionSection(section.name) ? (
+                              ) : isAnnualProgressionSection(sectionTemplateKey(section)) ? (
                                 <div className="space-y-8">
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
@@ -3153,7 +3153,7 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
-                              ) : isPortfolioSection(section.name) ? (
+                              ) : isPortfolioSection(sectionTemplateKey(section)) ? (
                                 <div className="space-y-8">
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
@@ -3275,7 +3275,7 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
-                              ) : isBranchesSection(section.name) ? (
+                              ) : isBranchesSection(sectionTemplateKey(section)) ? (
                                 <div className="space-y-8">
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
@@ -3456,7 +3456,7 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
-                              ) : isCounterStatsSection(section.name) ? (
+                              ) : isCounterStatsSection(sectionTemplateKey(section)) ? (
                                 <div className="space-y-8">
                                   {[0, 1, 2, 3].map((statIndex) => {
                                     const stat = (values.stats && values.stats[statIndex]) || {}
@@ -3526,7 +3526,7 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
-                              ) : isTestimonialsSection(section.name) ? (
+                              ) : isTestimonialsSection(sectionTemplateKey(section)) ? (
                                 <div className="space-y-8">
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
@@ -3689,7 +3689,7 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
-                              ) : isLatestNewsSection(section.name) ? (
+                              ) : isLatestNewsSection(sectionTemplateKey(section)) ? (
                                 <div className="space-y-8">
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
@@ -3850,7 +3850,7 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
-                              ) : isClientLogosSection(section.name) ? (
+                              ) : isClientLogosSection(sectionTemplateKey(section)) ? (
                                 <div className="space-y-8">
                                   {[0, 1, 2, 3, 4].map((itemIndex) => {
                                     const item = (values.items && values.items[itemIndex]) || {}
@@ -3918,7 +3918,7 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
-                              ) : isCtaBannerSection(section.name) ? (
+                              ) : isCtaBannerSection(sectionTemplateKey(section)) ? (
                                 <div className="space-y-8">
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
@@ -4065,34 +4065,34 @@ export default function AdvisorDashboard() {
 
                               {/* Real template4 component rendered inside an iframe via postMessage */}
                               <SectionIframePreview
-                                sectionName={section.name}
+                                sectionName={sectionTemplateKey(section)}
                                 data={{
-                                  ...(isAboutSection(section.name)
+                                  ...(isAboutSection(sectionTemplateKey(section))
                                     ? aboutPreviewPayload(values)
-                                    : isCompanyHistorySection(section.name)
+                                    : isCompanyHistorySection(sectionTemplateKey(section))
                                       ? companyHistoryPreviewPayload(values)
-                                      : isFeaturedServicesSection(section.name)
+                                      : isFeaturedServicesSection(sectionTemplateKey(section))
                                         ? normalizeFeaturedServicesEditorContent(values)
-                                        : isAnnualProgressionSection(section.name)
+                                        : isAnnualProgressionSection(sectionTemplateKey(section))
                                           ? normalizeAnnualProgressionEditorContent(values)
-                                          : isPortfolioSection(section.name)
+                                          : isPortfolioSection(sectionTemplateKey(section))
                                             ? portfolioPreviewPayload(values)
-                                            : isBranchesSection(section.name)
+                                            : isBranchesSection(sectionTemplateKey(section))
                                               ? branchesPreviewPayload(values)
-                                              : isCounterStatsSection(section.name)
+                                              : isCounterStatsSection(sectionTemplateKey(section))
                                                 ? normalizeCounterStatsEditorContent(values)
-                                                : isTestimonialsSection(section.name)
+                                                : isTestimonialsSection(sectionTemplateKey(section))
                                                   ? testimonialsPreviewPayload(values)
-                                                  : isLatestNewsSection(section.name)
+                                                  : isLatestNewsSection(sectionTemplateKey(section))
                                                     ? latestNewsPreviewPayload(values)
-                                                    : isClientLogosSection(section.name)
+                                                    : isClientLogosSection(sectionTemplateKey(section))
                                                       ? clientLogosPreviewPayload(values)
-                                                      : isCtaBannerSection(section.name)
+                                                      : isCtaBannerSection(sectionTemplateKey(section))
                                                         ? normalizeCtaBannerEditorContent(values)
                                                         : values),
                                   preview_slide: previewSlide[secId] ?? 0,
                                 }}
-                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) || isPortfolioSection(section.name) || isBranchesSection(section.name) || isCounterStatsSection(section.name) || isTestimonialsSection(section.name) || isLatestNewsSection(section.name) || isClientLogosSection(section.name) || isCtaBannerSection(section.name) ? 720 : 520}
+                                height={isWhatWeDoSection(sectionTemplateKey(section)) || isAboutSection(sectionTemplateKey(section)) || isCompanyHistorySection(sectionTemplateKey(section)) || isFeaturedServicesSection(sectionTemplateKey(section)) || isAnnualProgressionSection(sectionTemplateKey(section)) || isPortfolioSection(sectionTemplateKey(section)) || isBranchesSection(sectionTemplateKey(section)) || isCounterStatsSection(sectionTemplateKey(section)) || isTestimonialsSection(sectionTemplateKey(section)) || isLatestNewsSection(sectionTemplateKey(section)) || isClientLogosSection(sectionTemplateKey(section)) || isCtaBannerSection(sectionTemplateKey(section)) ? 720 : 520}
                                 borderColor="border-[#C8102E]"
                               />
                             </div>

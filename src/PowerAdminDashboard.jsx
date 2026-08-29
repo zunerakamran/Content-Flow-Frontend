@@ -158,8 +158,7 @@ export default function PowerAdminDashboard() {
             const drafts = {}
             list.forEach((section) => {
                 drafts[section.id] = {
-                    name: section.name || '',
-                    display_name: section.display_name || '',
+                    display_name: section.display_name || section.name || '',
                     is_visible: section.is_visible !== false,
                 }
             })
@@ -193,8 +192,7 @@ export default function PowerAdminDashboard() {
                 const draft = sectionDrafts[section.id] || {}
                 return {
                     id: section.id,
-                    name: draft.name?.trim() || section.name,
-                    display_name: draft.display_name?.trim() || null,
+                    display_name: draft.display_name?.trim() || section.name,
                     is_visible: draft.is_visible !== false,
                 }
             })
@@ -500,7 +498,7 @@ export default function PowerAdminDashboard() {
                         </div>
 
                         <p className="text-xs text-gray-600 bg-slate-50 border border-slate-200 rounded-lg p-3">
-                            Rename sections or hide them from the live deployed site. Hidden sections stay in the database but will not appear on the advisor&apos;s public website.
+                            Change the section label shown in the dashboard, or hide sections from the live deployed site. The template key (used internally) cannot be changed.
                         </p>
 
                         {isLoadingSections ? (
@@ -526,22 +524,19 @@ export default function PowerAdminDashboard() {
                                                     )}
                                                 </div>
                                                 <div>
-                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Section Name (template key)</label>
-                                                    <input
-                                                        type="text"
-                                                        value={draft.name ?? section.name}
-                                                        onChange={e => handleSectionDraftChange(section.id, 'name', e.target.value)}
-                                                        className="w-full text-sm p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E] font-semibold"
-                                                    />
+                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Template Key (fixed)</label>
+                                                    <div className="w-full text-sm p-2 border rounded-lg bg-slate-50 text-slate-600 font-mono">
+                                                        {section.section_key || section.name}
+                                                    </div>
                                                 </div>
                                                 <div>
-                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Display Label (optional)</label>
+                                                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Section Name</label>
                                                     <input
                                                         type="text"
                                                         placeholder={section.name}
                                                         value={draft.display_name ?? ''}
                                                         onChange={e => handleSectionDraftChange(section.id, 'display_name', e.target.value)}
-                                                        className="w-full text-sm p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E]"
+                                                        className="w-full text-sm p-2 border rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E] font-semibold"
                                                     />
                                                 </div>
                                             </div>
