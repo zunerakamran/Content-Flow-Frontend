@@ -2276,11 +2276,6 @@ export default function AdvisorDashboard() {
                               {section.name === 'Hero Slider' ? (
                                 // Hero Slider - 3 Slides Editor
                                 <div className="space-y-8">
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                                    <h4 className="text-sm font-bold text-blue-900 mb-2">Hero Slider - 3 Slides</h4>
-                                    <p className="text-xs text-blue-700">Configure each slide with its own background image, heading, text, and buttons.</p>
-                                  </div>
-                                  
                                   {[0, 1, 2].map((slideIndex) => {
                                     const slide = (values.slides && Array.isArray(values.slides) && values.slides[slideIndex]) || {};
                                     const slideImage = slide.bg || slide.image_url || '';
@@ -2472,10 +2467,6 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isWhatWeDoSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">What we do</h4>
-                                    <p className="text-xs text-gray-600">Edit the subheading, main heading, intro text, and the three service boxes.</p>
-                                  </div>
 
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
@@ -2609,12 +2600,6 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isAboutSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">About Section</h4>
-                                    <p className="text-xs text-gray-600">
-                                      This section has no button. Edit the headings, photo (upload or pick), two percentage + text items, and the highlight box.
-                                    </p>
-                                  </div>
 
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
@@ -2774,11 +2759,6 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isCompanyHistorySection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Company History</h4>
-                                    <p className="text-xs text-gray-600">Edit the subheading, heading, intro text, and the six year milestones.</p>
-                                  </div>
-
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
                                       <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
@@ -2921,11 +2901,6 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isFeaturedServicesSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Featured Services</h4>
-                                    <p className="text-xs text-gray-600">Edit the subheading, heading, intro text, and the six service boxes (icon, heading, text, button).</p>
-                                  </div>
-
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
                                       <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
@@ -3039,11 +3014,6 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isAnnualProgressionSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Annual Progression</h4>
-                                    <p className="text-xs text-gray-600">Edit the subheading, heading, intro text, three progress bars, and two highlight cards.</p>
-                                  </div>
-
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
                                       <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
@@ -3183,11 +3153,6 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isPortfolioSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Portfolio Section</h4>
-                                    <p className="text-xs text-gray-600">Edit the subheading, heading, and the six project cards (image, category, heading, button).</p>
-                                  </div>
-
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
                                       <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
@@ -3310,11 +3275,6 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isBranchesSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Branches and Appointment</h4>
-                                    <p className="text-xs text-gray-600">Edit the heading copy, map image, form labels, stats overlay, and the four branch cards.</p>
-                                  </div>
-
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
                                       <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
@@ -3496,11 +3456,6 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isCounterStatsSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Counter Stats</h4>
-                                    <p className="text-xs text-gray-600">Edit the four stat cards shown in the red gradient band — icon, number, label, and description.</p>
-                                  </div>
-
                                   {[0, 1, 2, 3].map((statIndex) => {
                                     const stat = (values.stats && values.stats[statIndex]) || {}
                                     return (
@@ -3571,11 +3526,6 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isTestimonialsSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Testimonials Carousel</h4>
-                                    <p className="text-xs text-gray-600">Edit the section heading, side image, and three client testimonial slides.</p>
-                                  </div>
-
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
                                       <label className="block text-xs font-bold text-gray-700 mb-1">Eyebrow</label>
@@ -3739,11 +3689,6 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isLatestNewsSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Latest News</h4>
-                                    <p className="text-xs text-gray-600">Edit the section heading and three blog post cards with date, author, category, title, excerpt, and image.</p>
-                                  </div>
-
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
                                       <label className="block text-xs font-bold text-gray-700 mb-1">Eyebrow</label>
@@ -3905,11 +3850,6 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isClientLogosSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Client Logos</h4>
-                                    <p className="text-xs text-gray-600">Edit the five client logos shown in the grey band. Use a text label or upload a logo image for each slot.</p>
-                                  </div>
-
                                   {[0, 1, 2, 3, 4].map((itemIndex) => {
                                     const item = (values.items && values.items[itemIndex]) || {}
                                     return (
@@ -3978,11 +3918,6 @@ export default function AdvisorDashboard() {
                                 </div>
                               ) : isCtaBannerSection(section.name) ? (
                                 <div className="space-y-8">
-                                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">CTA Banner</h4>
-                                    <p className="text-xs text-gray-600">Edit the dark call-to-action strip — heading, supporting text, and button label/link.</p>
-                                  </div>
-
                                   <div className="grid md:grid-cols-2 gap-4">
                                     <div className="md:col-span-2">
                                       <label className="block text-xs font-bold text-gray-700 mb-1">Heading</label>
