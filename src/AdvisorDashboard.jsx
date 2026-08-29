@@ -253,8 +253,13 @@ function isClientLogosSection(name) {
   return key === 'clientlogos' || key.includes('clientlogo')
 }
 
+function isCtaBannerSection(name) {
+  const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return key === 'ctabanner' || key === 'cta' || key.includes('ctabanner')
+}
+
 function isAdvisorVisibleSection(name) {
-  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name) || isAnnualProgressionSection(name) || isPortfolioSection(name) || isBranchesSection(name) || isCounterStatsSection(name) || isTestimonialsSection(name) || isLatestNewsSection(name) || isClientLogosSection(name)
+  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name) || isAnnualProgressionSection(name) || isPortfolioSection(name) || isBranchesSection(name) || isCounterStatsSection(name) || isTestimonialsSection(name) || isLatestNewsSection(name) || isClientLogosSection(name) || isCtaBannerSection(name)
 }
 
 function advisorSectionOrder(name) {
@@ -270,6 +275,7 @@ function advisorSectionOrder(name) {
   if (isTestimonialsSection(name)) return 9
   if (isLatestNewsSection(name)) return 10
   if (isClientLogosSection(name)) return 11
+  if (isCtaBannerSection(name)) return 12
   return 99
 }
 
@@ -705,6 +711,16 @@ function clientLogosPreviewPayload(values) {
       }
     }),
   })
+}
+
+function normalizeCtaBannerEditorContent(content) {
+  const c = content && typeof content === 'object' ? content : {}
+  return {
+    heading: c.heading || c.title || 'Looking for the Best Business Consulting?',
+    subheading: c.subheading || c.text || c.desc || c.description || 'As a web crawler expert, we will help to organize.',
+    button_text: c.button_text || c.btn_text || c.button || 'GET A QUOTE',
+    button_url: c.button_url || c.btn_url || c.url || c.link || '#appointment',
+  }
 }
 
 function defaultAboutGauges() {
@@ -1527,7 +1543,9 @@ export default function AdvisorDashboard() {
                           ? normalizeLatestNewsEditorContent(parsed)
                           : isClientLogosSection(s.name)
                             ? normalizeClientLogosEditorContent(parsed)
-                            : parsed
+                            : isCtaBannerSection(s.name)
+                              ? normalizeCtaBannerEditorContent(parsed)
+                              : parsed
       }
     })
     setSectionEdits(initialEdits)
@@ -1577,7 +1595,9 @@ export default function AdvisorDashboard() {
                           ? normalizeLatestNewsEditorContent(parsed)
                           : isClientLogosSection(section.name)
                             ? normalizeClientLogosEditorContent(parsed)
-                            : parsed
+                            : isCtaBannerSection(section.name)
+                              ? normalizeCtaBannerEditorContent(parsed)
+                              : parsed
       }))
       setMessage(`🔒 Section "${section.name}" locked for you. You can now edit its content.`)
     } catch (err) {
@@ -1789,7 +1809,9 @@ export default function AdvisorDashboard() {
                     ? normalizeLatestNewsEditorContent(raw)
                     : section && isClientLogosSection(section.name)
                       ? normalizeClientLogosEditorContent(raw)
-                      : raw
+                      : section && isCtaBannerSection(section.name)
+                        ? normalizeCtaBannerEditorContent(raw)
+                        : raw
       return {
         section_id: secId,
         proposed_content: JSON.stringify(content, null, 2)
@@ -4031,6 +4053,56 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
+                              ) : isCtaBannerSection(section.name) ? (
+                                <div className="space-y-8">
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">CTA Banner</h4>
+                                    <p className="text-xs text-gray-600">Edit the dark call-to-action strip — heading, supporting text, and button label/link.</p>
+                                  </div>
+
+                                  <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Heading</label>
+                                      <input
+                                        type="text"
+                                        value={values.heading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'heading', e.target.value)}
+                                        placeholder="Looking for the Best Business Consulting?"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none font-semibold text-[#0B1B3D]"
+                                      />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
+                                      <textarea
+                                        rows={2}
+                                        value={values.subheading || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
+                                        placeholder="As a web crawler expert, we will help to organize."
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Button text</label>
+                                      <input
+                                        type="text"
+                                        value={values.button_text || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'button_text', e.target.value)}
+                                        placeholder="GET A QUOTE"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-bold text-gray-700 mb-1">Button URL</label>
+                                      <input
+                                        type="text"
+                                        value={values.button_url || ''}
+                                        onChange={(e) => handleFieldValueChange(secId, 'button_url', e.target.value)}
+                                        placeholder="#appointment"
+                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
                               ) : (
                                 // Standard Section Editor
                                 <div className="grid md:grid-cols-2 gap-4">
@@ -4162,10 +4234,12 @@ export default function AdvisorDashboard() {
                                                     ? latestNewsPreviewPayload(values)
                                                     : isClientLogosSection(section.name)
                                                       ? clientLogosPreviewPayload(values)
-                                                      : values),
+                                                      : isCtaBannerSection(section.name)
+                                                        ? normalizeCtaBannerEditorContent(values)
+                                                        : values),
                                   preview_slide: previewSlide[secId] ?? 0,
                                 }}
-                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) || isPortfolioSection(section.name) || isBranchesSection(section.name) || isCounterStatsSection(section.name) || isTestimonialsSection(section.name) || isLatestNewsSection(section.name) || isClientLogosSection(section.name) ? 720 : 520}
+                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) || isPortfolioSection(section.name) || isBranchesSection(section.name) || isCounterStatsSection(section.name) || isTestimonialsSection(section.name) || isLatestNewsSection(section.name) || isClientLogosSection(section.name) || isCtaBannerSection(section.name) ? 720 : 520}
                                 borderColor="border-[#C8102E]"
                               />
                             </div>
