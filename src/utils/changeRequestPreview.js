@@ -22,19 +22,25 @@ function parseContentArray(str) {
   }
 }
 
-function pickCurrentContent(item) {
+export function pickCurrentContent(item) {
   return item?.current_content
     ?? item?.original_content
     ?? item?.previous_content
     ?? item?.published_content
     ?? item?.live_content
+    ?? item?.content_before
+    ?? item?.before_content
+    ?? item?.old_content
+    ?? item?.submitted_current_content
+    ?? item?.snapshot_content
     ?? null
 }
 
-function pickProposedContent(item) {
+export function pickProposedContent(item) {
   return item?.proposed_content
     ?? item?.draft_content
     ?? item?.content
+    ?? item?.submitted_proposed_content
     ?? null
 }
 
@@ -50,6 +56,7 @@ function editsFromRelation(req) {
     ?? req.sectionEdits
     ?? req.edits
     ?? req.change_request_edits
+    ?? req.change_request_sections
 
   if (!Array.isArray(relation) || relation.length === 0) return null
 
@@ -93,6 +100,15 @@ export function buildPreviewFromRequest(req) {
   }
 }
 
+export function clonePreviewData(data) {
+  if (!data) return null
+  try {
+    return JSON.parse(JSON.stringify(data))
+  } catch {
+    return data
+  }
+}
+
 export function previewHasStoredSnapshot(preview) {
   if (!preview) return false
 
@@ -105,10 +121,16 @@ export function previewHasStoredSnapshot(preview) {
   return pickCurrentContent(preview) != null && pickProposedContent(preview) != null
 }
 
+export function previewHasDistinctSides(preview) {
+  if (!preview) return false
+  return !previewSidesMatch(preview)
+}
+
 export function previewSidesMatch(preview) {
   if (!preview) return false
 
   if (preview.is_batch && Array.isArray(preview.edits)) {
+    if (preview.edits.length === 0) return true
     return preview.edits.every(
       (item) => normalizeContent(pickCurrentContent(item)) === normalizeContent(pickProposedContent(item))
     )
@@ -191,4 +213,72 @@ export function preferStoredPreview(apiPreview, storedPreview) {
 
 export function isHistoricalRequest(req) {
   return ['approved', 'rejected', 'scheduled'].includes(req?.status)
+}
+
+async function fetchRequestDetail(api, req) {
+  try {
+    const res = await api.get(`/change-requests/${req.id}`)
+    return { ...req, ...(res.data?.data ?? res.data) }
+  } catch {
+    return req
+  }
+}
+
+export async function fetchLivePreview(api, requestId) {
+  const res = await api.get(`/change-requests/${requestId}/preview`)
+  return res.data
+}
+
+export async function resolveRequestPreview(api, req, { cachedPreview = null } = {}) {
+  const historical = isHistoricalRequest(req)
+
+  if (cachedPreview && (historical || previewHasDistinctSides(cachedPreview))) {
+    return clonePreviewData(cachedPreview)
+  }
+
+  const detailedReq = historical ? await fetchRequestDetail(api, req) : req
+  const storedPreview = buildPreviewFromRequest(detailedReq)
+
+  if (historical && previewHasStoredSnapshot(storedPreview) && previewHasDistinctSides(storedPreview)) {
+    return storedPreview
+  }
+
+  const livePreview = await fetchLivePreview(api, req.id)
+  let nextPreview = livePreview
+
+  if (previewHasStoredSnapshot(storedPreview)) {
+    nextPreview = preferStoredPreview(nextPreview, storedPreview)
+  }
+
+  if (cachedPreview && previewSidesMatch(nextPreview)) {
+    return clonePreviewData(cachedPreview)
+  }
+
+  return nextPreview
+}
+
+export async function capturePreviewSnapshot(api, requestId, existingPreview = null) {
+  if (existingPreview) return clonePreviewData(existingPreview)
+  return clonePreviewData(await fetchLivePreview(api, requestId))
+}
+
+export const PREVIEW_SNAPSHOT_STORAGE_KEY = 'approver_preview_snapshots_v1'
+
+export function loadPreviewSnapshots() {
+  try {
+    const raw = sessionStorage.getItem(PREVIEW_SNAPSHOT_STORAGE_KEY)
+    return raw ? JSON.parse(raw) : {}
+  } catch {
+    return {}
+  }
+}
+
+export function savePreviewSnapshot(snapshots, requestId, preview) {
+  const clone = clonePreviewData(preview)
+  if (!clone) return snapshots
+  const next = { ...snapshots, [requestId]: clone }
+  try {
+    sessionStorage.setItem(PREVIEW_SNAPSHOT_STORAGE_KEY, JSON.stringify(next))
+  } catch { /* ignore quota errors */ }
+  return next
 }

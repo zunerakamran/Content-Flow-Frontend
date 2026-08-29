@@ -5,10 +5,12 @@ import { useAuth } from './context/AuthContext'
 import { parseJson } from './utils/parseJson'
 import {
   buildPreviewFromRequest,
+  capturePreviewSnapshot,
   isHistoricalRequest,
-  preferStoredPreview,
+  loadPreviewSnapshots,
   previewHasStoredSnapshot,
-  previewSidesMatch,
+  resolveRequestPreview,
+  savePreviewSnapshot,
 } from './utils/changeRequestPreview'
 import SectionIframePreview from './SectionIframePreview'
 
@@ -43,7 +45,15 @@ function statusBadge(status, scheduledAt) {
   }
 }
 
-const RequestCard = memo(function RequestCard({ req, user, onStatusChange, onMessage, onError }) {
+const RequestCard = memo(function RequestCard({
+  req,
+  user,
+  onStatusChange,
+  onMessage,
+  onError,
+  getCachedPreview,
+  cachePreview,
+}) {
   const [previewData, setPreviewData] = useState(null)
   const [previewMode, setPreviewMode] = useState('visual')
   const [rejectionReason, setRejectionReason] = useState('')
@@ -81,29 +91,18 @@ const RequestCard = memo(function RequestCard({ req, user, onStatusChange, onMes
     setBusy('preview')
     onError('')
     try {
-      const storedPreview = buildPreviewFromRequest(req)
-      const historical = isHistoricalRequest(req)
-
-      if (historical && previewHasStoredSnapshot(storedPreview)) {
-        setPreviewData(storedPreview)
-        return
-      }
-
-      const res = await api.get(`/change-requests/${req.id}/preview`)
-      let nextPreview = res.data
-
-      if (previewHasStoredSnapshot(storedPreview)) {
-        if (historical || previewSidesMatch(nextPreview)) {
-          nextPreview = preferStoredPreview(nextPreview, storedPreview)
-        }
-      } else if (historical && previewSidesMatch(nextPreview)) {
-        onError('Historical snapshot is unavailable for this request. Live content may have changed since submission.')
-      }
-
+      const cachedPreview = getCachedPreview(req.id)
+      const nextPreview = await resolveRequestPreview(api, req, { cachedPreview })
       setPreviewData(nextPreview)
+      if (nextPreview && !isHistoricalRequest(req)) {
+        cachePreview(req.id, nextPreview)
+      }
     } catch {
+      const cachedPreview = getCachedPreview(req.id)
       const storedPreview = buildPreviewFromRequest(req)
-      if (previewHasStoredSnapshot(storedPreview)) {
+      if (cachedPreview) {
+        setPreviewData(cachedPreview)
+      } else if (previewHasStoredSnapshot(storedPreview)) {
         setPreviewData(storedPreview)
       } else {
         onError('Could not fetch request preview.')
@@ -119,6 +118,9 @@ const RequestCard = memo(function RequestCard({ req, user, onStatusChange, onMes
     onMessage('')
     const scheduledTime = scheduleDate
     try {
+      const snapshot = await capturePreviewSnapshot(api, req.id, previewData)
+      cachePreview(req.id, snapshot)
+
       await api.post(`/change-requests/${req.id}/approve`, {
         scheduled_at: isScheduled ? scheduledTime : null,
       })
@@ -146,6 +148,9 @@ const RequestCard = memo(function RequestCard({ req, user, onStatusChange, onMes
     onError('')
     onMessage('')
     try {
+      const snapshot = await capturePreviewSnapshot(api, req.id, previewData)
+      cachePreview(req.id, snapshot)
+
       await api.post(`/change-requests/${req.id}/reject`, {
         rejection_reason: rejectionReason,
       })
@@ -370,10 +375,21 @@ const RequestCard = memo(function RequestCard({ req, user, onStatusChange, onMes
 export default function ApproverDashboard() {
   const { user } = useAuth()
   const [requests, setRequests] = useState([])
+  const [previewSnapshots, setPreviewSnapshots] = useState(() => loadPreviewSnapshots())
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState('active')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+
+  const cachePreview = useCallback((requestId, preview) => {
+    if (!preview) return
+    setPreviewSnapshots(prev => savePreviewSnapshot(prev, requestId, preview))
+  }, [])
+
+  const getCachedPreview = useCallback(
+    (requestId) => previewSnapshots[requestId] || null,
+    [previewSnapshots]
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -491,6 +507,8 @@ export default function ApproverDashboard() {
                 onStatusChange={handleStatusChange}
                 onMessage={setFeedbackMessage}
                 onError={setFeedbackError}
+                getCachedPreview={getCachedPreview}
+                cachePreview={cachePreview}
               />
             ))}
           </div>
