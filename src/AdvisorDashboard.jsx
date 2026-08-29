@@ -20,8 +20,11 @@ import {
   FaPercentage,
   FaSeedling,
   FaShieldAlt,
+  FaStar,
   FaTasks,
+  FaUserTie,
   FaUsers,
+  FaAward,
 } from 'react-icons/fa'
 
 const API_BASE = String(api.defaults.baseURL || '').replace(/\/$/, '')
@@ -230,8 +233,13 @@ function isBranchesSection(name) {
   return key === 'branchesandappointment' || key.includes('branch') || key.includes('appointment')
 }
 
+function isCounterStatsSection(name) {
+  const key = (name || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+  return key === 'counterstats' || key === 'stats' || key.includes('counter')
+}
+
 function isAdvisorVisibleSection(name) {
-  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name) || isAnnualProgressionSection(name) || isPortfolioSection(name) || isBranchesSection(name)
+  return isHeroSection(name) || isWhatWeDoSection(name) || isAboutSection(name) || isCompanyHistorySection(name) || isFeaturedServicesSection(name) || isAnnualProgressionSection(name) || isPortfolioSection(name) || isBranchesSection(name) || isCounterStatsSection(name)
 }
 
 function advisorSectionOrder(name) {
@@ -243,6 +251,7 @@ function advisorSectionOrder(name) {
   if (isAnnualProgressionSection(name)) return 5
   if (isPortfolioSection(name)) return 6
   if (isBranchesSection(name)) return 7
+  if (isCounterStatsSection(name)) return 8
   return 99
 }
 
@@ -265,6 +274,14 @@ const SERVICE_ICON_OPTIONS = [
   { value: 'globe', label: 'Globe', Icon: FaGlobe },
   { value: 'comments', label: 'Comments', Icon: FaComments },
   { value: 'balance-scale', label: 'Balance', Icon: FaBalanceScale },
+]
+
+const STAT_ICON_OPTIONS = [
+  { value: 'users', label: 'Users', Icon: FaUsers },
+  { value: 'star', label: 'Star', Icon: FaStar },
+  { value: 'user-tie', label: 'User tie', Icon: FaUserTie },
+  { value: 'award', label: 'Award', Icon: FaAward },
+  ...SERVICE_ICON_OPTIONS.filter((opt) => opt.value !== 'users'),
 ]
 
 function defaultFeaturedServiceBoxes() {
@@ -469,6 +486,35 @@ function branchesPreviewPayload(values) {
     image: absImage || image,
     image_preview: preview || undefined,
   })
+}
+
+function defaultCounterStats() {
+  return [
+    { icon: 'users', value: '2,800+', label: 'Active Clients', sub: 'Empowering businesses globally with passion and proven expertise.' },
+    { icon: 'star', value: '1,670+', label: '5-Star Reviews', sub: 'Top customer satisfaction and unmatched quality of service.' },
+    { icon: 'user-tie', value: '106+', label: 'Team Members', sub: 'Dedicated specialists and leaders driving continuous innovation.' },
+    { icon: 'award', value: '99.8%', label: 'Success Rate', sub: 'Consistently delivering top-tier performance and business growth.' },
+  ]
+}
+
+function normalizeCounterStatsEditorContent(content) {
+  const c = content && typeof content === 'object' ? content : {}
+  const defaults = defaultCounterStats()
+  const list = Array.isArray(c.stats) && c.stats.length
+    ? c.stats
+    : (Array.isArray(c.items) && c.items.length ? c.items : [])
+  return {
+    stats: defaults.map((fallback, i) => {
+      const item = list[i] && typeof list[i] === 'object' ? list[i] : {}
+      const n = i + 1
+      return {
+        icon: item.icon || c[`stat_${n}_icon`] || fallback.icon,
+        value: item.value || item.number || c[`stat_${n}_value`] || fallback.value,
+        label: item.label || item.title || item.heading || c[`stat_${n}_label`] || fallback.label,
+        sub: item.sub || item.desc || item.description || item.text || c[`stat_${n}_sub`] || fallback.sub,
+      }
+    }),
+  }
 }
 
 function defaultAboutGauges() {
@@ -1065,7 +1111,9 @@ export default function AdvisorDashboard() {
                   ? normalizePortfolioEditorContent(parsed)
                   : isBranchesSection(s.name)
                     ? normalizeBranchesEditorContent(parsed)
-                    : parsed
+                    : isCounterStatsSection(s.name)
+                      ? normalizeCounterStatsEditorContent(parsed)
+                      : parsed
       }
     })
     setSectionEdits(initialEdits)
@@ -1107,7 +1155,9 @@ export default function AdvisorDashboard() {
                   ? normalizePortfolioEditorContent(parsed)
                   : isBranchesSection(section.name)
                     ? normalizeBranchesEditorContent(parsed)
-                    : parsed
+                    : isCounterStatsSection(section.name)
+                      ? normalizeCounterStatsEditorContent(parsed)
+                      : parsed
       }))
       setMessage(`🔒 Section "${section.name}" locked for you. You can now edit its content.`)
     } catch (err) {
@@ -1196,6 +1246,15 @@ export default function AdvisorDashboard() {
     })
   }
 
+  const patchCounterStat = (secId, statIndex, patch) => {
+    setSectionEdits((prev) => {
+      const source = prev[secId]?.stats || prev[secId]?.items || defaultCounterStats()
+      const stats = defaultCounterStats().map((_, i) => ({ ...(source[i] || {}) }))
+      stats[statIndex] = { ...stats[statIndex], ...patch }
+      return { ...prev, [secId]: { ...(prev[secId] || {}), stats } }
+    })
+  }
+
   const patchYear = (secId, yearIndex, patch) => {
     setSectionEdits((prev) => {
       const source = prev[secId]?.years || prev[secId]?.items || defaultCompanyHistoryYears()
@@ -1259,7 +1318,9 @@ export default function AdvisorDashboard() {
             ? normalizePortfolioEditorContent(raw)
             : section && isBranchesSection(section.name)
               ? normalizeBranchesEditorContent(raw)
-              : raw
+              : section && isCounterStatsSection(section.name)
+                ? normalizeCounterStatsEditorContent(raw)
+                : raw
       return {
         section_id: secId,
         proposed_content: JSON.stringify(content, null, 2)
@@ -2991,6 +3052,81 @@ export default function AdvisorDashboard() {
                                     )
                                   })}
                                 </div>
+                              ) : isCounterStatsSection(section.name) ? (
+                                <div className="space-y-8">
+                                  <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                                    <h4 className="text-sm font-bold text-[#0B1B3D] mb-2">Counter Stats</h4>
+                                    <p className="text-xs text-gray-600">Edit the four stat cards shown in the red gradient band — icon, number, label, and description.</p>
+                                  </div>
+
+                                  {[0, 1, 2, 3].map((statIndex) => {
+                                    const stat = (values.stats && values.stats[statIndex]) || {}
+                                    return (
+                                      <div key={statIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
+                                          <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">{statIndex + 1}</span>
+                                          Stat {statIndex + 1}
+                                        </h5>
+                                        <div className="grid md:grid-cols-2 gap-4">
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-2">Icon</label>
+                                            <div className="grid grid-cols-6 sm:grid-cols-9 gap-2">
+                                              {STAT_ICON_OPTIONS.map((opt) => {
+                                                const selected = (stat.icon || '') === opt.value
+                                                const Icon = opt.Icon
+                                                return (
+                                                  <button
+                                                    key={opt.value}
+                                                    type="button"
+                                                    title={opt.label}
+                                                    onClick={() => patchCounterStat(secId, statIndex, { icon: opt.value })}
+                                                    className={`h-10 rounded-lg border flex items-center justify-center transition ${
+                                                      selected
+                                                        ? 'border-[#0B1B3D] bg-[#0B1B3D] text-white'
+                                                        : 'border-gray-200 bg-white text-[#0B1B3D] hover:border-gray-400'
+                                                    }`}
+                                                  >
+                                                    <Icon size={16} />
+                                                  </button>
+                                                )
+                                              })}
+                                            </div>
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Value</label>
+                                            <input
+                                              type="text"
+                                              value={stat.value || stat.number || ''}
+                                              onChange={(e) => patchCounterStat(secId, statIndex, { value: e.target.value })}
+                                              placeholder="2,800+"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div>
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Label</label>
+                                            <input
+                                              type="text"
+                                              value={stat.label || stat.title || ''}
+                                              onChange={(e) => patchCounterStat(secId, statIndex, { label: e.target.value })}
+                                              placeholder="Active Clients"
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                          <div className="md:col-span-2">
+                                            <label className="block text-xs font-bold text-gray-700 mb-1">Description</label>
+                                            <textarea
+                                              rows={2}
+                                              value={stat.sub || stat.desc || ''}
+                                              onChange={(e) => patchCounterStat(secId, statIndex, { sub: e.target.value })}
+                                              placeholder="Empowering businesses globally with passion and proven expertise."
+                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )
+                                  })}
+                                </div>
                               ) : (
                                 // Standard Section Editor
                                 <div className="grid md:grid-cols-2 gap-4">
@@ -3114,10 +3250,12 @@ export default function AdvisorDashboard() {
                                             ? portfolioPreviewPayload(values)
                                             : isBranchesSection(section.name)
                                               ? branchesPreviewPayload(values)
-                                              : values),
+                                              : isCounterStatsSection(section.name)
+                                                ? normalizeCounterStatsEditorContent(values)
+                                                : values),
                                   preview_slide: previewSlide[secId] ?? 0,
                                 }}
-                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) || isPortfolioSection(section.name) || isBranchesSection(section.name) ? 720 : 520}
+                                height={isWhatWeDoSection(section.name) || isAboutSection(section.name) || isCompanyHistorySection(section.name) || isFeaturedServicesSection(section.name) || isAnnualProgressionSection(section.name) || isPortfolioSection(section.name) || isBranchesSection(section.name) || isCounterStatsSection(section.name) ? 720 : 520}
                                 borderColor="border-[#C8102E]"
                               />
                             </div>
