@@ -3,6 +3,7 @@ import Navbar from './Navbar'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import SectionIframePreview from './SectionIframePreview'
+import TemplateScrollPreview from './components/TemplateScrollPreview'
 import { parseJson } from './utils/parseJson'
 import { sectionDisplayName, sectionTemplateKey } from './utils/sectionDisplay'
 import {
@@ -2003,22 +2004,25 @@ export default function AdvisorDashboard() {
                           <div
                             key={tpl.id}
                             onClick={() => setSelectedTemplateName(tpl.slug)}
-                            className={`p-4 rounded-xl border cursor-pointer transition flex flex-col justify-between ${
+                            className={`rounded-xl border cursor-pointer transition flex flex-col overflow-hidden ${
                               isSelected
                                 ? 'bg-blue-50/70 border-[#0B1B3D] ring-2 ring-[#0B1B3D]/20 shadow-sm'
                                 : 'bg-white border-gray-200 hover:border-gray-300'
                             }`}
                           >
-                            <div>
-                              <div className="flex items-center justify-between mb-1">
-                                <span className="font-extrabold text-sm text-[#0B1B3D]">{tpl.name}</span>
-                                {isSelected && (
-                                  <span className="text-[10px] bg-[#0B1B3D] text-white font-bold px-2 py-0.5 rounded uppercase">Selected</span>
-                                )}
+                            <TemplateScrollPreview template={tpl} className="h-32" viewportHeight="8rem" />
+                            <div className="p-4 flex flex-col justify-between flex-1">
+                              <div>
+                                <div className="flex items-center justify-between mb-1">
+                                  <span className="font-extrabold text-sm text-[#0B1B3D]">{tpl.name}</span>
+                                  {isSelected && (
+                                    <span className="text-[10px] bg-[#0B1B3D] text-white font-bold px-2 py-0.5 rounded uppercase">Selected</span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-600 line-clamp-2">{tpl.description || 'Showcase template layout'}</p>
                               </div>
-                              <p className="text-xs text-gray-600 line-clamp-2">{tpl.description || 'Showcase template layout'}</p>
+                              <div className="mt-2 text-[10px] font-mono text-gray-400">slug: {tpl.slug}</div>
                             </div>
-                            <div className="mt-2 text-[10px] font-mono text-gray-400">slug: {tpl.slug}</div>
                           </div>
                         )
                       })}

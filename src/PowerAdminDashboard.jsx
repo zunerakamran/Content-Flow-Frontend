@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import Navbar from './Navbar'
 import api from './api/axios'
 import { sectionDisplayName } from './utils/sectionDisplay'
+import TemplateScrollPreview from './components/TemplateScrollPreview'
+import { defaultTemplatePreviewUrl } from './utils/assetUrl'
 
 export default function PowerAdminDashboard() {
     const [requests, setRequests] = useState([])
@@ -25,7 +27,8 @@ export default function PowerAdminDashboard() {
     const [templateName, setTemplateName] = useState('')
     const [templateSlug, setTemplateSlug] = useState('')
     const [templateDesc, setTemplateDesc] = useState('')
-    const [templateThumb, setTemplateThumb] = useState('')
+    const [templatePreviewUrl, setTemplatePreviewUrl] = useState('')
+    const [regeneratePreview, setRegeneratePreview] = useState(false)
     const [templateIsActive, setTemplateIsActive] = useState(true)
     const [isSavingTemplate, setIsSavingTemplate] = useState(false)
 
@@ -85,7 +88,8 @@ export default function PowerAdminDashboard() {
         setTemplateName('')
         setTemplateSlug('')
         setTemplateDesc('')
-        setTemplateThumb('')
+        setTemplatePreviewUrl('')
+        setRegeneratePreview(false)
         setTemplateIsActive(true)
         setShowTemplateModal(true)
     }
@@ -95,7 +99,8 @@ export default function PowerAdminDashboard() {
         setTemplateName(tpl.name || '')
         setTemplateSlug(tpl.slug || '')
         setTemplateDesc(tpl.description || '')
-        setTemplateThumb(tpl.thumbnail_url || '')
+        setTemplatePreviewUrl(tpl.preview_url || defaultTemplatePreviewUrl(tpl.slug))
+        setRegeneratePreview(false)
         setTemplateIsActive(Boolean(tpl.is_active))
         setShowTemplateModal(true)
     }
@@ -111,15 +116,20 @@ export default function PowerAdminDashboard() {
                 name: templateName,
                 slug: templateSlug,
                 description: templateDesc,
-                thumbnail_url: templateThumb,
+                preview_url: templatePreviewUrl || defaultTemplatePreviewUrl(templateSlug),
                 is_active: templateIsActive,
             }
 
+            const requestOptions = { timeout: 180000 }
+
             if (editingTemplate) {
-                await api.put(`/templates/${editingTemplate.id}`, payload)
+                if (regeneratePreview) {
+                    payload.regenerate_preview = true
+                }
+                await api.put(`/templates/${editingTemplate.id}`, payload, requestOptions)
                 setMessage(`🎉 Showcase template "${templateName}" updated successfully!`)
             } else {
-                await api.post('/templates', payload)
+                await api.post('/templates', payload, requestOptions)
                 setMessage(`🎉 New showcase template "${templateName}" created successfully!`)
             }
             setShowTemplateModal(false)
@@ -265,24 +275,28 @@ export default function PowerAdminDashboard() {
                         {templates.map(tpl => (
                             <div key={tpl.id} className="border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white flex flex-col justify-between hover:shadow-md transition">
                                 <div>
-                                    <div className="h-36 bg-slate-800 relative overflow-hidden flex items-center justify-center">
-                                        {tpl.thumbnail_url ? (
-                                            <img src={tpl.thumbnail_url} alt={tpl.name} className="w-full h-full object-cover" />
-                                        ) : (
-                                            <div className="text-slate-400 font-mono text-xs text-center p-4">
-                                                <span>🖼️ No Preview Image</span>
-                                            </div>
-                                        )}
-                                        <div className="absolute top-3 left-3 bg-[#0B1B3D]/90 backdrop-blur-sm text-white font-mono text-[10px] font-bold px-2.5 py-1 rounded-md">
-                                            {tpl.slug}
-                                        </div>
-                                        <div className="absolute top-3 right-3">
-                                            {tpl.is_active ? (
-                                                <span className="bg-emerald-500 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">Active</span>
-                                            ) : (
-                                                <span className="bg-gray-500 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">Disabled</span>
-                                            )}
-                                        </div>
+                                    <div className="relative overflow-hidden">
+                                        <TemplateScrollPreview
+                                            template={tpl}
+                                            className="h-36 w-full"
+                                            overlay={
+                                                <>
+                                                    <div className="absolute top-3 left-3 bg-[#0B1B3D]/90 backdrop-blur-sm text-white font-mono text-[10px] font-bold px-2.5 py-1 rounded-md z-10">
+                                                        {tpl.slug}
+                                                    </div>
+                                                    <div className="absolute top-3 right-3 z-10">
+                                                        {tpl.is_active ? (
+                                                            <span className="bg-emerald-500 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">Active</span>
+                                                        ) : (
+                                                            <span className="bg-gray-500 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">Disabled</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="absolute bottom-2 right-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity text-[9px] font-bold text-white/80 bg-black/40 px-2 py-0.5 rounded">
+                                                        Hover to scroll preview
+                                                    </div>
+                                                </>
+                                            }
+                                        />
                                     </div>
 
                                     <div className="p-4">
@@ -418,7 +432,13 @@ export default function PowerAdminDashboard() {
                                     type="text"
                                     placeholder="e.g. template5"
                                     value={templateSlug}
-                                    onChange={e => setTemplateSlug(e.target.value)}
+                                    onChange={e => {
+                                        const slug = e.target.value
+                                        setTemplateSlug(slug)
+                                        if (!editingTemplate && !templatePreviewUrl) {
+                                            setTemplatePreviewUrl(defaultTemplatePreviewUrl(slug))
+                                        }
+                                    }}
                                     className="w-full text-sm p-2.5 border rounded-lg outline-none font-mono"
                                 />
                                 <span className="text-[10px] text-gray-400 mt-1 block">Unique key used in React theme routing (e.g. template4, template5).</span>
@@ -436,15 +456,33 @@ export default function PowerAdminDashboard() {
                             </div>
 
                             <div>
-                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Thumbnail Preview Image URL</label>
+                                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Live Template Preview URL</label>
                                 <input
                                     type="url"
-                                    placeholder="https://..."
-                                    value={templateThumb}
-                                    onChange={e => setTemplateThumb(e.target.value)}
+                                    placeholder="https://epatronus.space/template4/"
+                                    value={templatePreviewUrl}
+                                    onChange={e => setTemplatePreviewUrl(e.target.value)}
                                     className="w-full text-sm p-2.5 border rounded-lg outline-none"
                                 />
+                                <span className="text-[10px] text-gray-400 mt-1 block">
+                                    The system captures a full-page screenshot from this URL when you save. Hover a template card to scroll through the preview.
+                                </span>
                             </div>
+
+                            {editingTemplate && (
+                                <div className="flex items-center gap-2 pt-1">
+                                    <input
+                                        type="checkbox"
+                                        id="regenerate_preview_checkbox"
+                                        checked={regeneratePreview}
+                                        onChange={e => setRegeneratePreview(e.target.checked)}
+                                        className="w-4 h-4 text-[#C8102E] rounded border-gray-300 focus:ring-[#C8102E]"
+                                    />
+                                    <label htmlFor="regenerate_preview_checkbox" className="text-xs font-bold text-gray-700 cursor-pointer">
+                                        Regenerate preview screenshot from URL
+                                    </label>
+                                </div>
+                            )}
 
                             <div className="flex items-center gap-2 pt-1">
                                 <input
@@ -472,7 +510,7 @@ export default function PowerAdminDashboard() {
                                     disabled={isSavingTemplate}
                                     className="px-5 py-2 text-xs font-bold bg-[#0B1B3D] text-white rounded-lg hover:bg-slate-800 transition disabled:opacity-50 shadow-md"
                                 >
-                                    {isSavingTemplate ? 'Saving...' : editingTemplate ? 'Update Template' : 'Create Template'}
+                                    {isSavingTemplate ? 'Capturing preview & saving…' : editingTemplate ? 'Update Template' : 'Create Template'}
                                 </button>
                             </div>
                         </form>
