@@ -75,9 +75,6 @@ export default function Login() {
                     </button>
                 </form>
 
-                <div className="mt-6 text-center border-t pt-4">
-                    <a href="/" className="text-xs text-gray-400 hover:text-gray-600 font-semibold">← Return to Public Website</a>
-                </div>
             </div>
         </div>
     )

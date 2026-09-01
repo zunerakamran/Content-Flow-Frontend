@@ -243,7 +243,11 @@ export default function PowerAdminDashboard() {
                 cpanel_db_pass: cpanelDbPass,
                 cpanel_api_key: cpanelApiKey,
             })
-            setMessage(`Template successfully deployed to ${cpanelDomain}!`)
+            setMessage(
+                selectedRequest.status === 'deployed'
+                    ? `Deployment settings updated for ${cpanelDomain}!`
+                    : `Template successfully deployed to ${cpanelDomain}!`
+            )
             setSelectedRequest(null)
             fetchData(true)
         } catch (err) {
@@ -954,7 +958,7 @@ export default function PowerAdminDashboard() {
                     subtitle={
                         <>
                             {sectionManageRequest.advisor?.name || 'Advisor'} —{' '}
-                            {sectionManageRequest.domain}
+                            {sectionManageRequest.domain_name || sectionManageRequest.domain}
                             {sectionManageRequest.cpanel_domain && (
                                 <>
                                     {' '}
@@ -1082,10 +1086,10 @@ export default function PowerAdminDashboard() {
             {/* Deploy Modal */}
             {selectedRequest && (
                 <ModalShell
-                    title="Deploy to cPanel"
+                    title={selectedRequest.status === 'deployed' ? 'Update Deployment' : 'Deploy to cPanel'}
                     subtitle={
                         <>
-                            Domain: {sectionManageRequest.domain} · Template:{' '}
+                            Domain: <strong>{selectedRequest.domain_name || selectedRequest.domain}</strong> · Template:{' '}
                             <strong>{selectedRequest.template_name || 'template4'}</strong>
                         </>
                     }
@@ -1093,6 +1097,14 @@ export default function PowerAdminDashboard() {
                     maxWidth="max-w-xl"
                 >
                     <form onSubmit={handleDeploySubmit} className="space-y-4">
+                        <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-800 flex items-start gap-2">
+                            <FaServer className="w-4 h-4 shrink-0 mt-0.5" />
+                            <span>
+                                Enter the advisor template folder URL where <code className="font-mono">api.php</code>{' '}
+                                lives — e.g. <code className="font-mono">https://epatronus.space/template4</code>
+                            </span>
+                        </div>
+
                         <div>
                             <label className={labelClass}>Advisor Site URL *</label>
                             <input
@@ -1182,7 +1194,12 @@ export default function PowerAdminDashboard() {
                                 {isDeploying ? (
                                     <>
                                         <FaSync className="w-3 h-3 animate-spin" />
-                                        Deploying…
+                                        {selectedRequest.status === 'deployed' ? 'Updating…' : 'Deploying…'}
+                                    </>
+                                ) : selectedRequest.status === 'deployed' ? (
+                                    <>
+                                        <FaCog className="w-3 h-3" />
+                                        Save Changes
                                     </>
                                 ) : (
                                     <>
