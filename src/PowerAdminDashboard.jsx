@@ -954,7 +954,7 @@ export default function PowerAdminDashboard() {
                     subtitle={
                         <>
                             {sectionManageRequest.advisor?.name || 'Advisor'} —{' '}
-                            {sectionManageRequest.domain_name || sectionManageRequest.domain}
+                            {sectionManageRequest.domain}
                             {sectionManageRequest.cpanel_domain && (
                                 <>
                                     {' '}
@@ -974,10 +974,6 @@ export default function PowerAdminDashboard() {
                     onClose={() => setSectionManageRequest(null)}
                     maxWidth="max-w-3xl"
                 >
-                    <p className="text-xs text-gray-600 bg-slate-50 border border-slate-200 rounded-xl p-3 mb-4">
-                        Change section labels shown in the dashboard, or hide sections from the live site. Template keys
-                        cannot be changed.
-                    </p>
 
                     {isLoadingSections ? (
                         <div className="py-12 text-center">
@@ -1097,20 +1093,12 @@ export default function PowerAdminDashboard() {
                     maxWidth="max-w-xl"
                 >
                     <form onSubmit={handleDeploySubmit} className="space-y-4">
-                        <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-800 flex items-start gap-2">
-                            <FaServer className="w-4 h-4 shrink-0 mt-0.5" />
-                            <span>
-                                Enter the advisor template folder URL where <code className="font-mono">api.php</code>{' '}
-                                lives — e.g. <code className="font-mono">https://epatronus.space/template4</code>
-                            </span>
-                        </div>
-
                         <div>
                             <label className={labelClass}>Advisor Site URL *</label>
                             <input
                                 type="url"
                                 required
-                                placeholder="https://epatronus.space/template4"
+                                placeholder="https://webiste-template"
                                 value={cpanelDomain}
                                 onChange={e => setCpanelDomain(e.target.value)}
                                 className={inputClass}
