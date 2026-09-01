@@ -27,6 +27,18 @@ import { sectionDisplayName } from './utils/sectionDisplay'
 import TemplateScrollPreview from './components/TemplateScrollPreview'
 import { defaultTemplatePreviewUrl } from './utils/assetUrl'
 
+function normalizeSiteUrl(value) {
+    const trimmed = String(value ?? '').trim()
+    if (!trimmed) return ''
+    if (/^https?:\/\//i.test(trimmed)) return trimmed
+    return `https://${trimmed.replace(/^\/+/, '')}`
+}
+
+function resolveAdvisorSiteUrl(req) {
+    const raw = req.cpanel_domain || req.domain_name || req.domain || ''
+    return normalizeSiteUrl(raw)
+}
+
 const STATUS_CONFIG = {
     pending: {
         label: 'Pending',
@@ -220,7 +232,7 @@ export default function PowerAdminDashboard() {
 
     const openDeployModal = req => {
         setSelectedRequest(req)
-        setCpanelDomain(req.cpanel_domain || `https://${req.domain_name}`)
+        setCpanelDomain(resolveAdvisorSiteUrl(req))
         setCpanelDbHost(req.cpanel_db_host || 'localhost')
         setCpanelDbName(req.cpanel_db_name || '')
         setCpanelDbUser(req.cpanel_db_user || '')
@@ -1088,7 +1100,20 @@ export default function PowerAdminDashboard() {
                     title={selectedRequest.status === 'deployed' ? 'Update Deployment' : 'Deploy to cPanel'}
                     subtitle={
                         <>
-                            Domain: <strong>{selectedRequest.domain_name || selectedRequest.domain}</strong> · Template:{' '}
+                            Domain:{' '}
+                            {(selectedRequest.cpanel_domain || cpanelDomain) ? (
+                                <a
+                                    href={selectedRequest.cpanel_domain || cpanelDomain}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[#C8102E] hover:underline font-semibold"
+                                >
+                                    {selectedRequest.cpanel_domain || cpanelDomain}
+                                </a>
+                            ) : (
+                                <strong>{selectedRequest.domain_name || selectedRequest.domain}</strong>
+                            )}
+                            {' '}· Template:{' '}
                             <strong>{selectedRequest.template_name || 'template4'}</strong>
                         </>
                     }
