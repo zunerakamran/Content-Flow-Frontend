@@ -39,12 +39,13 @@ import {
   FaServer,
   FaLayerGroup,
   FaFileAlt,
-  FaArrowUp,
   FaPalette,
   FaImages,
   FaPaperPlane,
   FaGlobeAmericas,
   FaExclamationTriangle,
+  FaTimesCircle,
+  FaPlus,
 } from 'react-icons/fa'
 
 const API_BASE = String(api.defaults.baseURL || '').replace(/\/$/, '')
@@ -310,37 +311,148 @@ function sectionIcon(name) {
   return FaLayerGroup
 }
 
-const DEPLOYMENT_STATUS = {
+const REQUEST_STATUS_CONFIG = {
   deployed: {
-    label: 'Site Active & Deployed',
+    label: 'Deployed',
     icon: FaCheckCircle,
     className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     dot: 'bg-emerald-500',
+    cardClass: 'border-emerald-200 bg-gradient-to-br from-emerald-50/80 to-white',
   },
   pending: {
-    label: 'Deployment Pending',
+    label: 'Pending',
     icon: FaClock,
     className: 'bg-amber-50 text-amber-700 border-amber-200',
     dot: 'bg-amber-500',
+    cardClass: 'border-amber-200 bg-gradient-to-br from-amber-50/60 to-white',
   },
-  not_deployed: {
-    label: 'Template Not Deployed',
-    icon: FaExclamationTriangle,
-    className: 'bg-slate-50 text-slate-600 border-slate-200',
-    dot: 'bg-slate-400',
+  rejected: {
+    label: 'Rejected',
+    icon: FaTimesCircle,
+    className: 'bg-rose-50 text-rose-700 border-rose-200',
+    dot: 'bg-rose-500',
+    cardClass: 'border-rose-200 bg-gradient-to-br from-rose-50/50 to-white',
   },
 }
 
-function DeploymentBadge({ status }) {
-  const config = DEPLOYMENT_STATUS[status]
+function RequestStatusBadge({ status }) {
+  const config = REQUEST_STATUS_CONFIG[status]
   if (!config) return null
   const Icon = config.icon
   return (
-    <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${config.className}`}>
+    <span className={`inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border uppercase tracking-wide ${config.className}`}>
       <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
       <Icon className="w-3 h-3" />
       {config.label}
     </span>
+  )
+}
+
+function DeploymentSummaryBadge({ deployed, pending, rejected }) {
+  if (!deployed && !pending && !rejected) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border bg-slate-50 text-slate-600 border-slate-200">
+        No deployments yet
+      </span>
+    )
+  }
+  return (
+    <div className="flex flex-wrap gap-2 justify-end">
+      {deployed > 0 && (
+        <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <FaCheckCircle className="w-3 h-3" />
+          {deployed} live
+        </span>
+      )}
+      {pending > 0 && (
+        <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+          <FaClock className="w-3 h-3" />
+          {pending} pending
+        </span>
+      )}
+      {rejected > 0 && (
+        <span className="inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+          <FaTimesCircle className="w-3 h-3" />
+          {rejected} rejected
+        </span>
+      )}
+    </div>
+  )
+}
+
+function DeploymentRequestCard({ request, isActive, onSelect }) {
+  const config = REQUEST_STATUS_CONFIG[request.status] || REQUEST_STATUS_CONFIG.pending
+  const isDeployed = request.status === 'deployed'
+
+  return (
+    <div
+      className={`rounded-xl border p-4 transition-all ${config.cardClass} ${
+        isActive ? 'ring-2 ring-[#C8102E] ring-offset-1 shadow-md' : 'shadow-sm hover:shadow-md'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="flex items-start gap-3 min-w-0 flex-1">
+          <div className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${
+            isDeployed ? 'bg-emerald-100 text-emerald-600' : request.status === 'pending' ? 'bg-amber-100 text-amber-600' : 'bg-rose-100 text-rose-600'
+          }`}>
+            {isDeployed ? <FaGlobeAmericas className="w-4 h-4" /> : request.status === 'pending' ? <FaClock className="w-4 h-4" /> : <FaTimesCircle className="w-4 h-4" />}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center flex-wrap gap-2">
+              <h3 className="font-extrabold text-sm text-[#0B1B3D] truncate">{request.domain_name}</h3>
+              <RequestStatusBadge status={request.status} />
+              {isActive && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#C8102E] text-white uppercase tracking-wide">
+                  Editing
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Template: <span className="font-semibold text-gray-700">{request.template_name || 'template4'}</span>
+              {isDeployed && request.cpanel_domain && (
+                <> · cPanel: <code className="font-mono text-[11px] bg-white/80 px-1.5 py-0.5 rounded border border-gray-200">{request.cpanel_domain}</code></>
+              )}
+            </p>
+            {request.status === 'rejected' && request.rejection_reason && (
+              <p className="text-xs text-rose-700 mt-2 bg-white/70 border border-rose-100 rounded-lg px-2.5 py-2">
+                {request.rejection_reason}
+              </p>
+            )}
+            {request.status === 'pending' && (
+              <p className="text-xs text-amber-700 mt-2">
+                Awaiting Power Admin review and cPanel deployment.
+              </p>
+            )}
+            <div className="flex items-center flex-wrap gap-2 mt-2">
+              <span className="w-4 h-4 rounded-full border border-white shadow-sm ring-1 ring-gray-200" style={{ backgroundColor: request.primary_color || '#0B1B3D' }} title="Primary" />
+              <span className="w-4 h-4 rounded-full border border-white shadow-sm ring-1 ring-gray-200" style={{ backgroundColor: request.secondary_color || '#C8102E' }} title="Secondary" />
+              {request.logo_url && (
+                <span className="text-[10px] text-gray-500 font-medium">Logo attached</span>
+              )}
+            </div>
+          </div>
+        </div>
+        {isDeployed && onSelect && (
+          <button
+            type="button"
+            onClick={onSelect}
+            className={`shrink-0 text-xs font-bold px-3 py-2 rounded-lg transition ${
+              isActive
+                ? 'bg-[#C8102E] text-white shadow-sm'
+                : 'bg-white text-[#0B1B3D] border border-gray-200 hover:border-[#C8102E]/40 hover:bg-gray-50'
+            }`}
+          >
+            {isActive ? 'Selected' : 'Edit Content'}
+          </button>
+        )}
+        {isDeployed && (
+          <span className="shrink-0 inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-white border border-emerald-200 px-2 py-1 rounded-lg">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            Live
+          </span>
+        )}
+      </div>
+    </div>
   )
 }
 
@@ -1047,6 +1159,7 @@ export default function AdvisorDashboard() {
   const [primaryColor, setPrimaryColor] = useState('#0B1B3D')
   const [secondaryColor, setSecondaryColor] = useState('#C8102E')
   const [isSubmittingTemplate, setIsSubmittingTemplate] = useState(false)
+  const [selectedDeploymentId, setSelectedDeploymentId] = useState(null)
   const [uploadingState, setUploadingState] = useState({})
   const [localPreviewUrls, setLocalPreviewUrls] = useState({})
   const [localImages, setLocalImages] = useState(LOCAL_TEMPLATE_IMAGES)
@@ -1593,11 +1706,35 @@ export default function AdvisorDashboard() {
     }
   }
 
-  // Fetch pages for the deployed template. Fall back to all/public pages so
-  // the dropdown is not empty if the template filter fails.
+  // Keep a valid deployed site selected when requests change
   useEffect(() => {
-    const deployedRequest = templateRequests.find(r => r.status === 'deployed')
-    if (!deployedRequest) {
+    const deployed = templateRequests.filter(r => r.status === 'deployed')
+    if (deployed.length === 0) {
+      setSelectedDeploymentId(null)
+      return
+    }
+    if (!selectedDeploymentId || !deployed.some(r => r.id === selectedDeploymentId)) {
+      setSelectedDeploymentId(deployed[0].id)
+    }
+  }, [templateRequests, selectedDeploymentId])
+
+  const handleDeploymentSelect = (deploymentId) => {
+    if (deploymentId === selectedDeploymentId) return
+    setSelectedDeploymentId(deploymentId)
+    setSelectedPageId('')
+    setSections([])
+    setCheckedSectionIds([])
+    setSectionEdits({})
+    setPreviewTab({})
+  }
+
+  // Fetch pages for the selected deployed site
+  useEffect(() => {
+    const activeDeployment = templateRequests.find(
+      r => r.status === 'deployed' && r.id === selectedDeploymentId
+    ) || templateRequests.find(r => r.status === 'deployed')
+
+    if (!activeDeployment) {
       setPages([])
       setSelectedPageId('')
       setSections([])
@@ -1605,7 +1742,7 @@ export default function AdvisorDashboard() {
     }
 
     const loadPages = async () => {
-      const templateName = deployedRequest.template_name
+      const templateName = activeDeployment.template_name
       try {
         const res = await api.get('/pages', {
           params: templateName ? { template: templateName } : {},
@@ -1631,7 +1768,7 @@ export default function AdvisorDashboard() {
     }
 
     loadPages()
-  }, [templateRequests])
+  }, [templateRequests, selectedDeploymentId])
 
   const handleTemplateSubmit = async (e) => {
     e.preventDefault()
@@ -1647,7 +1784,7 @@ export default function AdvisorDashboard() {
         secondary_color: secondaryColor,
         request_type: 'advisor_website'
       })
-      setMessage('🎉 Template deployment request submitted! Power admin will manually deploy it to your cPanel.')
+      setMessage('Deployment request submitted! Power Admin will review it. You can request additional deployments anytime.')
       setShowTemplateModal(false)
       setDomainName('')
       setLogoUrl('')
@@ -2008,11 +2145,12 @@ export default function AdvisorDashboard() {
 
   const selectedPage = pages.find(p => p.id === Number(selectedPageId))
 
-  // Find deployment statuses
-  const deployedRequest = templateRequests.find(r => r.status === 'deployed')
-  const pendingRequest = templateRequests.find(r => r.status === 'pending')
-  const rejectedRequest = templateRequests.find(r => r.status === 'rejected')
-  const isSiteDeployed = Boolean(deployedRequest)
+  const deployedRequests = templateRequests.filter(r => r.status === 'deployed')
+  const pendingRequests = templateRequests.filter(r => r.status === 'pending')
+  const rejectedRequests = templateRequests.filter(r => r.status === 'rejected')
+  const activeDeployment =
+    deployedRequests.find(r => r.id === selectedDeploymentId) || deployedRequests[0] || null
+  const hasDeployedSite = deployedRequests.length > 0
   const visibleSections = [...sections]
     .filter((s) => isAdvisorVisibleSection(sectionTemplateKey(s)))
     .sort((a, b) => advisorSectionOrder(sectionTemplateKey(a)) - advisorSectionOrder(sectionTemplateKey(b)))
@@ -2029,7 +2167,7 @@ export default function AdvisorDashboard() {
               <p className="text-xs font-extrabold text-[#C8102E] uppercase tracking-widest mb-1">Advisor Console</p>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1B3D] tracking-tight">Content Management</h1>
               <p className="text-gray-500 text-sm mt-2 max-w-xl">
-                Deploy your showcase site, lock sections, edit content, and submit changes for approval — all in one place.
+                Request multiple showcase sites, manage deployments, and edit content for each live site.
               </p>
             </div>
             <button
@@ -2037,8 +2175,8 @@ export default function AdvisorDashboard() {
               onClick={() => setShowTemplateModal(true)}
               className="inline-flex items-center gap-2 bg-[#0B1B3D] text-white text-sm font-bold px-5 py-3 rounded-xl hover:bg-[#07122A] transition shadow-lg shadow-[#0B1B3D]/20"
             >
-              <FaPalette className="w-4 h-4" />
-              Request Deployment
+              <FaPlus className="w-4 h-4" />
+              New Deployment
             </button>
           </div>
 
@@ -2046,12 +2184,17 @@ export default function AdvisorDashboard() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="bg-white rounded-xl border border-gray-200/80 p-4 shadow-sm">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isSiteDeployed ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                  deployedRequests.length > 0 ? 'bg-emerald-100 text-emerald-600' : pendingRequests.length > 0 ? 'bg-amber-100 text-amber-600' : 'bg-gray-100 text-gray-400'
+                }`}>
                   <FaServer className="w-4 h-4" />
                 </div>
                 <div>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Site Status</p>
-                  <p className="text-sm font-extrabold text-[#0B1B3D]">{isSiteDeployed ? 'Live' : pendingRequest ? 'Pending' : 'Not Deployed'}</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Deployments</p>
+                  <p className="text-sm font-extrabold text-[#0B1B3D]">
+                    {deployedRequests.length} live
+                    {pendingRequests.length > 0 && <span className="text-amber-600 font-bold"> · {pendingRequests.length} pending</span>}
+                  </p>
                 </div>
               </div>
             </div>
@@ -2093,7 +2236,7 @@ export default function AdvisorDashboard() {
 
         {/* Workflow progress */}
         <WorkflowStepper
-          isSiteDeployed={isSiteDeployed}
+          isSiteDeployed={hasDeployedSite}
           hasPage={Boolean(selectedPageId)}
           hasSections={checkedSectionIds.length > 0}
           isComplete={false}
@@ -2106,252 +2249,141 @@ export default function AdvisorDashboard() {
         {/* Step 1: Template Deployment Status & Selection */}
         <StepCard
           step={1}
-          title="cPanel Template Deployment"
-          description="Each advisor site must be deployed to cPanel before section editing is enabled."
+          title="Site Deployments"
+          description="Request multiple showcase sites — each with its own domain and template. Select a live site to edit its content."
           badge={
-            <DeploymentBadge
-              status={isSiteDeployed ? 'deployed' : pendingRequest ? 'pending' : 'not_deployed'}
+            <DeploymentSummaryBadge
+              deployed={deployedRequests.length}
+              pending={pendingRequests.length}
+              rejected={rejectedRequests.length}
             />
           }
         >
-          {/* Active Deployed State */}
-          {isSiteDeployed && (
-            <div className="bg-gradient-to-br from-emerald-50 to-emerald-50/30 border border-emerald-200 rounded-xl p-5">
-              <div className="flex items-start justify-between flex-wrap gap-4">
-                <div>
-                  <h3 className="font-extrabold text-emerald-950 text-base flex items-center gap-2">
-                    <FaGlobeAmericas className="w-4 h-4 text-emerald-600" />
-                    {deployedRequest.domain_name}
-                    <span className="text-xs bg-emerald-200 text-emerald-900 font-bold px-2.5 py-0.5 rounded-full">
-                      {deployedRequest.template_name || 'template4'}
-                    </span>
-                  </h3>
-                  <p className="text-xs text-emerald-700 mt-2">
-                    cPanel Target: <code className="bg-white/80 px-2 py-0.5 rounded-md font-mono font-semibold border border-emerald-200">{deployedRequest.cpanel_domain || deployedRequest.domain_name}</code>
-                  </p>
-                  <div className="flex items-center flex-wrap gap-3 mt-3">
-                    <span className="text-xs text-emerald-800 font-bold">Theme:</span>
-                    <div className="flex items-center gap-2">
-                      <span className="w-5 h-5 rounded-full border-2 border-white shadow-sm ring-1 ring-emerald-200" style={{ backgroundColor: deployedRequest.primary_color }} title="Primary" />
-                      <span className="w-5 h-5 rounded-full border-2 border-white shadow-sm ring-1 ring-emerald-200" style={{ backgroundColor: deployedRequest.secondary_color }} title="Secondary" />
-                    </div>
-                    {deployedRequest.logo_url && (
-                      <span className="text-xs bg-white text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-full font-medium">
-                        Logo attached
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-white border border-emerald-200 px-3 py-2 rounded-xl shadow-sm">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Live sync active
-                </span>
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-5">
+            <p className="text-sm text-gray-600">
+              <span className="font-bold text-[#0B1B3D]">{templateRequests.length}</span>
+              {' '}deployment request{templateRequests.length === 1 ? '' : 's'} total
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowTemplateModal(true)}
+              className="inline-flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl bg-[#0B1B3D] text-white hover:bg-[#07122A] transition shadow-sm"
+            >
+              <FaPlus className="w-3 h-3" />
+              Request New Deployment
+            </button>
+          </div>
+
+          {templateRequests.length === 0 ? (
+            <div className="text-center py-10 px-4 border-2 border-dashed border-gray-200 rounded-xl bg-slate-50/50">
+              <div className="w-14 h-14 rounded-2xl bg-white border border-gray-200 text-gray-400 flex items-center justify-center mx-auto mb-4 shadow-sm">
+                <FaRocket className="w-6 h-6" />
               </div>
+              <h3 className="text-base font-bold text-[#0B1B3D]">No deployments yet</h3>
+              <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
+                Submit your first deployment request. You can request additional sites anytime after that.
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowTemplateModal(true)}
+                className="mt-5 inline-flex items-center gap-2 bg-[#C8102E] text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-[#A00C23] transition shadow-md"
+              >
+                <FaPlus className="w-4 h-4" />
+                Request First Deployment
+              </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {templateRequests.map(req => (
+                <DeploymentRequestCard
+                  key={req.id}
+                  request={req}
+                  isActive={req.status === 'deployed' && req.id === activeDeployment?.id}
+                  onSelect={req.status === 'deployed' ? () => handleDeploymentSelect(req.id) : undefined}
+                />
+              ))}
             </div>
           )}
 
-          {/* Pending Deployment State */}
-          {!isSiteDeployed && pendingRequest && (
-            <div className="bg-gradient-to-br from-amber-50 to-orange-50/30 border border-amber-200 rounded-xl p-5">
-              <div className="flex items-start gap-4">
-                <div className="shrink-0 w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
-                  <FaClock className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-amber-900 text-base flex items-center flex-wrap gap-2">
-                    Deployment Request Submitted
-                    <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-2.5 py-0.5 rounded-full uppercase">
-                      Pending Review
-                    </span>
-                  </h3>
-                  <p className="text-xs text-amber-800 mt-1.5">
-                    Domain: <strong>{pendingRequest.domain_name}</strong> · Template: <strong>{pendingRequest.template_name || 'template4'}</strong>
-                  </p>
-                  <p className="text-xs text-amber-700 mt-3 bg-white/70 p-3 rounded-lg border border-amber-200/80 leading-relaxed">
-                    Power Admin will review and deploy your template to cPanel. Once complete, the section editor below unlocks automatically.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Rejected State */}
-          {!isSiteDeployed && !pendingRequest && rejectedRequest && (
-            <div className="bg-rose-50 border border-rose-200 rounded-xl p-5 mb-4 flex items-start gap-3">
-              <FaExclamationTriangle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
-              <div>
-                <h3 className="font-bold text-rose-900 text-sm">Previous Request Rejected</h3>
-                <p className="text-xs text-rose-700 mt-1">{rejectedRequest.rejection_reason}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Setup / Request Form Card if No Deployed Site */}
-          {!isSiteDeployed && !pendingRequest && (
-            <div className="space-y-4">
-              <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-5">
-                <h3 className="text-sm font-bold text-[#0B1B3D] mb-1 flex items-center gap-2">
-                  <FaPalette className="w-4 h-4 text-[#C8102E]" />
-                  Choose a Template & Request Deployment
-                </h3>
-                <p className="text-xs text-gray-500 mb-4">
-                  Select a showcase template, customize your domain and colors, then submit for deployment.
-                </p>
-
-                <form onSubmit={handleTemplateSubmit} className="space-y-5">
-                  <div>
-                    <label className={labelClass}>Select Showcase Template *</label>
-                    <div className="grid md:grid-cols-2 gap-4">
-                      {availableTemplates.map(tpl => {
-                        const isSelected = selectedTemplateName === tpl.slug
-                        return (
-                          <div
-                            key={tpl.id}
-                            onClick={() => setSelectedTemplateName(tpl.slug)}
-                            className={`rounded-xl border cursor-pointer transition-all flex flex-col overflow-hidden group ${
-                              isSelected
-                                ? 'bg-blue-50/50 border-[#0B1B3D] ring-2 ring-[#0B1B3D]/15 shadow-md'
-                                : 'bg-white border-gray-200 hover:border-[#C8102E]/30 hover:shadow-md'
-                            }`}
-                          >
-                            <TemplateScrollPreview template={tpl} className="h-36" viewportHeight="9rem" />
-                            <div className="p-4 flex flex-col justify-between flex-1">
-                              <div>
-                                <div className="flex items-center justify-between mb-1">
-                                  <span className="font-extrabold text-sm text-[#0B1B3D]">{tpl.name}</span>
-                                  {isSelected && (
-                                    <span className="text-[10px] bg-[#C8102E] text-white font-bold px-2 py-0.5 rounded-full">Selected</span>
-                                  )}
-                                </div>
-                                <p className="text-xs text-gray-600 line-clamp-2">{tpl.description || 'Showcase template layout'}</p>
-                              </div>
-                            </div>
-                          </div>
-                        )
-                      })}
-                      {availableTemplates.length === 0 && (
-                        <div className="p-4 border border-[#0B1B3D] bg-blue-50/40 rounded-xl flex items-center justify-between">
-                          <div>
-                            <div className="font-extrabold text-sm text-[#0B1B3D]">Template 4 - Corporate Financial Advisory</div>
-                            <div className="text-xs text-gray-600 mt-0.5">Corporate React showcase template for advisors.</div>
-                          </div>
-                          <span className="text-xs bg-[#0B1B3D] text-white font-bold px-3 py-1 rounded">Selected</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div>
-                      <label className={labelClass}>Target Domain Name *</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. advisor.myfirm.com"
-                        value={domainName}
-                        onChange={e => setDomainName(e.target.value)}
-                        className={inputClass}
-                      />
-                    </div>
-
-                    <div>
-                      <label className={labelClass}>Logo URL (Optional)</label>
-                      <input
-                        type="url"
-                        placeholder="https://myfirm.com/logo.png"
-                        value={logoUrl}
-                        onChange={e => setLogoUrl(e.target.value)}
-                        className={inputClass}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className={labelClass}>Primary Color</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={primaryColor}
-                          onChange={e => setPrimaryColor(e.target.value)}
-                          className="w-11 h-11 border border-gray-200 rounded-xl cursor-pointer"
-                        />
-                        <input
-                          type="text"
-                          value={primaryColor}
-                          onChange={e => setPrimaryColor(e.target.value)}
-                          className="w-full text-xs p-2.5 border border-gray-200 rounded-xl font-mono focus:ring-2 focus:ring-[#C8102E]/30 outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className={labelClass}>Secondary Color</label>
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="color"
-                          value={secondaryColor}
-                          onChange={e => setSecondaryColor(e.target.value)}
-                          className="w-11 h-11 border border-gray-200 rounded-xl cursor-pointer"
-                        />
-                        <input
-                          type="text"
-                          value={secondaryColor}
-                          onChange={e => setSecondaryColor(e.target.value)}
-                          className="w-full text-xs p-2.5 border border-gray-200 rounded-xl font-mono focus:ring-2 focus:ring-[#C8102E]/30 outline-none"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-2 flex justify-end">
-                    <button
-                      type="submit"
-                      disabled={isSubmittingTemplate}
-                      className="inline-flex items-center gap-2 bg-[#0B1B3D] text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-[#07122A] transition disabled:opacity-50 shadow-lg shadow-[#0B1B3D]/20"
-                    >
-                      <FaRocket className="w-4 h-4" />
-                      {isSubmittingTemplate ? 'Submitting...' : 'Submit Deployment Request'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
+          {hasDeployedSite && deployedRequests.length > 1 && (
+            <p className="text-xs text-gray-500 mt-4 flex items-center gap-1.5">
+              <FaGlobeAmericas className="w-3.5 h-3.5 text-[#C8102E]" />
+              Currently editing: <strong className="text-[#0B1B3D]">{activeDeployment?.domain_name}</strong>
+            </p>
           )}
         </StepCard>
 
         {/* Step 2: Page Selection & Section Editing (Gated by Template Deployment) */}
-        {!isSiteDeployed ? (
+        {!hasDeployedSite ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200/80 p-12 text-center">
             <div className="w-16 h-16 rounded-2xl bg-gray-100 text-gray-400 flex items-center justify-center mx-auto mb-4">
               <FaLock className="w-7 h-7" />
             </div>
             <h3 className="text-lg font-bold text-[#0B1B3D]">Section Editor Locked</h3>
             <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto leading-relaxed">
-              Complete template deployment first. Once Power Admin deploys your site, you can lock sections and edit content here.
+              At least one deployment must be live before you can edit content. Request a deployment above — you can submit multiple requests for different domains.
             </p>
-            {pendingRequest ? (
+            {pendingRequests.length > 0 ? (
               <div className="mt-5 inline-flex items-center gap-2 bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold px-4 py-2.5 rounded-xl">
                 <FaClock className="w-3.5 h-3.5" />
-                Deployment pending — check back soon
+                {pendingRequests.length} deployment{pendingRequests.length === 1 ? '' : 's'} pending review
               </div>
             ) : (
               <button
                 type="button"
-                onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                onClick={() => setShowTemplateModal(true)}
                 className="mt-5 inline-flex items-center gap-2 bg-[#0B1B3D] text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-[#07122A] transition shadow-md"
               >
-                <FaArrowUp className="w-3.5 h-3.5" />
-                Request Deployment Above
+                <FaPlus className="w-3.5 h-3.5" />
+                Request Deployment
               </button>
             )}
           </div>
         ) : (
           <div>
+            {deployedRequests.length > 1 && (
+              <StepCard
+                step={2}
+                title="Select Active Site"
+                description="You have multiple live deployments. Choose which site you want to edit."
+              >
+                <div className="grid sm:grid-cols-2 gap-3">
+                  {deployedRequests.map(req => {
+                    const isSelected = req.id === activeDeployment?.id
+                    return (
+                      <button
+                        key={req.id}
+                        type="button"
+                        onClick={() => handleDeploymentSelect(req.id)}
+                        className={`text-left p-4 rounded-xl border transition-all ${
+                          isSelected
+                            ? 'border-[#C8102E] bg-[#C8102E]/5 ring-2 ring-[#C8102E]/15 shadow-sm'
+                            : 'border-gray-200 bg-white hover:border-[#C8102E]/30 hover:shadow-md'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <FaGlobeAmericas className={`w-4 h-4 ${isSelected ? 'text-[#C8102E]' : 'text-gray-400'}`} />
+                          <span className="font-bold text-sm text-[#0B1B3D] truncate">{req.domain_name}</span>
+                          {isSelected && (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#C8102E] text-white ml-auto">Active</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-500">{req.template_name || 'template4'}</p>
+                      </button>
+                    )
+                  })}
+                </div>
+              </StepCard>
+            )}
+
             <StepCard
-              step={2}
+              step={deployedRequests.length > 1 ? 3 : 2}
               title="Select Page"
-              description="Choose which page you want to edit sections on."
+              description={
+                activeDeployment
+                  ? `Choose a page to edit on ${activeDeployment.domain_name}.`
+                  : 'Choose which page you want to edit sections on.'
+              }
             >
               <select
                 value={selectedPageId}
@@ -2370,7 +2402,7 @@ export default function AdvisorDashboard() {
             {selectedPage && (
               <div className="space-y-8">
                 <StepCard
-                  step={3}
+                  step={deployedRequests.length > 1 ? 4 : 3}
                   title={`Select Sections — ${selectedPage.title}`}
                   description="Check sections to lock them for editing. Locked sections appear in the editor below."
                   badge={
@@ -2451,7 +2483,7 @@ export default function AdvisorDashboard() {
                   <div className="space-y-6">
                     <div className="sticky top-0 z-20 flex items-center justify-between bg-gradient-to-r from-[#0B1B3D] to-[#132952] text-white px-6 py-4 rounded-2xl shadow-lg border border-white/10">
                       <div>
-                        <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-0.5">Step 4</p>
+                        <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-0.5">Step {deployedRequests.length > 1 ? 5 : 4}</p>
                         <h2 className="text-lg font-bold">Edit & Submit Changes</h2>
                         <p className="text-xs text-white/60 mt-0.5">All edits are submitted together as one request.</p>
                       </div>
@@ -4362,8 +4394,8 @@ export default function AdvisorDashboard() {
       {/* Template Deployment Request Modal */}
       {showTemplateModal && (
         <ModalShell
-          title="Request Template Deployment"
-          subtitle="Submit a deployment request to Power Admin"
+          title="Request New Deployment"
+          subtitle="Submit another showcase site — each request can use a different domain and template"
           onClose={() => setShowTemplateModal(false)}
         >
             <form onSubmit={handleTemplateSubmit} className="space-y-4">
