@@ -287,19 +287,6 @@ export default function ClientAdminDashboard() {
               <FaSync className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
               Refresh
             </button>
-            {user && (
-              <div className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm text-right">
-                <span className="text-[10px] text-gray-400 block uppercase font-bold tracking-wider">Logged in as</span>
-                <span className="text-sm font-bold text-[#C8102E]">{user.name}</span>
-                <RoleBadge role="client_admin" />
-                {user.firm && (
-                  <span className="text-xs text-gray-500 block mt-0.5 flex items-center gap-1 justify-end">
-                    <FaBuilding className="w-3 h-3" />
-                    {user.firm.name}
-                  </span>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
