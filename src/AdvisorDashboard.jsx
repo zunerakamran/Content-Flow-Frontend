@@ -4,8 +4,13 @@ import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import SectionIframePreview from './SectionIframePreview'
 import TemplateScrollPreview from './components/TemplateScrollPreview'
+import ImageFieldPicker from './components/ImageFieldPicker'
 import { parseJson } from './utils/parseJson'
 import { sectionDisplayName, sectionTemplateKey } from './utils/sectionDisplay'
+import {
+  absoluteAssetUrl,
+  isUploadedAsset,
+} from './utils/imageAssets'
 import {
   FaBalanceScale,
   FaBriefcase,
@@ -48,36 +53,6 @@ import {
   FaPlus,
   FaChevronDown,
 } from 'react-icons/fa'
-
-const API_BASE = String(api.defaults.baseURL || '').replace(/\/$/, '')
-
-function isUploadedAsset(url) {
-  return typeof url === 'string' && (
-    url.startsWith('/uploaded-images') ||
-    url.includes('/uploaded-images/') ||
-    url.startsWith('/uploads') ||
-    url.includes('/uploads/')
-  )
-}
-
-function absoluteAssetUrl(url) {
-  if (!url) return ''
-  if (/^(data:|blob:)/i.test(url)) return url
-  if (/^https?:\/\/(localhost|127\.0\.0\.1)/i.test(url) && isUploadedAsset(url)) {
-    const name = url.split('/').pop()
-    return `${API_BASE}/uploaded-images/${name}`
-  }
-  if (/^(https?:)/i.test(url)) return url
-  if (url.startsWith('/uploaded-images') || url.includes('/uploaded-images/')) {
-    const name = url.split('/').pop()
-    return `${API_BASE}/uploaded-images/${name}`
-  }
-  if (url.startsWith('/uploads') || url.includes('/uploads/')) {
-    const name = url.split('/').pop()
-    return `${API_BASE}/uploaded-images/${name}`
-  }
-  return url
-}
 
 const LOCAL_TEMPLATE_IMAGES = [
   { label: 'banner1', value: 'banner1' },
@@ -137,16 +112,6 @@ LOCAL_TEMPLATE_IMAGES.forEach((item) => {
   item.file = `${item.value}.${PNG_STEMS.has(item.value) ? 'png' : 'jpg'}`
 })
 
-function imageStem(path) {
-  if (!path || typeof path !== 'string') return ''
-  return path.split('/').pop().split('?')[0].replace(/\.[a-zA-Z0-9]+$/, '')
-}
-
-function selectedLocalValue(path, catalog) {
-  const stem = imageStem(path)
-  return (catalog || []).some((p) => p.value === stem) ? stem : ''
-}
-
 function storedUploadPath(data) {
   const path = data?.relative_url || data?.url || ''
   if (!path || /^data:/i.test(path)) return ''
@@ -156,23 +121,6 @@ function storedUploadPath(data) {
     return `/uploaded-images/${name}`
   }
   return path.startsWith('/') ? path : `/uploaded-images/${name}`
-}
-
-function localThumbSrc(path, catalog) {
-  const stem = imageStem(path)
-  const hit = (catalog || []).find((p) => p.value === stem)
-  if (!hit) return ''
-  const file = hit.file || `${stem}.jpg`
-  const base = import.meta.env.BASE_URL || '/'
-  return `${base}assets/intime/${file}`.replace(/([^:]\/)\/+/g, '$1')
-}
-
-function editorPreviewSrc(slideImage, catalog) {
-  if (!slideImage) return ''
-  if (/^(data:|blob:)/i.test(slideImage) || isUploadedAsset(slideImage) || /^https?:/i.test(slideImage)) {
-    return absoluteAssetUrl(slideImage)
-  }
-  return localThumbSrc(slideImage, catalog)
 }
 
 function stripDataImageUrls(value) {
@@ -202,11 +150,6 @@ function stripPreviewKeys(value) {
 function sanitizeSectionContent(content) {
   if (!content || typeof content !== 'object') return content || {}
   return stripDataImageUrls(stripPreviewKeys(content))
-}
-
-function displayImagePath(url) {
-  if (!url || /^data:/i.test(url)) return ''
-  return url
 }
 
 function isHeroSection(name) {
@@ -1679,6 +1622,57 @@ export default function AdvisorDashboard() {
     }
   }
 
+  const handleSectionImageUpload = async (secId, file) => {
+    if (!file) return
+    const uploadKey = `section-${secId}`
+    setLocalPreview(uploadKey, file)
+    setUploadingState((prev) => ({ ...prev, [uploadKey]: true }))
+    const dataUrl = await new Promise((resolve) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
+      reader.onerror = () => resolve('')
+      reader.readAsDataURL(file)
+    })
+    if (dataUrl) {
+      setSectionEdits((prev) => ({
+        ...prev,
+        [secId]: {
+          ...(prev[secId] || {}),
+          image_url: dataUrl,
+          image: dataUrl,
+          img: dataUrl,
+          image_preview: dataUrl,
+        },
+      }))
+    }
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+      const res = await api.post('upload-image', formData)
+      const uploadedUrl = storedUploadPath(res.data)
+      if (uploadedUrl) {
+        setSectionEdits((prev) => ({
+          ...prev,
+          [secId]: {
+            ...(prev[secId] || {}),
+            image_url: uploadedUrl,
+            image: uploadedUrl,
+            img: uploadedUrl,
+            image_preview: dataUrl || prev[secId]?.image_preview,
+          },
+        }))
+        setMessage('📸 Image uploaded successfully!')
+      } else {
+        setError('Upload succeeded but no image path was returned.')
+      }
+    } catch (err) {
+      const fieldError = err.response?.data?.errors?.image?.[0]
+      setError(fieldError || err.response?.data?.message || 'Failed to upload image.')
+    } finally {
+      setUploadingState((prev) => ({ ...prev, [uploadKey]: false }))
+    }
+  }
+
   const handleBranchesMapUpload = async (secId, file) => {
     if (!file) return
     const uploadKey = `branches-map-${secId}`
@@ -2743,65 +2737,19 @@ export default function AdvisorDashboard() {
                                         </h5>
 
                                         <div className="grid md:grid-cols-2 gap-4">
-                                          <div className="md:col-span-2 space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
-                                            <div className="flex items-center justify-between flex-wrap gap-2">
-                                              <label className="block text-xs font-extrabold text-[#0B1B3D]">
-                                                Background Image
-                                              </label>
-                                              {displayImagePath(slideImage) && (
-                                                <span className="text-[11px] font-mono bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full truncate max-w-xs">
-                                                  {selectedLocalValue(slideImage, localImages) || displayImagePath(slideImage)}
-                                                </span>
-                                              )}
-                                            </div>
-
-                                            <div className="grid md:grid-cols-2 gap-3">
-                                              <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">Upload image</label>
-                                                <input
-                                                  type="file"
-                                                  accept="image/*"
-                                                  disabled={uploadingState[`${secId}-${activeSlideIndex}`]}
-                                                  onChange={(e) => {
-                                                    if (e.target.files && e.target.files[0]) {
-                                                      handleSlideImageUpload(secId, activeSlideIndex, e.target.files[0])
-                                                    }
-                                                  }}
-                                                  className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
-                                                />
-                                                {uploadingState[`${secId}-${activeSlideIndex}`] && (
-                                                  <p className="text-[11px] text-blue-600 mt-1 font-semibold">Uploading...</p>
-                                                )}
-                                              </div>
-
-                                              <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">Template image</label>
-                                                <select
-                                                  value={selectedLocalValue(slideImage, localImages)}
-                                                  onChange={(e) => {
-                                                    updateSlide({ bg: e.target.value, image_url: e.target.value })
-                                                    setPreviewSlide((prev) => ({ ...prev, [secId]: activeSlideIndex }))
-                                                  }}
-                                                  className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
-                                                >
-                                                  <option value="">-- Choose image --</option>
-                                                  {localImages.map(preset => (
-                                                    <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
-                                                  ))}
-                                                </select>
-                                              </div>
-                                            </div>
-
-                                            <div>
-                                              <label className="block text-[11px] text-gray-500 mb-1 font-semibold">Image URL / path</label>
-                                              <input
-                                                type="text"
-                                                value={displayImagePath(slideImage)}
-                                                onChange={(e) => updateSlide({ bg: e.target.value, image_url: e.target.value })}
-                                                placeholder="e.g. intime-08 or /uploads/image.jpg"
-                                                className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
-                                              />
-                                            </div>
+                                          <div className="md:col-span-2">
+                                            <ImageFieldPicker
+                                              label="Background Image"
+                                              value={slideImage}
+                                              onChange={(v) => {
+                                                updateSlide({ bg: v, image_url: v })
+                                                setPreviewSlide((prev) => ({ ...prev, [secId]: activeSlideIndex }))
+                                              }}
+                                              onUpload={(file) => handleSlideImageUpload(secId, activeSlideIndex, file)}
+                                              uploading={uploadingState[`${secId}-${activeSlideIndex}`]}
+                                              localImages={localImages}
+                                              pathPlaceholder="e.g. intime-08 or /uploaded-images/image.jpg"
+                                            />
                                           </div>
 
                                           <div className="md:col-span-2">
@@ -2938,46 +2886,14 @@ export default function AdvisorDashboard() {
 
                                         <ItemPanel index={activeBoxIndex} title={`Box ${activeBoxIndex + 1}`}>
                                           <div className="grid md:grid-cols-2 gap-4">
-                                            <div className="md:col-span-2 space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
-                                              <label className="block text-xs font-extrabold text-[#0B1B3D]">Box Image</label>
-                                              <div className="grid md:grid-cols-2 gap-3">
-                                                <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Upload image</label>
-                                                  <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    disabled={uploadingState[`box-${secId}-${activeBoxIndex}`]}
-                                                    onChange={(e) => {
-                                                      if (e.target.files && e.target.files[0]) {
-                                                        handleBoxImageUpload(secId, activeBoxIndex, e.target.files[0])
-                                                      }
-                                                    }}
-                                                    className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
-                                                  />
-                                                  {uploadingState[`box-${secId}-${activeBoxIndex}`] && (
-                                                    <p className="text-[11px] text-blue-600 mt-1 font-semibold">Uploading...</p>
-                                                  )}
-                                                </div>
-                                                <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Template image</label>
-                                                  <select
-                                                    value={selectedLocalValue(boxImage, localImages)}
-                                                    onChange={(e) => patchBox(secId, activeBoxIndex, { image_url: e.target.value })}
-                                                    className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
-                                                  >
-                                                    <option value="">-- Choose image --</option>
-                                                    {localImages.map(preset => (
-                                                      <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
-                                                    ))}
-                                                  </select>
-                                                </div>
-                                              </div>
-                                              <input
-                                                type="text"
-                                                value={displayImagePath(boxImage)}
-                                                onChange={(e) => patchBox(secId, activeBoxIndex, { image_url: e.target.value })}
-                                                placeholder="intime-12 or /uploads/image.jpg"
-                                                className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                            <div className="md:col-span-2">
+                                              <ImageFieldPicker
+                                                label="Box Image"
+                                                value={boxImage}
+                                                onChange={(v) => patchBox(secId, activeBoxIndex, { image_url: v })}
+                                                onUpload={(file) => handleBoxImageUpload(secId, activeBoxIndex, file)}
+                                                uploading={uploadingState[`box-${secId}-${activeBoxIndex}`]}
+                                                localImages={localImages}
                                               />
                                             </div>
                                             <div className="md:col-span-2">
@@ -3073,56 +2989,14 @@ export default function AdvisorDashboard() {
                                   </div>
 
                                   <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                    <h5 className="text-sm font-bold text-[#0B1B3D] mb-4">Image</h5>
-                                    <div className="space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
-                                      <div className="flex items-center justify-between flex-wrap gap-2">
-                                        <label className="block text-xs font-extrabold text-[#0B1B3D]">About Image</label>
-                                        {displayImagePath(values.image_url) && (
-                                          <span className="text-[11px] font-mono bg-blue-50 text-blue-800 border border-blue-200 px-2.5 py-0.5 rounded-full truncate max-w-xs">
-                                            {selectedLocalValue(values.image_url, localImages) || displayImagePath(values.image_url)}
-                                          </span>
-                                        )}
-                                      </div>
-                                      <div className="grid md:grid-cols-2 gap-3">
-                                        <div className="bg-gray-50 border p-2.5 rounded-md">
-                                          <label className="block text-[11px] font-bold text-gray-700 mb-1">📁 Upload Custom Image File</label>
-                                          <input
-                                            type="file"
-                                            accept="image/*"
-                                            disabled={uploadingState[`about-${secId}`]}
-                                            onChange={(e) => {
-                                              if (e.target.files && e.target.files[0]) {
-                                                handleAboutImageUpload(secId, e.target.files[0])
-                                              }
-                                            }}
-                                            className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
-                                          />
-                                          {uploadingState[`about-${secId}`] && (
-                                            <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
-                                          )}
-                                        </div>
-                                        <div className="bg-gray-50 border p-2.5 rounded-md">
-                                          <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
-                                          <select
-                                            value={selectedLocalValue(values.image_url, localImages)}
-                                            onChange={(e) => handleFieldValueChange(secId, 'image_url', e.target.value)}
-                                            className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
-                                          >
-                                            <option value="">-- Choose Local Template Image --</option>
-                                            {localImages.map(preset => (
-                                              <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
-                                            ))}
-                                          </select>
-                                        </div>
-                                      </div>
-                                      <input
-                                        type="text"
-                                        value={displayImagePath(values.image_url)}
-                                        onChange={(e) => handleFieldValueChange(secId, 'image_url', e.target.value)}
-                                        placeholder="intime-04 or /uploads/image.jpg"
-                                        className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
-                                      />
-                                    </div>
+                                    <ImageFieldPicker
+                                      label="About Image"
+                                      value={values.image_url || ''}
+                                      onChange={(v) => handleFieldValueChange(secId, 'image_url', v)}
+                                      onUpload={(file) => handleAboutImageUpload(secId, file)}
+                                      uploading={uploadingState[`about-${secId}`]}
+                                      localImages={localImages}
+                                    />
                                   </div>
 
                                   {(() => {
@@ -3289,46 +3163,14 @@ export default function AdvisorDashboard() {
                                                 className={`${inputClass} font-semibold text-[#0B1B3D]`}
                                               />
                                             </div>
-                                            <div className="md:col-span-2 space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
-                                              <label className="block text-xs font-extrabold text-[#0B1B3D]">Image</label>
-                                              <div className="grid md:grid-cols-2 gap-3">
-                                                <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Upload image</label>
-                                                  <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    disabled={uploadingState[`year-${secId}-${yearIndex}`]}
-                                                    onChange={(e) => {
-                                                      if (e.target.files && e.target.files[0]) {
-                                                        handleYearImageUpload(secId, yearIndex, e.target.files[0])
-                                                      }
-                                                    }}
-                                                    className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
-                                                  />
-                                                  {uploadingState[`year-${secId}-${yearIndex}`] && (
-                                                    <p className="text-[11px] text-blue-600 mt-1 font-semibold">Uploading...</p>
-                                                  )}
-                                                </div>
-                                                <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Template image</label>
-                                                  <select
-                                                    value={selectedLocalValue(yearImage, localImages)}
-                                                    onChange={(e) => patchYear(secId, yearIndex, { image_url: e.target.value })}
-                                                    className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
-                                                  >
-                                                    <option value="">-- Choose image --</option>
-                                                    {localImages.map(preset => (
-                                                      <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
-                                                    ))}
-                                                  </select>
-                                                </div>
-                                              </div>
-                                              <input
-                                                type="text"
-                                                value={displayImagePath(yearImage)}
-                                                onChange={(e) => patchYear(secId, yearIndex, { image_url: e.target.value })}
-                                                placeholder="intime-06 or /uploads/image.jpg"
-                                                className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                            <div className="md:col-span-2">
+                                              <ImageFieldPicker
+                                                label="Year Image"
+                                                value={yearImage}
+                                                onChange={(v) => patchYear(secId, yearIndex, { image_url: v })}
+                                                onUpload={(file) => handleYearImageUpload(secId, yearIndex, file)}
+                                                uploading={uploadingState[`year-${secId}-${yearIndex}`]}
+                                                localImages={localImages}
                                               />
                                             </div>
                                             <div className="md:col-span-2">
@@ -3673,46 +3515,14 @@ export default function AdvisorDashboard() {
                                         />
                                         <ItemPanel index={itemIndex} title={`Project ${itemIndex + 1}`}>
                                           <div className="grid md:grid-cols-2 gap-4">
-                                            <div className="md:col-span-2 space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
-                                              <label className="block text-xs font-extrabold text-[#0B1B3D]">Image</label>
-                                              <div className="grid md:grid-cols-2 gap-3">
-                                                <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Upload image</label>
-                                                  <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    disabled={uploadingState[`portfolio-${secId}-${itemIndex}`]}
-                                                    onChange={(e) => {
-                                                      if (e.target.files && e.target.files[0]) {
-                                                        handlePortfolioItemImageUpload(secId, itemIndex, e.target.files[0])
-                                                      }
-                                                    }}
-                                                    className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
-                                                  />
-                                                  {uploadingState[`portfolio-${secId}-${itemIndex}`] && (
-                                                    <p className="text-[11px] text-blue-600 mt-1 font-semibold">Uploading...</p>
-                                                  )}
-                                                </div>
-                                                <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Template image</label>
-                                                  <select
-                                                    value={selectedLocalValue(itemImage, localImages)}
-                                                    onChange={(e) => patchPortfolioItem(secId, itemIndex, { image_url: e.target.value })}
-                                                    className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
-                                                  >
-                                                    <option value="">-- Choose image --</option>
-                                                    {localImages.map(preset => (
-                                                      <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
-                                                    ))}
-                                                  </select>
-                                                </div>
-                                              </div>
-                                              <input
-                                                type="text"
-                                                value={displayImagePath(itemImage)}
-                                                onChange={(e) => patchPortfolioItem(secId, itemIndex, { image_url: e.target.value })}
-                                                placeholder="intime-12 or /uploads/image.jpg"
-                                                className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                            <div className="md:col-span-2">
+                                              <ImageFieldPicker
+                                                label="Project Image"
+                                                value={itemImage}
+                                                onChange={(v) => patchPortfolioItem(secId, itemIndex, { image_url: v })}
+                                                onUpload={(file) => handlePortfolioItemImageUpload(secId, itemIndex, file)}
+                                                uploading={uploadingState[`portfolio-${secId}-${itemIndex}`]}
+                                                localImages={localImages}
                                               />
                                             </div>
                                             <div>
@@ -3844,46 +3654,15 @@ export default function AdvisorDashboard() {
                                         className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                       />
                                     </div>
-                                    <div className="md:col-span-2 space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
-                                      <label className="block text-xs font-extrabold text-[#0B1B3D]">Map image</label>
-                                      <div className="grid md:grid-cols-2 gap-3">
-                                        <div className="bg-gray-50 border p-2.5 rounded-md">
-                                          <label className="block text-[11px] font-bold text-gray-700 mb-1">📁 Upload Custom Image</label>
-                                          <input
-                                            type="file"
-                                            accept="image/*"
-                                            disabled={uploadingState[`branches-map-${secId}`]}
-                                            onChange={(e) => {
-                                              if (e.target.files && e.target.files[0]) {
-                                                handleBranchesMapUpload(secId, e.target.files[0])
-                                              }
-                                            }}
-                                            className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
-                                          />
-                                          {uploadingState[`branches-map-${secId}`] && (
-                                            <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
-                                          )}
-                                        </div>
-                                        <div className="bg-gray-50 border p-2.5 rounded-md">
-                                          <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
-                                          <select
-                                            value={selectedLocalValue(values.map_image, localImages)}
-                                            onChange={(e) => handleFieldValueChange(secId, 'map_image', e.target.value)}
-                                            className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
-                                          >
-                                            <option value="">-- Choose Local Template Image --</option>
-                                            {localImages.map(preset => (
-                                              <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
-                                            ))}
-                                          </select>
-                                        </div>
-                                      </div>
-                                      <input
-                                        type="text"
-                                        value={displayImagePath(values.map_image)}
-                                        onChange={(e) => handleFieldValueChange(secId, 'map_image', e.target.value)}
-                                        placeholder="maps-point or /uploads/image.jpg"
-                                        className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                    <div className="md:col-span-2">
+                                      <ImageFieldPicker
+                                        label="Map Image"
+                                        value={values.map_image || ''}
+                                        onChange={(v) => handleFieldValueChange(secId, 'map_image', v)}
+                                        onUpload={(file) => handleBranchesMapUpload(secId, file)}
+                                        uploading={uploadingState[`branches-map-${secId}`]}
+                                        localImages={localImages}
+                                        pathPlaceholder="maps-point or /uploaded-images/image.jpg"
                                       />
                                     </div>
                                   </div>
@@ -4063,46 +3842,14 @@ export default function AdvisorDashboard() {
                                         className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                       />
                                     </div>
-                                    <div className="md:col-span-2 space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
-                                      <label className="block text-xs font-extrabold text-[#0B1B3D]">Side image (right column)</label>
-                                      <div className="grid md:grid-cols-2 gap-3">
-                                        <div className="bg-gray-50 border p-2.5 rounded-md">
-                                          <label className="block text-[11px] font-bold text-gray-700 mb-1">📁 Upload Custom Image</label>
-                                          <input
-                                            type="file"
-                                            accept="image/*"
-                                            disabled={uploadingState[`testimonials-side-${secId}`]}
-                                            onChange={(e) => {
-                                              if (e.target.files && e.target.files[0]) {
-                                                handleTestimonialsSideImageUpload(secId, e.target.files[0])
-                                              }
-                                            }}
-                                            className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
-                                          />
-                                          {uploadingState[`testimonials-side-${secId}`] && (
-                                            <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
-                                          )}
-                                        </div>
-                                        <div className="bg-gray-50 border p-2.5 rounded-md">
-                                          <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
-                                          <select
-                                            value={selectedLocalValue(values.image_url, localImages)}
-                                            onChange={(e) => handleFieldValueChange(secId, 'image_url', e.target.value)}
-                                            className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
-                                          >
-                                            <option value="">-- Choose Local Template Image --</option>
-                                            {localImages.map(preset => (
-                                              <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
-                                            ))}
-                                          </select>
-                                        </div>
-                                      </div>
-                                      <input
-                                        type="text"
-                                        value={displayImagePath(values.image_url)}
-                                        onChange={(e) => handleFieldValueChange(secId, 'image_url', e.target.value)}
-                                        placeholder="intime-17 or /uploads/image.jpg"
-                                        className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                    <div className="md:col-span-2">
+                                      <ImageFieldPicker
+                                        label="Side Image (right column)"
+                                        value={values.image_url || ''}
+                                        onChange={(v) => handleFieldValueChange(secId, 'image_url', v)}
+                                        onUpload={(file) => handleTestimonialsSideImageUpload(secId, file)}
+                                        uploading={uploadingState[`testimonials-side-${secId}`]}
+                                        localImages={localImages}
                                       />
                                     </div>
                                   </div>
@@ -4155,46 +3902,15 @@ export default function AdvisorDashboard() {
                                                 className={inputClass}
                                               />
                                             </div>
-                                            <div className="md:col-span-2 space-y-3 bg-white p-3 border border-gray-200 rounded-lg">
-                                              <label className="block text-xs font-extrabold text-[#0B1B3D]">Avatar image</label>
-                                              <div className="grid md:grid-cols-2 gap-3">
-                                                <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Upload image</label>
-                                                  <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    disabled={uploadingState[`testimonial-${secId}-${itemIndex}`]}
-                                                    onChange={(e) => {
-                                                      if (e.target.files && e.target.files[0]) {
-                                                        handleTestimonialItemImageUpload(secId, itemIndex, e.target.files[0])
-                                                      }
-                                                    }}
-                                                    className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
-                                                  />
-                                                  {uploadingState[`testimonial-${secId}-${itemIndex}`] && (
-                                                    <p className="text-[11px] text-blue-600 mt-1 font-semibold">Uploading...</p>
-                                                  )}
-                                                </div>
-                                                <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Template image</label>
-                                                  <select
-                                                    value={selectedLocalValue(item.image_url, localImages)}
-                                                    onChange={(e) => patchTestimonialItem(secId, itemIndex, { image_url: e.target.value })}
-                                                    className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
-                                                  >
-                                                    <option value="">-- Choose image --</option>
-                                                    {localImages.map(preset => (
-                                                      <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
-                                                    ))}
-                                                  </select>
-                                                </div>
-                                              </div>
-                                              <input
-                                                type="text"
-                                                value={displayImagePath(item.image_url)}
-                                                onChange={(e) => patchTestimonialItem(secId, itemIndex, { image_url: e.target.value })}
-                                                placeholder="testimonial-01 or /uploads/image.jpg"
-                                                className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                            <div className="md:col-span-2">
+                                              <ImageFieldPicker
+                                                label="Avatar Image"
+                                                value={item.image_url || ''}
+                                                onChange={(v) => patchTestimonialItem(secId, itemIndex, { image_url: v })}
+                                                onUpload={(file) => handleTestimonialItemImageUpload(secId, itemIndex, file)}
+                                                uploading={uploadingState[`testimonial-${secId}-${itemIndex}`]}
+                                                localImages={localImages}
+                                                pathPlaceholder="testimonial-01 or /uploaded-images/image.jpg"
                                               />
                                             </div>
                                           </div>
@@ -4326,46 +4042,14 @@ export default function AdvisorDashboard() {
                                                 className={inputClass}
                                               />
                                             </div>
-                                            <div className="md:col-span-2 space-y-3 bg-white p-3 border border-gray-200 rounded-lg">
-                                              <label className="block text-xs font-extrabold text-[#0B1B3D]">Featured image</label>
-                                              <div className="grid md:grid-cols-2 gap-3">
-                                                <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Upload image</label>
-                                                  <input
-                                                    type="file"
-                                                    accept="image/*"
-                                                    disabled={uploadingState[`latestnews-${secId}-${itemIndex}`]}
-                                                    onChange={(e) => {
-                                                      if (e.target.files && e.target.files[0]) {
-                                                        handleLatestNewsItemImageUpload(secId, itemIndex, e.target.files[0])
-                                                      }
-                                                    }}
-                                                    className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
-                                                  />
-                                                  {uploadingState[`latestnews-${secId}-${itemIndex}`] && (
-                                                    <p className="text-[11px] text-blue-600 mt-1 font-semibold">Uploading...</p>
-                                                  )}
-                                                </div>
-                                                <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Template image</label>
-                                                  <select
-                                                    value={selectedLocalValue(item.image_url, localImages)}
-                                                    onChange={(e) => patchNewsItem(secId, itemIndex, { image_url: e.target.value })}
-                                                    className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
-                                                  >
-                                                    <option value="">-- Choose image --</option>
-                                                    {localImages.map(preset => (
-                                                      <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
-                                                    ))}
-                                                  </select>
-                                                </div>
-                                              </div>
-                                              <input
-                                                type="text"
-                                                value={displayImagePath(item.image_url)}
-                                                onChange={(e) => patchNewsItem(secId, itemIndex, { image_url: e.target.value })}
-                                                placeholder="intime-03 or /uploads/image.jpg"
-                                                className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                            <div className="md:col-span-2">
+                                              <ImageFieldPicker
+                                                label="Featured Image"
+                                                value={item.image_url || ''}
+                                                onChange={(v) => patchNewsItem(secId, itemIndex, { image_url: v })}
+                                                onUpload={(file) => handleLatestNewsItemImageUpload(secId, itemIndex, file)}
+                                                uploading={uploadingState[`latestnews-${secId}-${itemIndex}`]}
+                                                localImages={localImages}
                                               />
                                             </div>
                                           </div>
@@ -4403,46 +4087,15 @@ export default function AdvisorDashboard() {
                                               className={inputClass}
                                             />
                                           </div>
-                                          <div className="md:col-span-2 space-y-3 bg-white p-3 border border-gray-200 rounded-lg">
-                                            <label className="block text-xs font-extrabold text-[#0B1B3D]">Logo image (optional)</label>
-                                            <div className="grid md:grid-cols-2 gap-3">
-                                              <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">Upload image</label>
-                                                <input
-                                                  type="file"
-                                                  accept="image/*"
-                                                  disabled={uploadingState[`clientlogo-${secId}-${itemIndex}`]}
-                                                  onChange={(e) => {
-                                                    if (e.target.files && e.target.files[0]) {
-                                                      handleClientLogoImageUpload(secId, itemIndex, e.target.files[0])
-                                                    }
-                                                  }}
-                                                  className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
-                                                />
-                                                {uploadingState[`clientlogo-${secId}-${itemIndex}`] && (
-                                                  <p className="text-[11px] text-blue-600 mt-1 font-semibold">Uploading...</p>
-                                                )}
-                                              </div>
-                                              <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">Template image</label>
-                                                <select
-                                                  value={selectedLocalValue(item.image_url, localImages)}
-                                                  onChange={(e) => patchClientLogo(secId, itemIndex, { image_url: e.target.value })}
-                                                  className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
-                                                >
-                                                  <option value="">-- Choose image --</option>
-                                                  {localImages.map(preset => (
-                                                    <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
-                                                  ))}
-                                                </select>
-                                              </div>
-                                            </div>
-                                            <input
-                                              type="text"
-                                              value={displayImagePath(item.image_url)}
-                                              onChange={(e) => patchClientLogo(secId, itemIndex, { image_url: e.target.value })}
-                                              placeholder="logo.png or /uploads/image.jpg"
-                                              className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                          <div className="md:col-span-2">
+                                            <ImageFieldPicker
+                                              label="Logo Image (optional)"
+                                              value={item.image_url || ''}
+                                              onChange={(v) => patchClientLogo(secId, itemIndex, { image_url: v })}
+                                              onUpload={(file) => handleClientLogoImageUpload(secId, itemIndex, file)}
+                                              uploading={uploadingState[`clientlogo-${secId}-${itemIndex}`]}
+                                              localImages={localImages}
+                                              pathPlaceholder="logo-dark or /uploaded-images/image.jpg"
                                             />
                                           </div>
                                         </div>
@@ -4539,26 +4192,14 @@ export default function AdvisorDashboard() {
                                     />
                                   </div>
                                   <div className="md:col-span-2">
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">Image</label>
-                                    <div className="grid md:grid-cols-2 gap-3 mb-2">
-                                      <select
-                                        value={selectedLocalValue(values.image_url, localImages)}
-                                        onChange={(e) => handleFieldValueChange(secId, 'image_url', e.target.value)}
-                                        className="w-full text-xs p-2 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
-                                      >
-                                        <option value="">-- Choose Local Template Image --</option>
-                                        {localImages.map(preset => (
-                                          <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
-                                        ))}
-                                      </select>
-                                      <input
-                                        type="text"
-                                        value={values.image_url || ''}
-                                        onChange={(e) => handleFieldValueChange(secId, 'image_url', e.target.value)}
-                                        placeholder="intime-08"
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
-                                      />
-                                    </div>
+                                    <ImageFieldPicker
+                                      label="Section Image"
+                                      value={values.image_url || ''}
+                                      onChange={(v) => handleFieldValueChange(secId, 'image_url', v)}
+                                      onUpload={(file) => handleSectionImageUpload(secId, file)}
+                                      uploading={uploadingState[`section-${secId}`]}
+                                      localImages={localImages}
+                                    />
                                   </div>
                                   <div>
                                     <label className="block text-xs font-bold text-gray-700 mb-1">Button Text</label>
