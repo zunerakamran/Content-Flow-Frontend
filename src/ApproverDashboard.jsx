@@ -14,6 +14,9 @@ import {
   FaClipboardCheck,
   FaUser,
   FaCalendarCheck,
+  FaChevronDown,
+  FaChevronUp,
+  FaLayerGroup,
 } from 'react-icons/fa'
 import Navbar from './Navbar'
 import api from './api/axios'
@@ -65,16 +68,111 @@ const STATUS_CONFIG = {
   },
 }
 
-function getRequestSectionTitle(req) {
-  if (req.section) return `Section: ${req.section.name}`
+function getRequestSections(req) {
+  if (req.section?.name) {
+    return { type: 'single', names: [req.section.name] }
+  }
+  if (Array.isArray(req.section_edits) && req.section_edits.length > 0) {
+    return {
+      type: 'batch',
+      names: req.section_edits.map(e => e.section_name || 'Section'),
+    }
+  }
   try {
     const parsed = JSON.parse(req.proposed_content)
-    if (Array.isArray(parsed)) {
-      const names = parsed.map(p => p.section_name || 'Section').join(', ')
-      return `Single Batch Request (${parsed.length} Sections: ${names})`
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return {
+        type: 'batch',
+        names: parsed.map(p => p.section_name || 'Section'),
+      }
     }
   } catch { /* ignore malformed content */ }
-  return `Change Request #${req.id}`
+  return { type: 'unknown', names: [] }
+}
+
+function getRequestSearchText(req) {
+  const { type, names } = getRequestSections(req)
+  if (type === 'single') return names[0]
+  if (type === 'batch') return names.join(' ')
+  return `Change Request ${req.id}`
+}
+
+function RequestTitle({ req }) {
+  const [expanded, setExpanded] = useState(false)
+  const { type, names } = useMemo(() => getRequestSections(req), [req.id, req.section, req.section_edits, req.proposed_content])
+
+  if (type === 'single') {
+    return (
+      <h3 className="text-base sm:text-lg font-bold text-[#0B1B3D]">
+        Section: {names[0]}
+      </h3>
+    )
+  }
+
+  if (type === 'batch') {
+    const count = names.length
+    const previewLimit = 3
+    const preview = names.slice(0, previewLimit).join(', ')
+    const hiddenCount = count - previewLimit
+
+    return (
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className="text-base sm:text-lg font-bold text-[#0B1B3D]">Batch Request</h3>
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+            <FaLayerGroup className="w-3 h-3" />
+            {count} {count === 1 ? 'section' : 'sections'}
+          </span>
+        </div>
+
+        {!expanded ? (
+          <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+            <span className="line-clamp-1 sm:line-clamp-2">
+              {preview}
+              {hiddenCount > 0 && ` + ${hiddenCount} more`}
+            </span>
+            {count > previewLimit && (
+              <button
+                type="button"
+                onClick={() => setExpanded(true)}
+                className="inline-flex items-center gap-1 ml-1.5 text-[#C8102E] font-bold hover:underline shrink-0"
+              >
+                Show all
+                <FaChevronDown className="w-2.5 h-2.5" />
+              </button>
+            )}
+          </p>
+        ) : (
+          <div className="mt-2">
+            <div className="flex flex-wrap gap-1.5">
+              {names.map((name, idx) => (
+                <span
+                  key={`${name}-${idx}`}
+                  className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-slate-50 text-slate-700 border border-slate-200"
+                >
+                  {name}
+                </span>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="inline-flex items-center gap-1 mt-2 text-xs text-[#C8102E] font-bold hover:underline"
+            >
+              Show less
+              <FaChevronUp className="w-2.5 h-2.5" />
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <h3 className="text-base sm:text-lg font-bold text-[#0B1B3D]">
+      Change Request #{req.id}
+    </h3>
+  )
 }
 
 function StatusBadge({ status, scheduledAt }) {
@@ -145,7 +243,6 @@ const RequestCard = memo(function RequestCard({
   const [busy, setBusy] = useState(null)
 
   const isAssignedToMe = req.approver_id === user?.id
-  const sectionTitle = useMemo(() => getRequestSectionTitle(req), [req.id, req.section, req.proposed_content])
 
   const handleAssign = async () => {
     setBusy('assign')
@@ -261,8 +358,8 @@ const RequestCard = memo(function RequestCard({
       <div className="p-5 sm:p-6 border-b border-gray-100">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h3 className="text-base sm:text-lg font-bold text-[#0B1B3D]">{sectionTitle}</h3>
+            <div className="flex items-start gap-2 flex-wrap">
+              <RequestTitle req={req} />
               <StatusBadge status={req.status} scheduledAt={req.scheduled_at} />
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
@@ -635,10 +732,10 @@ export default function ApproverDashboard() {
     if (search.trim()) {
       const q = search.trim().toLowerCase()
       list = list.filter(r => {
-        const title = getRequestSectionTitle(r).toLowerCase()
+        const searchText = getRequestSearchText(r).toLowerCase()
         const editor = (r.editor?.name || '').toLowerCase()
         const approver = (r.approver?.name || '').toLowerCase()
-        return title.includes(q) || editor.includes(q) || approver.includes(q) || String(r.id).includes(q)
+        return searchText.includes(q) || editor.includes(q) || approver.includes(q) || String(r.id).includes(q)
       })
     }
 
