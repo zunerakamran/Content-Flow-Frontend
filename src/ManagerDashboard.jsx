@@ -1,4 +1,29 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react'
+import {
+  FaCheckCircle,
+  FaClock,
+  FaTimes,
+  FaTimesCircle,
+  FaEye,
+  FaEyeSlash,
+  FaUser,
+  FaCalendarCheck,
+  FaChevronDown,
+  FaChevronUp,
+  FaLayerGroup,
+  FaInbox,
+  FaClipboardCheck,
+  FaClipboardList,
+  FaUserPlus,
+  FaUsers,
+  FaListAlt,
+  FaSearch,
+  FaSync,
+  FaUserCheck,
+  FaEnvelope,
+  FaBuilding,
+  FaHistory,
+} from 'react-icons/fa'
 import Navbar from './Navbar'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
@@ -17,56 +42,223 @@ const PENDING_STATUS = 'pending'
 const PREVIOUS_STATUSES = new Set(['under_review', 'scheduled', 'approved', 'rejected'])
 
 const CREATABLE_ROLES = [
-  { value: 'advisor', label: 'Advisor (Editor)' },
-  { value: 'approver', label: 'Approver' },
-  { value: 'client_admin', label: 'Client Admin' },
+  { value: 'advisor', label: 'Advisor (Editor)', description: 'Can edit website sections and submit change requests' },
+  { value: 'approver', label: 'Approver', description: 'Reviews and approves or rejects submitted changes' },
+  { value: 'client_admin', label: 'Client Admin', description: 'Manages firm settings and user access' },
 ]
 
-function getRequestSectionTitle(req) {
-  if (req.section) return `Section: ${req.section.name}`
+const STATUS_CONFIG = {
+  pending: {
+    label: 'Pending Assignment',
+    icon: FaInbox,
+    className: 'bg-amber-50 text-amber-700 border-amber-200',
+    dot: 'bg-amber-500',
+  },
+  under_review: {
+    label: 'Under Review',
+    icon: FaClipboardCheck,
+    className: 'bg-blue-50 text-blue-700 border-blue-200',
+    dot: 'bg-blue-500',
+  },
+  scheduled: {
+    label: 'Scheduled',
+    icon: FaCalendarCheck,
+    className: 'bg-purple-50 text-purple-700 border-purple-200',
+    dot: 'bg-purple-500',
+  },
+  approved: {
+    label: 'Approved & Published',
+    icon: FaCheckCircle,
+    className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    dot: 'bg-emerald-500',
+  },
+  rejected: {
+    label: 'Rejected',
+    icon: FaTimesCircle,
+    className: 'bg-rose-50 text-rose-700 border-rose-200',
+    dot: 'bg-rose-500',
+  },
+}
+
+const ROLE_COLORS = {
+  advisor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  approver: 'bg-teal-100 text-teal-800 border-teal-200',
+  manager: 'bg-violet-100 text-violet-800 border-violet-200',
+  client_admin: 'bg-slate-100 text-slate-800 border-slate-200',
+  power_admin: 'bg-orange-100 text-orange-800 border-orange-200',
+}
+
+function getRequestSections(req) {
+  if (req.section?.name) {
+    return { type: 'single', names: [req.section.name] }
+  }
   if (Array.isArray(req.section_edits) && req.section_edits.length > 0) {
-    const names = req.section_edits.map(e => e.section_name || 'Section').join(', ')
-    return `Batch Request (${req.section_edits.length} Sections: ${names})`
+    return {
+      type: 'batch',
+      names: req.section_edits.map(e => e.section_name || 'Section'),
+    }
   }
   try {
     const parsed = JSON.parse(req.proposed_content)
-    if (Array.isArray(parsed)) {
-      const names = parsed.map(p => p.section_name || 'Section').join(', ')
-      return `Batch Request (${parsed.length} Sections: ${names})`
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return {
+        type: 'batch',
+        names: parsed.map(p => p.section_name || 'Section'),
+      }
     }
   } catch { /* ignore */ }
-  return `Change Request #${req.id}`
+  return { type: 'unknown', names: [] }
 }
 
-function statusBadge(status, scheduledAt) {
-  switch (status) {
-    case 'pending':
-      return <span className="bg-amber-100 text-amber-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Pending Assignment</span>
-    case 'under_review':
-      return <span className="bg-blue-100 text-blue-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Under Review</span>
-    case 'scheduled':
-      return <span className="bg-purple-100 text-purple-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Scheduled ({scheduledAt ? new Date(scheduledAt).toLocaleString() : '—'})</span>
-    case 'approved':
-      return <span className="bg-emerald-100 text-emerald-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Approved & Published</span>
-    case 'rejected':
-      return <span className="bg-rose-100 text-rose-800 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Rejected</span>
-    default:
-      return <span className="bg-gray-100 text-gray-700 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">{status}</span>
-  }
+function getRequestSearchText(req) {
+  const { type, names } = getRequestSections(req)
+  const idText = `request ${req.id}`
+  if (type === 'single') return `${names[0]} ${idText}`
+  if (type === 'batch') return `${names.join(' ')} ${idText}`
+  return `Change Request ${req.id}`
 }
 
-function roleBadge(role) {
-  const colors = {
-    advisor: 'bg-indigo-100 text-indigo-800',
-    approver: 'bg-teal-100 text-teal-800',
-    manager: 'bg-violet-100 text-violet-800',
-    client_admin: 'bg-slate-100 text-slate-800',
-    power_admin: 'bg-orange-100 text-orange-800',
+function RequestTitle({ req }) {
+  const [expanded, setExpanded] = useState(false)
+  const { type, names } = useMemo(() => getRequestSections(req), [req.id, req.section, req.section_edits, req.proposed_content])
+
+  if (type === 'single') {
+    return (
+      <h3 className="text-base sm:text-lg font-bold text-[#0B1B3D]">
+        Section: {names[0]}
+      </h3>
+    )
   }
+
+  if (type === 'batch') {
+    const count = names.length
+    const previewLimit = 3
+    const preview = names.slice(0, previewLimit).join(', ')
+    const hiddenCount = count - previewLimit
+
+    return (
+      <div className="min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h3 className="text-base sm:text-lg font-bold text-[#0B1B3D]">Request #{req.id}</h3>
+          <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+            <FaLayerGroup className="w-3 h-3" />
+            {count} {count === 1 ? 'section' : 'sections'}
+          </span>
+        </div>
+
+        {!expanded ? (
+          <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+            <span className="line-clamp-1 sm:line-clamp-2">
+              {preview}
+              {hiddenCount > 0 && ` + ${hiddenCount} more`}
+            </span>
+            {count > previewLimit && (
+              <button
+                type="button"
+                onClick={() => setExpanded(true)}
+                className="inline-flex items-center gap-1 ml-1.5 text-[#C8102E] font-bold hover:underline shrink-0"
+              >
+                Show all
+                <FaChevronDown className="w-2.5 h-2.5" />
+              </button>
+            )}
+          </p>
+        ) : (
+          <div className="mt-2">
+            <div className="flex flex-wrap gap-1.5">
+              {names.map((name, idx) => (
+                <span
+                  key={`${name}-${idx}`}
+                  className="text-[11px] font-semibold px-2 py-1 rounded-lg bg-slate-50 text-slate-700 border border-slate-200"
+                >
+                  {name}
+                </span>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setExpanded(false)}
+              className="inline-flex items-center gap-1 mt-2 text-xs text-[#C8102E] font-bold hover:underline"
+            >
+              Show less
+              <FaChevronUp className="w-2.5 h-2.5" />
+            </button>
+          </div>
+        )}
+      </div>
+    )
+  }
+
   return (
-    <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase tracking-wider ${colors[role] || 'bg-gray-100 text-gray-700'}`}>
-      {role?.replace('_', ' ')}
+    <h3 className="text-base sm:text-lg font-bold text-[#0B1B3D]">
+      Change Request #{req.id}
+    </h3>
+  )
+}
+
+function StatusBadge({ status, scheduledAt }) {
+  const config = STATUS_CONFIG[status]
+  if (!config) {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border bg-gray-50 text-gray-700 border-gray-200">
+        {status}
+      </span>
+    )
+  }
+  const Icon = config.icon
+  const label = status === 'scheduled' && scheduledAt
+    ? `${config.label} · ${new Date(scheduledAt).toLocaleString()}`
+    : config.label
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border ${config.className}`}>
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dot}`} />
+      <Icon className="w-3 h-3 shrink-0" />
+      {label}
     </span>
+  )
+}
+
+function RoleBadge({ role }) {
+  return (
+    <span className={`inline-flex items-center text-[11px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${ROLE_COLORS[role] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+      {role?.replace(/_/g, ' ')}
+    </span>
+  )
+}
+
+function AlertBanner({ type, message, onDismiss }) {
+  const isSuccess = type === 'success'
+  return (
+    <div
+      className={`${
+        isSuccess ? 'bg-emerald-50 border-emerald-500 text-emerald-800' : 'bg-rose-50 border-rose-500 text-rose-800'
+      } border-l-4 p-4 mb-6 rounded-lg shadow-sm flex items-start justify-between gap-3 text-sm font-medium`}
+      role="alert"
+    >
+      <span className="flex-1">{message}</span>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="shrink-0 p-1 rounded hover:bg-black/5 transition"
+        aria-label="Dismiss"
+      >
+        <FaTimes className="w-4 h-4" />
+      </button>
+    </div>
+  )
+}
+
+function StatCard({ label, value, icon: Icon, accent }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4">
+      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${accent}`}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div>
+        <p className="text-2xl font-extrabold text-[#0B1B3D] leading-none">{value}</p>
+        <p className="text-xs text-gray-500 font-semibold mt-1">{label}</p>
+      </div>
+    </div>
   )
 }
 
@@ -84,15 +276,17 @@ const ManagerRequestCard = memo(function ManagerRequestCard({
 }) {
   const [previewData, setPreviewData] = useState(null)
   const [previewMode, setPreviewMode] = useState('visual')
+  const [expandedPreviewSections, setExpandedPreviewSections] = useState(() => new Set())
   const [busy, setBusy] = useState(null)
 
-  const sectionTitle = useMemo(() => getRequestSectionTitle(req), [req])
   const isPending = req.status === PENDING_STATUS
   const isHistorical = isHistoricalRequest(req)
+  const batchEdits = previewData?.is_batch && Array.isArray(previewData.edits) ? previewData.edits : null
 
   const handleTogglePreview = async () => {
     if (previewData) {
       setPreviewData(null)
+      setExpandedPreviewSections(new Set())
       return
     }
 
@@ -128,134 +322,268 @@ const ManagerRequestCard = memo(function ManagerRequestCard({
     onAssign(req.id, selectedApproverId)
   }
 
+  const togglePreviewSection = (idx) => {
+    setExpandedPreviewSections(prev => {
+      const next = new Set(prev)
+      if (next.has(idx)) next.delete(idx)
+      else next.add(idx)
+      return next
+    })
+  }
+
+  const expandAllPreviewSections = () => {
+    if (!batchEdits) return
+    setExpandedPreviewSections(new Set(batchEdits.map((_, idx) => idx)))
+  }
+
+  const collapseAllPreviewSections = () => {
+    setExpandedPreviewSections(new Set())
+  }
+
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-      <div className="p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <h3 className="text-lg font-bold text-[#0B1B3D]">{sectionTitle}</h3>
-            {statusBadge(req.status, req.scheduled_at)}
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
+      <div className="p-5 sm:p-6 border-b border-gray-100">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-start gap-2 flex-wrap">
+              <RequestTitle req={req} />
+              <StatusBadge status={req.status} scheduledAt={req.scheduled_at} />
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+              <span className="inline-flex items-center gap-1.5">
+                <FaUser className="w-3 h-3 text-gray-400" />
+                <span>Submitted by <strong className="text-gray-700">{req.editor?.name || 'Editor'}</strong></span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <FaClock className="w-3 h-3 text-gray-400" />
+                <span>{new Date(req.created_at).toLocaleString()}</span>
+              </span>
+              {req.approver && (
+                <span className="inline-flex items-center gap-1.5">
+                  <FaUserCheck className="w-3 h-3 text-[#C8102E]" />
+                  <span>Assigned to <strong className="text-[#C8102E]">{req.approver.name}</strong></span>
+                </span>
+              )}
+            </div>
           </div>
-          <div className="text-xs text-gray-500 mt-1 flex items-center gap-3 flex-wrap">
-            <span>Submitted by: <strong className="text-gray-700">{req.editor?.name || 'Editor'}</strong></span>
-            <span>&bull;</span>
-            <span>Date: <strong>{new Date(req.created_at).toLocaleString()}</strong></span>
-            {req.approver && (
+
+          <button
+            type="button"
+            onClick={handleTogglePreview}
+            disabled={busy === 'preview'}
+            className={`inline-flex items-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl transition disabled:opacity-60 shrink-0 ${
+              previewData
+                ? 'bg-[#0B1B3D] text-white hover:bg-slate-800'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            {busy === 'preview' ? (
               <>
-                <span>&bull;</span>
-                <span>Assigned to: <strong className="text-[#C8102E]">{req.approver.name}</strong></span>
+                <span className="w-3.5 h-3.5 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                Loading…
+              </>
+            ) : previewData ? (
+              <>
+                <FaEyeSlash className="w-3.5 h-3.5" />
+                Hide Preview
+              </>
+            ) : (
+              <>
+                <FaEye className="w-3.5 h-3.5" />
+                Preview Changes
               </>
             )}
-          </div>
+          </button>
         </div>
-
-        <button
-          onClick={handleTogglePreview}
-          disabled={busy === 'preview'}
-          className="bg-gray-100 text-gray-700 text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-200 transition disabled:opacity-60"
-        >
-          {busy === 'preview' ? 'Loading preview…' : previewData ? 'Hide Preview' : '👁️ Preview Changes'}
-        </button>
       </div>
 
       {isPending && (
-        <div className="bg-amber-50 px-6 py-4 border-b flex flex-wrap items-center gap-3">
-          <span className="text-xs font-bold text-amber-900 uppercase tracking-wider">Assign to Approver</span>
-          <select
-            value={selectedApproverId || ''}
-            onChange={e => onSelectApprover(req.id, e.target.value)}
-            className="flex-1 min-w-[200px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D] bg-white"
-          >
-            <option value="">Select Approver</option>
-            {approvers.map(a => (
-              <option key={a.id} value={a.id}>
-                {a.name} ({a.email}){a.firm?.name ? ` — ${a.firm.name}` : ''}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={handleAssign}
-            disabled={assigning === req.id || !selectedApproverId}
-            className="bg-[#0B1B3D] text-white text-xs font-bold px-5 py-2 rounded-lg hover:bg-slate-800 transition shadow-sm disabled:opacity-50"
-          >
-            {assigning === req.id ? 'Assigning…' : '📌 Assign Request'}
-          </button>
+        <div className="bg-amber-50 border-b border-amber-100 px-5 sm:px-6 py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-bold text-amber-900 flex items-center gap-2">
+                <FaUserCheck className="w-4 h-4 shrink-0" />
+                Assign to Approver
+              </p>
+              <p className="text-xs text-amber-700 mt-0.5">
+                Select an approver from your team to review this request.
+              </p>
+            </div>
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 sm:min-w-[320px]">
+              <select
+                value={selectedApproverId || ''}
+                onChange={e => onSelectApprover(req.id, e.target.value)}
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]/20 focus:border-[#0B1B3D] bg-white"
+              >
+                <option value="">Choose approver…</option>
+                {approvers.map(a => (
+                  <option key={a.id} value={a.id}>
+                    {a.name} ({a.email}){a.firm?.name ? ` — ${a.firm.name}` : ''}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={handleAssign}
+                disabled={assigning === req.id || !selectedApproverId}
+                className="inline-flex items-center justify-center gap-2 bg-[#0B1B3D] text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-slate-800 transition shadow-sm disabled:opacity-50 shrink-0"
+              >
+                {assigning === req.id ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Assigning…
+                  </>
+                ) : (
+                  <>
+                    <FaUserCheck className="w-3.5 h-3.5" />
+                    Assign
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+          {approvers.length === 0 && (
+            <p className="text-xs text-amber-800 mt-3 bg-amber-100/60 rounded-lg px-3 py-2">
+              No approvers found. Create an approver account in the <strong>Create User</strong> tab first.
+            </p>
+          )}
         </div>
       )}
 
       {req.rejection_reason && (
-        <div className="bg-rose-50 px-6 py-3 text-xs text-rose-800 font-medium border-b">
-          Rejection Reason: {req.rejection_reason}
+        <div className="bg-rose-50 px-5 sm:px-6 py-3 text-sm text-rose-800 border-b border-rose-100 flex items-start gap-2">
+          <FaTimesCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-500" />
+          <div>
+            <span className="font-bold">Rejection reason: </span>
+            {req.rejection_reason}
+          </div>
         </div>
       )}
 
       {previewData && (
-        <div className="p-6 bg-slate-50 border-t space-y-6">
-          <div className="flex items-center justify-between border-b pb-3 flex-wrap gap-2">
+        <div className="p-5 sm:p-6 bg-slate-50 border-t space-y-6">
+          <div className="flex items-center justify-between border-b border-gray-200 pb-4 flex-wrap gap-3">
             <div>
               <h4 className="text-xs font-extrabold uppercase text-gray-500 tracking-wider">
                 {isHistorical
                   ? 'Submission Snapshot: Live Published vs Proposed Draft'
-                  : 'Side-by-Side Comparison: Current Live Published vs Proposed Changes'}
+                  : 'Side-by-Side Comparison: Current Live vs Proposed'}
               </h4>
+              {isHistorical && (
+                <p className="text-[11px] text-gray-500 mt-1">
+                  Showing content as it existed when this request was submitted.
+                </p>
+              )}
             </div>
-            <div className="flex items-center gap-2 bg-white border p-1 rounded-lg">
-              <button
-                onClick={() => setPreviewMode('visual')}
-                className={`text-[11px] font-bold px-3 py-1 rounded ${previewMode === 'visual' ? 'bg-[#0B1B3D] text-white' : 'text-gray-600'}`}
-              >
-                Visual Preview
-              </button>
-              <button
-                onClick={() => setPreviewMode('json')}
-                className={`text-[11px] font-bold px-3 py-1 rounded ${previewMode === 'json' ? 'bg-[#0B1B3D] text-white' : 'text-gray-600'}`}
-              >
-                JSON Diff
-              </button>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1 bg-white border border-gray-200 p-1 rounded-xl shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode('visual')}
+                  className={`text-[11px] font-bold px-3 py-1.5 rounded-lg transition ${
+                    previewMode === 'visual' ? 'bg-[#0B1B3D] text-white' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Visual Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode('json')}
+                  className={`text-[11px] font-bold px-3 py-1.5 rounded-lg transition ${
+                    previewMode === 'json' ? 'bg-[#0B1B3D] text-white' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  JSON Diff
+                </button>
+              </div>
+
+              {batchEdits && (
+                <div className="flex items-center gap-1 bg-white border border-gray-200 p-1 rounded-xl shadow-sm">
+                  <button
+                    type="button"
+                    onClick={expandAllPreviewSections}
+                    className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 transition"
+                  >
+                    Expand all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={collapseAllPreviewSections}
+                    className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 transition"
+                  >
+                    Collapse all
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {previewData.is_batch && Array.isArray(previewData.edits) ? (
-            previewData.edits.map((item, idx) => {
-              const curParsed = parseJson(item.current_content)
-              const propParsed = parseJson(item.proposed_content)
-              return (
-                <div key={idx} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                  <h5 className="font-extrabold text-[#0B1B3D] text-sm">
-                    Section #{idx + 1}: {item.section_name}
-                  </h5>
-                  {previewMode === 'visual' ? (
-                    <div className="grid lg:grid-cols-2 gap-6">
-                      <SectionIframePreview
-                        sectionName={item.section_name}
-                        data={curParsed}
-                        height={480}
-                        label={isHistorical ? 'Live Published (at submission)' : 'Current Live Published'}
-                        borderColor="border-gray-300"
-                      />
-                      <SectionIframePreview
-                        sectionName={item.section_name}
-                        data={propParsed}
-                        height={480}
-                        label={isHistorical ? 'Proposed Draft (at submission)' : 'Proposed Draft'}
-                        borderColor="border-emerald-500"
-                      />
-                    </div>
-                  ) : (
-                    <div className="grid lg:grid-cols-2 gap-4 font-mono text-xs">
-                      <div className="bg-gray-50 border p-3 rounded">
-                        <span className="block font-sans font-bold text-gray-500 mb-1 text-[11px]">Current</span>
-                        <pre className="whitespace-pre-wrap">{item.current_content || 'None'}</pre>
+          {batchEdits ? (
+            <div className="space-y-2">
+              {batchEdits.map((item, idx) => {
+                const curParsed = parseJson(item.current_content)
+                const propParsed = parseJson(item.proposed_content)
+                const isExpanded = expandedPreviewSections.has(idx)
+
+                return (
+                  <div key={idx} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => togglePreviewSection(idx)}
+                      className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-slate-50 transition"
+                      aria-expanded={isExpanded}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                          {idx + 1}
+                        </span>
+                        <h5 className="font-extrabold text-[#0B1B3D] text-sm truncate">
+                          {item.section_name}
+                        </h5>
                       </div>
-                      <div className="bg-emerald-50/50 border border-emerald-300 p-3 rounded">
-                        <span className="block font-sans font-bold text-emerald-800 mb-1 text-[11px]">Proposed</span>
-                        <pre className="whitespace-pre-wrap">{item.proposed_content}</pre>
+                      <FaChevronDown
+                        className={`w-3.5 h-3.5 shrink-0 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      />
+                    </button>
+
+                    {isExpanded && (
+                      <div className="px-5 pb-5 border-t border-gray-100 pt-4">
+                        {previewMode === 'visual' ? (
+                          <div className="grid lg:grid-cols-2 gap-6">
+                            <SectionIframePreview
+                              sectionName={item.section_name}
+                              data={curParsed}
+                              height={480}
+                              label={isHistorical ? 'Live Published (at submission)' : 'Current Live Published'}
+                              borderColor="border-gray-300"
+                            />
+                            <SectionIframePreview
+                              sectionName={item.section_name}
+                              data={propParsed}
+                              height={480}
+                              label={isHistorical ? 'Proposed Draft (at submission)' : 'Proposed Draft'}
+                              borderColor="border-emerald-500"
+                            />
+                          </div>
+                        ) : (
+                          <div className="grid lg:grid-cols-2 gap-4 font-mono text-xs">
+                            <div className="bg-gray-50 border p-3 rounded-lg">
+                              <span className="block font-sans font-bold text-gray-500 mb-1 text-[11px]">Current</span>
+                              <pre className="whitespace-pre-wrap">{item.current_content || 'None'}</pre>
+                            </div>
+                            <div className="bg-emerald-50/50 border border-emerald-300 p-3 rounded-lg">
+                              <span className="block font-sans font-bold text-emerald-800 mb-1 text-[11px]">Proposed</span>
+                              <pre className="whitespace-pre-wrap">{item.proposed_content}</pre>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           ) : (
             <div className="grid lg:grid-cols-2 gap-6">
               <SectionIframePreview
@@ -290,10 +618,14 @@ export default function ManagerDashboard() {
   const [assigningId, setAssigningId] = useState(null)
   const [previewSnapshots, setPreviewSnapshots] = useState(() => loadPreviewSnapshots())
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [usersLoading, setUsersLoading] = useState(false)
   const [creatingUser, setCreatingUser] = useState(false)
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
+  const [requestSearch, setRequestSearch] = useState('')
+  const [userSearch, setUserSearch] = useState('')
+  const [logSearch, setLogSearch] = useState('')
 
   const [userForm, setUserForm] = useState({
     name: '',
@@ -338,18 +670,23 @@ export default function ManagerDashboard() {
     setLogs(res.data.data || res.data || [])
   }, [])
 
-  useEffect(() => {
-    let cancelled = false
-    setLoading(true)
-    Promise.all([fetchRequests(), fetchUsers(), fetchLogs()])
-      .catch(err => {
-        if (!cancelled) setError(err.response?.data?.message || 'Failed to load dashboard data.')
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => { cancelled = true }
+  const loadAll = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
+    else setLoading(true)
+    setError('')
+    try {
+      await Promise.all([fetchRequests(), fetchUsers(), fetchLogs()])
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to load dashboard data.')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
   }, [fetchRequests, fetchUsers, fetchLogs])
+
+  useEffect(() => {
+    loadAll()
+  }, [loadAll])
 
   const newRequests = useMemo(
     () => requests.filter(r => r.status === PENDING_STATUS),
@@ -360,6 +697,48 @@ export default function ManagerDashboard() {
     () => requests.filter(r => PREVIOUS_STATUSES.has(r.status)),
     [requests]
   )
+
+  const stats = useMemo(() => ({
+    new: newRequests.length,
+    underReview: requests.filter(r => r.status === 'under_review').length,
+    completed: requests.filter(r => r.status === 'approved' || r.status === 'scheduled').length,
+    team: users.length,
+  }), [requests, users, newRequests])
+
+  const filterRequests = useCallback((list) => {
+    if (!requestSearch.trim()) return list
+    const q = requestSearch.trim().toLowerCase()
+    return list.filter(r => {
+      const searchText = getRequestSearchText(r).toLowerCase()
+      const editor = (r.editor?.name || '').toLowerCase()
+      const approver = (r.approver?.name || '').toLowerCase()
+      return searchText.includes(q) || editor.includes(q) || approver.includes(q) || String(r.id).includes(q)
+    })
+  }, [requestSearch])
+
+  const filteredNewRequests = useMemo(() => filterRequests(newRequests), [newRequests, filterRequests])
+  const filteredPreviousRequests = useMemo(() => filterRequests(previousRequests), [previousRequests, filterRequests])
+
+  const filteredUsers = useMemo(() => {
+    if (!userSearch.trim()) return users
+    const q = userSearch.trim().toLowerCase()
+    return users.filter(u =>
+      (u.name || '').toLowerCase().includes(q) ||
+      (u.email || '').toLowerCase().includes(q) ||
+      (u.role || '').toLowerCase().includes(q) ||
+      (u.firm?.name || '').toLowerCase().includes(q)
+    )
+  }, [users, userSearch])
+
+  const filteredLogs = useMemo(() => {
+    if (!logSearch.trim()) return logs
+    const q = logSearch.trim().toLowerCase()
+    return logs.filter(log =>
+      (log.user?.name || '').toLowerCase().includes(q) ||
+      (log.action || '').toLowerCase().includes(q) ||
+      (log.details || log.description || '').toLowerCase().includes(q)
+    )
+  }, [logs, logSearch])
 
   const handleAssign = async (requestId, approverId) => {
     setAssigningId(requestId)
@@ -435,17 +814,19 @@ export default function ManagerDashboard() {
   }
 
   const tabs = [
-    { id: 'new', label: 'New Requests', count: newRequests.length },
-    { id: 'previous', label: 'Previous Requests', count: previousRequests.length },
-    { id: 'create-user', label: 'Create User' },
-    { id: 'users', label: 'All Users', count: users.length },
-    { id: 'logs', label: 'Activity Logs' },
+    { id: 'new', label: 'New Requests', count: newRequests.length, icon: FaInbox },
+    { id: 'previous', label: 'History', count: previousRequests.length, icon: FaClipboardList },
+    { id: 'create-user', label: 'Create User', icon: FaUserPlus },
+    { id: 'users', label: 'Team', count: users.length, icon: FaUsers },
+    { id: 'logs', label: 'Activity', icon: FaListAlt },
   ]
+
+  const selectedRoleInfo = CREATABLE_ROLES.find(r => r.value === userForm.role)
 
   const renderRequestList = (list, emptyTitle, emptyHint) => {
     if (loading) {
       return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center text-gray-500">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center text-gray-500">
           <div className="w-10 h-10 mx-auto mb-4 rounded-full border-4 border-[#C8102E] border-t-transparent animate-spin" />
           <p className="text-sm font-semibold">Loading requests…</p>
         </div>
@@ -453,17 +834,33 @@ export default function ManagerDashboard() {
     }
 
     if (list.length === 0) {
+      const isSearching = requestSearch.trim().length > 0
       return (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center text-gray-500">
-          <div className="text-4xl mb-3">📁</div>
-          <h3 className="text-lg font-bold text-[#0B1B3D]">{emptyTitle}</h3>
-          <p className="text-sm text-gray-500 mt-1">{emptyHint}</p>
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
+            <FaInbox className="w-6 h-6 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-bold text-[#0B1B3D]">
+            {isSearching ? 'No matching requests' : emptyTitle}
+          </h3>
+          <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
+            {isSearching ? 'Try a different search term or clear the filter.' : emptyHint}
+          </p>
+          {isSearching && (
+            <button
+              type="button"
+              onClick={() => setRequestSearch('')}
+              className="mt-4 text-sm font-bold text-[#C8102E] hover:underline"
+            >
+              Clear search
+            </button>
+          )}
         </div>
       )
     }
 
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         {list.map(req => (
           <ManagerRequestCard
             key={req.id}
@@ -484,244 +881,464 @@ export default function ManagerDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans text-gray-800">
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {/* Page header */}
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-extrabold text-[#0B1B3D]">Manager Dashboard</h1>
-            <p className="text-gray-500 text-sm mt-1">
-              Create users, review incoming change requests, assign approvers, and track request history.
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1B3D]">Manager Dashboard</h1>
+            <p className="text-gray-500 text-sm mt-1 max-w-xl">
+              Manage your team, assign incoming change requests to approvers, and track activity.
             </p>
           </div>
-          {user && (
-            <div className="bg-white border rounded-lg px-4 py-2 text-right shadow-sm">
-              <span className="text-xs text-gray-400 block uppercase font-bold tracking-wider">Logged in as</span>
-              <span className="text-sm font-bold text-[#C8102E]">{user.name} (manager)</span>
-              {user.firm && (
-                <span className="text-xs text-gray-500 block">{user.firm.name}</span>
-              )}
-            </div>
-          )}
-        </div>
-
-        {message && (
-          <div className="bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 p-4 mb-6 rounded-lg shadow-sm flex items-center justify-between text-sm font-medium">
-            <span>{message}</span>
-            <button onClick={() => setMessage('')} className="font-bold hover:opacity-75 text-lg">✕</button>
-          </div>
-        )}
-
-        {error && (
-          <div className="bg-rose-50 border-l-4 border-rose-500 text-rose-800 p-4 mb-6 rounded-lg shadow-sm flex items-center justify-between text-sm font-medium">
-            <span>{error}</span>
-            <button onClick={() => setError('')} className="font-bold hover:opacity-75 text-lg">✕</button>
-          </div>
-        )}
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">New Requests</p>
-            <p className="text-3xl font-extrabold text-amber-600 mt-1">{newRequests.length}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">Under Review</p>
-            <p className="text-3xl font-extrabold text-blue-600 mt-1">
-              {requests.filter(r => r.status === 'under_review').length}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">Completed</p>
-            <p className="text-3xl font-extrabold text-emerald-600 mt-1">
-              {requests.filter(r => r.status === 'approved' || r.status === 'scheduled').length}
-            </p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">Team Members</p>
-            <p className="text-3xl font-extrabold text-[#0B1B3D] mt-1">{users.length}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 mb-6 flex-wrap">
-          {tabs.map(tab => (
+          <div className="flex items-center gap-3">
             <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
-                activeTab === tab.id
-                  ? 'bg-[#0B1B3D] text-white'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-              }`}
+              type="button"
+              onClick={() => loadAll(true)}
+              disabled={refreshing || loading}
+              className="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition shadow-sm disabled:opacity-60"
             >
-              {tab.label}{tab.count != null ? ` (${tab.count})` : ''}
+              <FaSync className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
             </button>
-          ))}
+            {user && (
+              <div className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm text-right">
+                <span className="text-[10px] text-gray-400 block uppercase font-bold tracking-wider">Logged in as</span>
+                <span className="text-sm font-bold text-[#C8102E]">{user.name}</span>
+                <RoleBadge role="manager" />
+                {user.firm && (
+                  <span className="text-xs text-gray-500 block mt-0.5 flex items-center gap-1 justify-end">
+                    <FaBuilding className="w-3 h-3" />
+                    {user.firm.name}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
+
+        {message && <AlertBanner type="success" message={message} onDismiss={() => setMessage('')} />}
+        {error && <AlertBanner type="error" message={error} onDismiss={() => setError('')} />}
+
+        {/* Stats */}
+        {!loading && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+            <StatCard
+              label="New Requests"
+              value={stats.new}
+              icon={FaInbox}
+              accent="bg-amber-100 text-amber-600"
+            />
+            <StatCard
+              label="Under Review"
+              value={stats.underReview}
+              icon={FaClipboardCheck}
+              accent="bg-blue-100 text-blue-600"
+            />
+            <StatCard
+              label="Completed"
+              value={stats.completed}
+              icon={FaCheckCircle}
+              accent="bg-emerald-100 text-emerald-600"
+            />
+            <StatCard
+              label="Team Members"
+              value={stats.team}
+              icon={FaUsers}
+              accent="bg-violet-100 text-violet-600"
+            />
+          </div>
+        )}
+
+        {/* Tab navigation */}
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          {tabs.map(tab => {
+            const Icon = tab.icon
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition ${
+                  activeTab === tab.id
+                    ? 'bg-[#0B1B3D] text-white shadow-sm'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {tab.label}
+                {tab.count != null && (
+                  <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-extrabold ${
+                    activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Request tabs: search bar */}
+        {(activeTab === 'new' || activeTab === 'previous') && (
+          <div className="relative mb-6 max-w-md">
+            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+            <input
+              type="search"
+              placeholder="Search by section, editor, approver, or ID…"
+              value={requestSearch}
+              onChange={e => setRequestSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E] transition"
+            />
+          </div>
+        )}
 
         {activeTab === 'new' && renderRequestList(
-          newRequests,
+          filteredNewRequests,
           'No New Requests',
           'All incoming change requests have been assigned to approvers.'
         )}
 
         {activeTab === 'previous' && renderRequestList(
-          previousRequests,
+          filteredPreviousRequests,
           'No Previous Requests',
           'Completed, rejected, and in-review requests will appear here.'
         )}
 
         {activeTab === 'create-user' && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 max-w-xl">
-            <h2 className="text-xl font-bold text-[#0B1B3D] mb-1">Create New User</h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Add advisors, approvers, or client admins to your team.
-              {user?.firm?.name && ` New users will be linked to ${user.firm.name}.`}
-            </p>
-
-            <form onSubmit={handleCreateUser} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Full Name</label>
-                <input
-                  type="text"
-                  value={userForm.name}
-                  onChange={e => setUserForm(prev => ({ ...prev, name: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]"
-                  placeholder="John Smith"
-                  required
-                />
+          <div className="grid lg:grid-cols-5 gap-6">
+            <div className="lg:col-span-3 bg-white rounded-2xl shadow-sm border border-gray-200 p-6 sm:p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 rounded-xl bg-[#C8102E]/10 flex items-center justify-center">
+                  <FaUserPlus className="w-5 h-5 text-[#C8102E]" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-[#0B1B3D]">Create New User</h2>
+                  <p className="text-sm text-gray-500">
+                    Add advisors, approvers, or client admins to your team.
+                  </p>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Email Address</label>
-                <input
-                  type="email"
-                  value={userForm.email}
-                  onChange={e => setUserForm(prev => ({ ...prev, email: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]"
-                  placeholder="john@firm.com"
-                  required
-                />
-              </div>
+              <form onSubmit={handleCreateUser} className="space-y-5">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
+                      Full Name
+                    </label>
+                    <input
+                      type="text"
+                      value={userForm.name}
+                      onChange={e => setUserForm(prev => ({ ...prev, name: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]/20 focus:border-[#0B1B3D] transition"
+                      placeholder="John Smith"
+                      required
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Role</label>
-                <select
-                  value={userForm.role}
-                  onChange={e => setUserForm(prev => ({ ...prev, role: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D] bg-white"
-                  required
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      value={userForm.email}
+                      onChange={e => setUserForm(prev => ({ ...prev, email: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]/20 focus:border-[#0B1B3D] transition"
+                      placeholder="john@firm.com"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
+                    Role
+                  </label>
+                  <select
+                    value={userForm.role}
+                    onChange={e => setUserForm(prev => ({ ...prev, role: e.target.value }))}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]/20 focus:border-[#0B1B3D] bg-white transition"
+                    required
+                  >
+                    {CREATABLE_ROLES.map(r => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      value={userForm.password}
+                      onChange={e => setUserForm(prev => ({ ...prev, password: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]/20 focus:border-[#0B1B3D] transition"
+                      placeholder="Minimum 8 characters"
+                      minLength={8}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5">
+                      Confirm Password
+                    </label>
+                    <input
+                      type="password"
+                      value={userForm.password_confirmation}
+                      onChange={e => setUserForm(prev => ({ ...prev, password_confirmation: e.target.value }))}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]/20 focus:border-[#0B1B3D] transition"
+                      placeholder="Re-enter password"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {user?.firm?.name && (
+                  <p className="text-xs text-gray-500 flex items-center gap-1.5 bg-slate-50 rounded-lg px-3 py-2">
+                    <FaBuilding className="w-3 h-3 shrink-0" />
+                    New user will be linked to <strong>{user.firm.name}</strong>
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={creatingUser}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-[#C8102E] text-white py-3 rounded-xl font-bold text-sm hover:bg-red-700 transition disabled:opacity-50 shadow-md"
                 >
+                  {creatingUser ? (
+                    <>
+                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Creating User…
+                    </>
+                  ) : (
+                    <>
+                      <FaUserPlus className="w-4 h-4" />
+                      Create User
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+
+            <div className="lg:col-span-2 space-y-4">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
+                <h3 className="text-sm font-bold text-[#0B1B3D] mb-3">Role Guide</h3>
+                <div className="space-y-3">
                   {CREATABLE_ROLES.map(r => (
-                    <option key={r.value} value={r.value}>{r.label}</option>
+                    <div
+                      key={r.value}
+                      className={`p-3 rounded-xl border transition ${
+                        userForm.role === r.value
+                          ? 'border-[#C8102E]/30 bg-[#C8102E]/5'
+                          : 'border-gray-100 bg-gray-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <RoleBadge role={r.value} />
+                      </div>
+                      <p className="text-xs text-gray-600 leading-relaxed">{r.description}</p>
+                    </div>
                   ))}
-                </select>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Password</label>
-                <input
-                  type="password"
-                  value={userForm.password}
-                  onChange={e => setUserForm(prev => ({ ...prev, password: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]"
-                  placeholder="Minimum 8 characters"
-                  minLength={8}
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Confirm Password</label>
-                <input
-                  type="password"
-                  value={userForm.password_confirmation}
-                  onChange={e => setUserForm(prev => ({ ...prev, password_confirmation: e.target.value }))}
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]"
-                  placeholder="Re-enter password"
-                  required
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={creatingUser}
-                className="w-full bg-[#C8102E] text-white py-3 rounded-lg font-bold text-sm hover:bg-red-700 transition disabled:opacity-50 shadow-md mt-2"
-              >
-                {creatingUser ? 'Creating User…' : 'Create User'}
-              </button>
-            </form>
+              {selectedRoleInfo && (
+                <div className="bg-[#0B1B3D] rounded-2xl p-5 text-white">
+                  <p className="text-xs font-bold uppercase tracking-wider text-white/60 mb-1">Selected Role</p>
+                  <p className="text-lg font-bold">{selectedRoleInfo.label}</p>
+                  <p className="text-sm text-white/70 mt-1">{selectedRoleInfo.description}</p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {activeTab === 'users' && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            {usersLoading ? (
-              <div className="p-12 text-center text-gray-500">
-                <div className="w-8 h-8 mx-auto mb-3 rounded-full border-4 border-[#C8102E] border-t-transparent animate-spin" />
-                Loading users…
-              </div>
-            ) : (
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 border-b">
-                  <tr>
-                    <th className="text-left px-4 py-3 text-gray-600 font-bold uppercase text-xs tracking-wider">Name</th>
-                    <th className="text-left px-4 py-3 text-gray-600 font-bold uppercase text-xs tracking-wider">Email</th>
-                    <th className="text-left px-4 py-3 text-gray-600 font-bold uppercase text-xs tracking-wider">Role</th>
-                    <th className="text-left px-4 py-3 text-gray-600 font-bold uppercase text-xs tracking-wider">Firm</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {users.map(u => (
-                    <tr key={u.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-medium text-gray-800">{u.name}</td>
-                      <td className="px-4 py-3 text-gray-600">{u.email}</td>
-                      <td className="px-4 py-3">{roleBadge(u.role)}</td>
-                      <td className="px-4 py-3 text-gray-500">{u.firm?.name || '—'}</td>
-                    </tr>
-                  ))}
-                  {users.length === 0 && (
-                    <tr>
-                      <td colSpan="4" className="px-4 py-8 text-center text-gray-400">
-                        No users found. Create your first team member above.
-                      </td>
-                    </tr>
+          <div className="space-y-4">
+            <div className="relative max-w-md">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              <input
+                type="search"
+                placeholder="Search team members…"
+                value={userSearch}
+                onChange={e => setUserSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E] transition"
+              />
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+              {usersLoading ? (
+                <div className="p-16 text-center text-gray-500">
+                  <div className="w-8 h-8 mx-auto mb-3 rounded-full border-4 border-[#C8102E] border-t-transparent animate-spin" />
+                  <p className="text-sm font-semibold">Loading team members…</p>
+                </div>
+              ) : filteredUsers.length === 0 ? (
+                <div className="p-16 text-center">
+                  <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
+                    <FaUsers className="w-6 h-6 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-bold text-[#0B1B3D]">
+                    {userSearch.trim() ? 'No matching users' : 'No team members yet'}
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {userSearch.trim()
+                      ? 'Try a different search term.'
+                      : 'Create your first team member in the Create User tab.'}
+                  </p>
+                  {!userSearch.trim() && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('create-user')}
+                      className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-[#C8102E] hover:underline"
+                    >
+                      <FaUserPlus className="w-3.5 h-3.5" />
+                      Create User
+                    </button>
                   )}
-                </tbody>
-              </table>
-            )}
+                </div>
+              ) : (
+                <>
+                  {/* Desktop table */}
+                  <div className="hidden md:block">
+                    <table className="w-full text-sm">
+                      <thead className="bg-gray-50 border-b border-gray-100">
+                        <tr>
+                          <th className="text-left px-5 py-3 text-gray-500 font-bold uppercase text-[11px] tracking-wider">Name</th>
+                          <th className="text-left px-5 py-3 text-gray-500 font-bold uppercase text-[11px] tracking-wider">Email</th>
+                          <th className="text-left px-5 py-3 text-gray-500 font-bold uppercase text-[11px] tracking-wider">Role</th>
+                          <th className="text-left px-5 py-3 text-gray-500 font-bold uppercase text-[11px] tracking-wider">Firm</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {filteredUsers.map(u => (
+                          <tr key={u.id} className="hover:bg-gray-50/80 transition">
+                            <td className="px-5 py-3.5">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-[#0B1B3D]/10 flex items-center justify-center shrink-0">
+                                  <FaUser className="w-3.5 h-3.5 text-[#0B1B3D]" />
+                                </div>
+                                <span className="font-semibold text-gray-800">{u.name}</span>
+                              </div>
+                            </td>
+                            <td className="px-5 py-3.5 text-gray-600">
+                              <span className="inline-flex items-center gap-1.5">
+                                <FaEnvelope className="w-3 h-3 text-gray-400 shrink-0" />
+                                {u.email}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3.5"><RoleBadge role={u.role} /></td>
+                            <td className="px-5 py-3.5 text-gray-500">
+                              {u.firm?.name ? (
+                                <span className="inline-flex items-center gap-1.5">
+                                  <FaBuilding className="w-3 h-3 text-gray-400 shrink-0" />
+                                  {u.firm.name}
+                                </span>
+                              ) : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Mobile cards */}
+                  <div className="md:hidden divide-y divide-gray-100">
+                    {filteredUsers.map(u => (
+                      <div key={u.id} className="p-4 hover:bg-gray-50/80 transition">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-[#0B1B3D]/10 flex items-center justify-center shrink-0">
+                            <FaUser className="w-4 h-4 text-[#0B1B3D]" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-semibold text-gray-800">{u.name}</p>
+                              <RoleBadge role={u.role} />
+                            </div>
+                            <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+                              <FaEnvelope className="w-3 h-3 shrink-0" />
+                              {u.email}
+                            </p>
+                            {u.firm?.name && (
+                              <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1.5">
+                                <FaBuilding className="w-3 h-3 shrink-0" />
+                                {u.firm.name}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         )}
 
         {activeTab === 'logs' && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="text-left px-4 py-3 text-gray-600 font-bold uppercase text-xs tracking-wider">User</th>
-                  <th className="text-left px-4 py-3 text-gray-600 font-bold uppercase text-xs tracking-wider">Action</th>
-                  <th className="text-left px-4 py-3 text-gray-600 font-bold uppercase text-xs tracking-wider">Details</th>
-                  <th className="text-left px-4 py-3 text-gray-600 font-bold uppercase text-xs tracking-wider">Time</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {logs.map(log => (
-                  <tr key={log.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-gray-800">{log.user?.name || '—'}</td>
-                    <td className="px-4 py-3 capitalize text-gray-700">{log.action?.replace(/_/g, ' ')}</td>
-                    <td className="px-4 py-3 text-gray-500">{log.details || log.description || '—'}</td>
-                    <td className="px-4 py-3 text-gray-400 text-xs">{new Date(log.created_at).toLocaleString()}</td>
-                  </tr>
-                ))}
-                {logs.length === 0 && (
-                  <tr>
-                    <td colSpan="4" className="px-4 py-8 text-center text-gray-400">
-                      No activity logs yet
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="space-y-4">
+            <div className="relative max-w-md">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+              <input
+                type="search"
+                placeholder="Search activity logs…"
+                value={logSearch}
+                onChange={e => setLogSearch(e.target.value)}
+                className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E] transition"
+              />
+            </div>
+
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+              {filteredLogs.length === 0 ? (
+                <div className="p-16 text-center">
+                  <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
+                    <FaHistory className="w-6 h-6 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-bold text-[#0B1B3D]">
+                    {logSearch.trim() ? 'No matching activity' : 'No activity logs yet'}
+                  </h3>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {logSearch.trim() ? 'Try a different search term.' : 'Team actions will be recorded here.'}
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-100">
+                  {filteredLogs.map(log => (
+                    <div key={log.id} className="px-5 py-4 hover:bg-gray-50/80 transition flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
+                      <div className="flex items-center gap-3 min-w-0 sm:w-48 shrink-0">
+                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                          <FaUser className="w-3.5 h-3.5 text-slate-500" />
+                        </div>
+                        <span className="font-semibold text-gray-800 text-sm truncate">
+                          {log.user?.name || 'System'}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className="inline-flex items-center text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 capitalize">
+                          {log.action?.replace(/_/g, ' ')}
+                        </span>
+                        {(log.details || log.description) && (
+                          <p className="text-sm text-gray-500 mt-1 truncate">
+                            {log.details || log.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-xs text-gray-400 shrink-0 flex items-center gap-1.5">
+                        <FaClock className="w-3 h-3" />
+                        {new Date(log.created_at).toLocaleString()}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
