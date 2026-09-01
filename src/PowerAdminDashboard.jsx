@@ -23,7 +23,6 @@ import {
 } from 'react-icons/fa'
 import Navbar from './Navbar'
 import api from './api/axios'
-import { useAuth } from './context/AuthContext'
 import { sectionDisplayName } from './utils/sectionDisplay'
 import TemplateScrollPreview from './components/TemplateScrollPreview'
 import { defaultTemplatePreviewUrl } from './utils/assetUrl'
@@ -118,7 +117,6 @@ const inputClass =
 const labelClass = 'block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1.5'
 
 export default function PowerAdminDashboard() {
-    const { user } = useAuth()
     const [requests, setRequests] = useState([])
     const [templates, setTemplates] = useState([])
     const [message, setMessage] = useState('')
@@ -427,123 +425,92 @@ export default function PowerAdminDashboard() {
         <div className="min-h-screen bg-gradient-to-b from-slate-100 to-gray-100 font-sans text-gray-800">
             <Navbar />
 
-            <div className="max-w-7xl mx-auto px-4 py-6">
-                {/* Dashboard Top Bar */}
-                <div className="sticky top-0 z-30 mb-6">
-                    <div className="bg-[#0B1B3D] rounded-2xl shadow-xl overflow-hidden ring-1 ring-black/5">
-                        <div className="absolute inset-0 bg-gradient-to-br from-[#C8102E]/10 via-transparent to-transparent pointer-events-none" />
+            <div className="max-w-7xl mx-auto px-4 py-8">
+                {/* Page header */}
+                <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
+                    <div>
+                        <h1 className="text-3xl font-extrabold text-[#0B1B3D]">Template & Deployment Hub</h1>
+                        <p className="text-gray-500 text-sm mt-1 max-w-2xl">
+                            Register showcase templates, deploy advisor websites to cPanel, and manage live section visibility.
+                        </p>
+                    </div>
 
-                        <div className="relative px-5 sm:px-6 py-5 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-                            <div className="flex items-start sm:items-center gap-4 min-w-0">
-                                <div className="shrink-0 w-12 h-12 rounded-xl bg-[#C8102E] flex items-center justify-center shadow-lg shadow-[#C8102E]/30">
-                                    <FaServer className="w-5 h-5 text-white" />
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="text-[10px] font-extrabold uppercase tracking-[0.2em] text-white/45 mb-0.5">
-                                        Power Admin
-                                    </p>
-                                    <h1 className="text-xl sm:text-2xl font-extrabold text-white leading-tight truncate">
-                                        Template & Deployment Hub
-                                    </h1>
-                                    <p className="text-white/55 text-xs sm:text-sm mt-1 max-w-xl">
-                                        Register templates, deploy advisor sites, and manage live sections.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 sm:gap-3 flex-wrap lg:justify-end">
-                                {user && (
-                                    <div className="flex items-center gap-2.5 bg-white/10 border border-white/10 rounded-xl px-3 py-2 backdrop-blur-sm">
-                                        <div className="w-8 h-8 rounded-lg bg-white/15 flex items-center justify-center text-xs font-extrabold text-white uppercase">
-                                            {user.name?.charAt(0) || 'A'}
-                                        </div>
-                                        <div className="text-left hidden sm:block">
-                                            <p className="text-xs font-bold text-white leading-tight">{user.name}</p>
-                                            <p className="text-[10px] text-white/50 uppercase tracking-wider font-bold">
-                                                {user.role?.replace('_', ' ')}
-                                            </p>
-                                        </div>
-                                    </div>
-                                )}
-                                <button
-                                    type="button"
-                                    onClick={() => fetchData(true)}
-                                    disabled={refreshing}
-                                    title="Refresh data"
-                                    className="inline-flex items-center justify-center gap-2 bg-white/10 border border-white/15 text-white text-xs font-bold px-3.5 sm:px-4 py-2.5 rounded-xl hover:bg-white/15 transition disabled:opacity-50"
-                                >
-                                    <FaSync className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-                                    <span className="hidden sm:inline">Refresh</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={openCreateTemplateModal}
-                                    className="inline-flex items-center gap-2 bg-[#C8102E] text-white text-xs font-extrabold px-4 sm:px-5 py-2.5 rounded-xl hover:bg-[#A00C23] transition shadow-lg shadow-[#C8102E]/25"
-                                >
-                                    <FaPlus className="w-3.5 h-3.5" />
-                                    New Template
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="relative border-t border-white/10 bg-black/20 px-5 sm:px-6 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                            <div className="flex items-center gap-1.5 p-1 bg-black/20 rounded-xl w-full md:w-auto overflow-x-auto">
-                                {tabs.map(tab => {
-                                    const Icon = tab.icon
-                                    const isActive = activeTab === tab.id
-                                    return (
-                                        <button
-                                            key={tab.id}
-                                            type="button"
-                                            onClick={() => setActiveTab(tab.id)}
-                                            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-bold whitespace-nowrap transition ${
-                                                isActive
-                                                    ? 'bg-white text-[#0B1B3D] shadow-sm'
-                                                    : 'text-white/70 hover:text-white hover:bg-white/10'
-                                            }`}
-                                        >
-                                            <Icon className="w-3.5 h-3.5 shrink-0" />
-                                            {tab.label}
-                                            <span
-                                                className={`text-[10px] min-w-[1.25rem] text-center px-1.5 py-0.5 rounded-full font-extrabold ${
-                                                    isActive ? 'bg-[#0B1B3D]/10 text-[#0B1B3D]' : 'bg-white/15 text-white/80'
-                                                }`}
-                                            >
-                                                {tab.count}
-                                            </span>
-                                        </button>
-                                    )
-                                })}
-                            </div>
-
-                            <div className="flex items-center gap-4 sm:gap-5 text-white/80 shrink-0 overflow-x-auto">
-                                <div className="flex items-center gap-2 text-xs whitespace-nowrap">
-                                    <FaThLarge className="w-3 h-3 text-white/40" />
-                                    <span className="font-bold text-white">{stats.totalTemplates}</span>
-                                    <span className="text-white/45">templates</span>
-                                    <span className="text-white/25">·</span>
-                                    <span className="text-emerald-400 font-bold">{stats.activeTemplates}</span>
-                                    <span className="text-white/45">active</span>
-                                </div>
-                                <div className="w-px h-4 bg-white/15 hidden sm:block" />
-                                <div className="flex items-center gap-2 text-xs whitespace-nowrap">
-                                    <FaClock className="w-3 h-3 text-amber-400/80" />
-                                    <span className="font-bold text-amber-300">{stats.pending}</span>
-                                    <span className="text-white/45">pending</span>
-                                </div>
-                                <div className="w-px h-4 bg-white/15 hidden sm:block" />
-                                <div className="flex items-center gap-2 text-xs whitespace-nowrap">
-                                    <FaCheckCircle className="w-3 h-3 text-emerald-400/80" />
-                                    <span className="font-bold text-emerald-300">{stats.deployed}</span>
-                                    <span className="text-white/45">deployed</span>
-                                </div>
-                            </div>
-                        </div>
+                    <div className="flex items-center gap-3 flex-wrap">
+                        <button
+                            type="button"
+                            onClick={() => fetchData(true)}
+                            disabled={refreshing}
+                            className="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 text-xs font-bold px-4 py-3 rounded-xl hover:bg-gray-50 transition shadow-sm disabled:opacity-50"
+                        >
+                            <FaSync className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+                            Refresh
+                        </button>
+                        <button
+                            type="button"
+                            onClick={openCreateTemplateModal}
+                            className="inline-flex items-center gap-2 bg-[#C8102E] text-white text-xs font-extrabold px-5 py-3 rounded-xl hover:bg-[#A00C23] transition shadow-md"
+                        >
+                            <FaPlus className="w-3.5 h-3.5" />
+                            New Template
+                        </button>
                     </div>
                 </div>
 
                 {message && <AlertBanner type="success" message={message} onDismiss={() => setMessage('')} />}
                 {error && <AlertBanner type="error" message={error} onDismiss={() => setError('')} />}
+
+                {/* Stats */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                        <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">Templates</p>
+                        <p className="text-3xl font-extrabold text-[#0B1B3D] mt-1">{stats.totalTemplates}</p>
+                        <p className="text-xs text-gray-500 mt-1">{stats.activeTemplates} active</p>
+                    </div>
+                    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                        <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">Pending</p>
+                        <p className="text-3xl font-extrabold text-amber-600 mt-1">{stats.pending}</p>
+                        <p className="text-xs text-gray-500 mt-1">Awaiting deployment</p>
+                    </div>
+                    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                        <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">Deployed</p>
+                        <p className="text-3xl font-extrabold text-emerald-600 mt-1">{stats.deployed}</p>
+                        <p className="text-xs text-gray-500 mt-1">Live advisor sites</p>
+                    </div>
+                    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+                        <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">Total Requests</p>
+                        <p className="text-3xl font-extrabold text-[#C8102E] mt-1">{stats.totalRequests}</p>
+                        <p className="text-xs text-gray-500 mt-1">All time</p>
+                    </div>
+                </div>
+
+                {/* Tabs */}
+                <div className="flex items-center gap-2 mb-6 flex-wrap">
+                    {tabs.map(tab => {
+                        const Icon = tab.icon
+                        return (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setActiveTab(tab.id)}
+                                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition ${
+                                    activeTab === tab.id
+                                        ? 'bg-[#0B1B3D] text-white shadow-md'
+                                        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                                }`}
+                            >
+                                <Icon className="w-3.5 h-3.5" />
+                                {tab.label}
+                                <span
+                                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                        activeTab === tab.id ? 'bg-white/20' : 'bg-gray-100 text-gray-500'
+                                    }`}
+                                >
+                                    {tab.count}
+                                </span>
+                            </button>
+                        )
+                    })}
+                </div>
 
                 {loading ? (
                     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center">
