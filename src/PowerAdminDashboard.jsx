@@ -459,7 +459,7 @@ export default function PowerAdminDashboard() {
                                 <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Live Template Preview URL</label>
                                 <input
                                     type="url"
-                                    placeholder="https://epatronus.space/template4/"
+                                    placeholder="https://website-template"
                                     value={templatePreviewUrl}
                                     onChange={e => setTemplatePreviewUrl(e.target.value)}
                                     className="w-full text-sm p-2.5 border rounded-lg outline-none"
