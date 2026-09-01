@@ -1164,6 +1164,7 @@ export default function AdvisorDashboard() {
   const [localPreviewUrls, setLocalPreviewUrls] = useState({})
   const [localImages, setLocalImages] = useState(LOCAL_TEMPLATE_IMAGES)
   const [previewSlide, setPreviewSlide] = useState({})
+  const [activeWhatWeDoBox, setActiveWhatWeDoBox] = useState({})
 
   useEffect(() => {
     const base = import.meta.env.BASE_URL || '/'
@@ -1726,6 +1727,7 @@ export default function AdvisorDashboard() {
     setCheckedSectionIds([])
     setSectionEdits({})
     setPreviewTab({})
+    setActiveWhatWeDoBox({})
   }
 
   // Fetch pages for the selected deployed site
@@ -2715,138 +2717,176 @@ export default function AdvisorDashboard() {
                                   )
                                 })()
                               ) : isWhatWeDoSection(sectionTemplateKey(section)) ? (
-                                <div className="space-y-8">
+                                (() => {
+                                  const activeBoxIndex = activeWhatWeDoBox[secId] ?? 0
+                                  const boxes = values.boxes && Array.isArray(values.boxes)
+                                    ? values.boxes
+                                    : (values.items && Array.isArray(values.items) ? values.items : [{}, {}, {}])
+                                  const box = boxes[activeBoxIndex] || {}
+                                  const boxImage = box.image_url || box.img || box.image || ''
 
-                                  <div className="grid md:grid-cols-2 gap-4">
-                                    <div className="md:col-span-2">
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Subheading</label>
-                                      <input
-                                        type="text"
-                                        value={values.subheading || values.eyebrow || ''}
-                                        onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
-                                        placeholder="WHAT WE DO"
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
-                                      />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Main Heading</label>
-                                      <input
-                                        type="text"
-                                        value={values.heading || ''}
-                                        onChange={(e) => handleFieldValueChange(secId, 'heading', e.target.value)}
-                                        placeholder="We are the best agency to improve your deals."
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none font-semibold text-[#0B1B3D]"
-                                      />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Text</label>
-                                      <textarea
-                                        rows={3}
-                                        value={values.text || ''}
-                                        onChange={(e) => handleFieldValueChange(secId, 'text', e.target.value)}
-                                        placeholder="Section introduction..."
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
-                                      />
-                                    </div>
-                                  </div>
+                                  return (
+                                    <div className="space-y-6">
+                                      <div className="grid md:grid-cols-2 gap-4">
+                                        <div className="md:col-span-2">
+                                          <label className={labelClass}>Subheading</label>
+                                          <input
+                                            type="text"
+                                            value={values.subheading || values.eyebrow || ''}
+                                            onChange={(e) => handleFieldValueChange(secId, 'subheading', e.target.value)}
+                                            placeholder="WHAT WE DO"
+                                            className={inputClass}
+                                          />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                          <label className={labelClass}>Main Heading</label>
+                                          <input
+                                            type="text"
+                                            value={values.heading || ''}
+                                            onChange={(e) => handleFieldValueChange(secId, 'heading', e.target.value)}
+                                            placeholder="We are the best agency to improve your deals."
+                                            className={`${inputClass} font-semibold text-[#0B1B3D]`}
+                                          />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                          <label className={labelClass}>Text</label>
+                                          <textarea
+                                            rows={3}
+                                            value={values.text || ''}
+                                            onChange={(e) => handleFieldValueChange(secId, 'text', e.target.value)}
+                                            placeholder="Section introduction..."
+                                            className={inputClass}
+                                          />
+                                        </div>
+                                      </div>
 
-                                  {[0, 1, 2].map((boxIndex) => {
-                                    const box = (values.boxes && values.boxes[boxIndex]) || (values.items && values.items[boxIndex]) || {}
-                                    const boxImage = box.image_url || box.img || box.image || ''
-                                    return (
-                                      <div key={boxIndex} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                                        <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
-                                          <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">{boxIndex + 1}</span>
-                                          Box {boxIndex + 1}
-                                        </h5>
-                                        <div className="grid md:grid-cols-2 gap-4">
-                                          <div className="md:col-span-2 space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
-                                            <label className="block text-xs font-extrabold text-[#0B1B3D]">Box Image</label>
-                                            <div className="grid md:grid-cols-2 gap-3">
-                                              <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">📁 Upload Custom Image</label>
-                                                <input
-                                                  type="file"
-                                                  accept="image/*"
-                                                  disabled={uploadingState[`box-${secId}-${boxIndex}`]}
-                                                  onChange={(e) => {
-                                                    if (e.target.files && e.target.files[0]) {
-                                                      handleBoxImageUpload(secId, boxIndex, e.target.files[0])
-                                                    }
-                                                  }}
-                                                  className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
-                                                />
-                                                {uploadingState[`box-${secId}-${boxIndex}`] && (
-                                                  <p className="text-[11px] text-blue-600 mt-1 font-semibold">⏳ Uploading image to server...</p>
-                                                )}
-                                              </div>
-                                              <div className="bg-gray-50 border p-2.5 rounded-md">
-                                                <label className="block text-[11px] font-bold text-gray-700 mb-1">🎨 Or Select Local Template Image</label>
-                                                <select
-                                                  value={selectedLocalValue(boxImage, localImages)}
-                                                  onChange={(e) => patchBox(secId, boxIndex, { image_url: e.target.value })}
-                                                  className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
+                                      <div className="space-y-4">
+                                        <div className="flex items-center justify-between flex-wrap gap-3">
+                                          <p className="text-xs text-gray-500">Edit one box at a time — switch tabs to update each feature box.</p>
+                                          <div className="flex items-center gap-1 p-1 bg-gray-100 rounded-xl">
+                                            {[0, 1, 2].map((boxIndex) => {
+                                              const b = boxes[boxIndex] || {}
+                                              const isActive = activeBoxIndex === boxIndex
+                                              const hasContent = Boolean(
+                                                b.heading || b.title || b.text || b.image_url || b.img || b.image
+                                              )
+                                              return (
+                                                <button
+                                                  key={boxIndex}
+                                                  type="button"
+                                                  onClick={() => setActiveWhatWeDoBox((prev) => ({ ...prev, [secId]: boxIndex }))}
+                                                  className={`relative inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition ${
+                                                    isActive
+                                                      ? 'bg-white text-[#0B1B3D] shadow-sm'
+                                                      : 'text-gray-500 hover:text-gray-700'
+                                                  }`}
                                                 >
-                                                  <option value="">-- Choose Local Template Image --</option>
-                                                  {localImages.map(preset => (
-                                                    <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
-                                                  ))}
-                                                </select>
+                                                  Box {boxIndex + 1}
+                                                  {hasContent && (
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-[#C8102E]' : 'bg-emerald-400'}`} />
+                                                  )}
+                                                </button>
+                                              )
+                                            })}
+                                          </div>
+                                        </div>
+
+                                        <div className="border border-gray-200 rounded-xl p-4 bg-gray-50/50">
+                                          <h5 className="text-sm font-bold text-[#0B1B3D] mb-4 flex items-center gap-2">
+                                            <span className="w-6 h-6 rounded-full bg-[#C8102E] text-white flex items-center justify-center text-xs">
+                                              {activeBoxIndex + 1}
+                                            </span>
+                                            Box {activeBoxIndex + 1}
+                                          </h5>
+                                          <div className="grid md:grid-cols-2 gap-4">
+                                            <div className="md:col-span-2 space-y-3 bg-white p-3.5 border border-gray-200 rounded-lg shadow-sm">
+                                              <label className="block text-xs font-extrabold text-[#0B1B3D]">Box Image</label>
+                                              <div className="grid md:grid-cols-2 gap-3">
+                                                <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Upload image</label>
+                                                  <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    disabled={uploadingState[`box-${secId}-${activeBoxIndex}`]}
+                                                    onChange={(e) => {
+                                                      if (e.target.files && e.target.files[0]) {
+                                                        handleBoxImageUpload(secId, activeBoxIndex, e.target.files[0])
+                                                      }
+                                                    }}
+                                                    className="w-full text-xs text-gray-500 file:mr-2 file:py-1 file:px-2.5 file:rounded file:border-0 file:text-xs file:font-bold file:bg-[#0B1B3D] file:text-white hover:file:bg-slate-800 cursor-pointer"
+                                                  />
+                                                  {uploadingState[`box-${secId}-${activeBoxIndex}`] && (
+                                                    <p className="text-[11px] text-blue-600 mt-1 font-semibold">Uploading...</p>
+                                                  )}
+                                                </div>
+                                                <div className="bg-gray-50 border p-2.5 rounded-md">
+                                                  <label className="block text-[11px] font-bold text-gray-700 mb-1">Template image</label>
+                                                  <select
+                                                    value={selectedLocalValue(boxImage, localImages)}
+                                                    onChange={(e) => patchBox(secId, activeBoxIndex, { image_url: e.target.value })}
+                                                    className="w-full text-xs p-1.5 border rounded bg-white outline-none focus:ring-1 focus:ring-[#C8102E]"
+                                                  >
+                                                    <option value="">-- Choose image --</option>
+                                                    {localImages.map(preset => (
+                                                      <option key={preset.file || preset.value} value={preset.value}>{preset.label}</option>
+                                                    ))}
+                                                  </select>
+                                                </div>
                                               </div>
+                                              <input
+                                                type="text"
+                                                value={displayImagePath(boxImage)}
+                                                onChange={(e) => patchBox(secId, activeBoxIndex, { image_url: e.target.value })}
+                                                placeholder="intime-12 or /uploads/image.jpg"
+                                                className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
+                                              />
                                             </div>
-                                            <input
-                                              type="text"
-                                              value={displayImagePath(boxImage)}
-                                              onChange={(e) => patchBox(secId, boxIndex, { image_url: e.target.value })}
-                                              placeholder="intime-12 or /uploads/image.jpg"
-                                              className="w-full text-xs p-2 border rounded focus:ring-2 focus:ring-[#C8102E] outline-none font-mono"
-                                            />
-                                          </div>
-                                          <div className="md:col-span-2">
-                                            <label className="block text-xs font-bold text-gray-700 mb-1">Heading</label>
-                                            <input
-                                              type="text"
-                                              value={box.heading || box.title || ''}
-                                              onChange={(e) => patchBox(secId, boxIndex, { heading: e.target.value })}
-                                              placeholder="Business & Strategy"
-                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none font-semibold text-[#0B1B3D]"
-                                            />
-                                          </div>
-                                          <div className="md:col-span-2">
-                                            <label className="block text-xs font-bold text-gray-700 mb-1">Text</label>
-                                            <textarea
-                                              rows={2}
-                                              value={box.text || ''}
-                                              onChange={(e) => patchBox(secId, boxIndex, { text: e.target.value })}
-                                              placeholder="Box description..."
-                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
-                                            />
-                                          </div>
-                                          <div>
-                                            <label className="block text-xs font-bold text-gray-700 mb-1">Read more button</label>
-                                            <input
-                                              type="text"
-                                              value={box.button_text || 'Read more'}
-                                              onChange={(e) => patchBox(secId, boxIndex, { button_text: e.target.value })}
-                                              placeholder="Read more"
-                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
-                                            />
-                                          </div>
-                                          <div>
-                                            <label className="block text-xs font-bold text-gray-700 mb-1">URL</label>
-                                            <input
-                                              type="text"
-                                              value={box.button_url || box.url || ''}
-                                              onChange={(e) => patchBox(secId, boxIndex, { button_url: e.target.value })}
-                                              placeholder="#services"
-                                              className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
-                                            />
+                                            <div className="md:col-span-2">
+                                              <label className={labelClass}>Heading</label>
+                                              <input
+                                                type="text"
+                                                value={box.heading || box.title || ''}
+                                                onChange={(e) => patchBox(secId, activeBoxIndex, { heading: e.target.value })}
+                                                placeholder="Business & Strategy"
+                                                className={`${inputClass} font-semibold text-[#0B1B3D]`}
+                                              />
+                                            </div>
+                                            <div className="md:col-span-2">
+                                              <label className={labelClass}>Text</label>
+                                              <textarea
+                                                rows={2}
+                                                value={box.text || ''}
+                                                onChange={(e) => patchBox(secId, activeBoxIndex, { text: e.target.value })}
+                                                placeholder="Box description..."
+                                                className={inputClass}
+                                              />
+                                            </div>
+                                            <div>
+                                              <label className={labelClass}>Read more button</label>
+                                              <input
+                                                type="text"
+                                                value={box.button_text || 'Read more'}
+                                                onChange={(e) => patchBox(secId, activeBoxIndex, { button_text: e.target.value })}
+                                                placeholder="Read more"
+                                                className={inputClass}
+                                              />
+                                            </div>
+                                            <div>
+                                              <label className={labelClass}>URL</label>
+                                              <input
+                                                type="text"
+                                                value={box.button_url || box.url || ''}
+                                                onChange={(e) => patchBox(secId, activeBoxIndex, { button_url: e.target.value })}
+                                                placeholder="#services"
+                                                className={inputClass}
+                                              />
+                                            </div>
                                           </div>
                                         </div>
                                       </div>
-                                    )
-                                  })}
-                                </div>
+                                    </div>
+                                  )
+                                })()
                               ) : isAboutSection(sectionTemplateKey(section)) ? (
                                 <div className="space-y-8">
 
