@@ -46,6 +46,7 @@ import {
   FaExclamationTriangle,
   FaTimesCircle,
   FaPlus,
+  FaChevronDown,
 } from 'react-icons/fa'
 
 const API_BASE = String(api.defaults.baseURL || '').replace(/\/$/, '')
@@ -499,22 +500,33 @@ function ModalShell({ title, subtitle, onClose, children, maxWidth = 'max-w-lg' 
   )
 }
 
-function StepCard({ step, title, description, badge, children, className = '' }) {
+function StepCard({ step, title, description, badge, children, className = '', defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen)
+
   return (
     <div className={`bg-white rounded-2xl shadow-sm border border-gray-200/80 overflow-hidden mb-8 ${className}`}>
       <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-white to-gray-50/80">
-        <div className="flex items-start gap-4 min-w-0">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex items-start gap-4 min-w-0 flex-1 text-left group"
+        >
           <div className="shrink-0 w-10 h-10 rounded-xl bg-[#0B1B3D] text-white flex items-center justify-center text-sm font-extrabold shadow-md shadow-[#0B1B3D]/20">
             {step}
           </div>
-          <div className="min-w-0">
-            <h2 className="text-base font-extrabold text-[#0B1B3D]">{title}</h2>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-extrabold text-[#0B1B3D] group-hover:text-[#C8102E] transition-colors">{title}</h2>
+              <FaChevronDown
+                className={`w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+              />
+            </div>
             {description && <p className="text-sm text-gray-500 mt-0.5">{description}</p>}
           </div>
-        </div>
-        {badge}
+        </button>
+        {badge && <div className="shrink-0">{badge}</div>}
       </div>
-      <div className="p-6">{children}</div>
+      {open && <div className="p-6">{children}</div>}
     </div>
   )
 }
@@ -1210,6 +1222,7 @@ export default function AdvisorDashboard() {
   const [localImages, setLocalImages] = useState(LOCAL_TEMPLATE_IMAGES)
   const [previewSlide, setPreviewSlide] = useState({})
   const [activeItemTab, setActiveItemTab] = useState({})
+  const [expandedEditors, setExpandedEditors] = useState({})
 
   useEffect(() => {
     const base = import.meta.env.BASE_URL || '/'
@@ -1773,6 +1786,7 @@ export default function AdvisorDashboard() {
     setSectionEdits({})
     setPreviewTab({})
     setActiveItemTab({})
+    setExpandedEditors({})
   }
 
   // Fetch pages for the selected deployed site
@@ -2204,6 +2218,48 @@ export default function AdvisorDashboard() {
     setActiveItemTab((prev) => ({ ...prev, [itemTabKey(secId, group)]: index }))
   }
 
+  const isEditorExpanded = (secId) => {
+    const key = String(secId)
+    if (key in expandedEditors) return expandedEditors[key]
+    return checkedSectionIds.length <= 1
+  }
+
+  const toggleEditorExpanded = (secId) => {
+    const key = String(secId)
+    setExpandedEditors((prev) => ({
+      ...prev,
+      [key]: !(key in prev ? prev[key] : checkedSectionIds.length <= 1),
+    }))
+  }
+
+  const setAllEditorsExpanded = (expanded) => {
+    setExpandedEditors(
+      Object.fromEntries(checkedSectionIds.map((id) => [String(id), expanded]))
+    )
+  }
+
+  useEffect(() => {
+    setExpandedEditors((prev) => {
+      const next = { ...prev }
+      let changed = false
+      checkedSectionIds.forEach((id) => {
+        const key = String(id)
+        if (!(key in next)) {
+          next[key] = checkedSectionIds.length <= 1
+          changed = true
+        }
+      })
+      Object.keys(next).forEach((key) => {
+        const numId = Number(key)
+        if (!checkedSectionIds.some((id) => String(id) === key || id === numId)) {
+          delete next[key]
+          changed = true
+        }
+      })
+      return changed ? next : prev
+    })
+  }, [checkedSectionIds])
+
   const visibleSections = [...sections]
     .filter((s) => isAdvisorVisibleSection(sectionTemplateKey(s)))
     .sort((a, b) => advisorSectionOrder(sectionTemplateKey(a)) - advisorSectionOrder(sectionTemplateKey(b)))
@@ -2304,6 +2360,7 @@ export default function AdvisorDashboard() {
           step={1}
           title="Site Deployments"
           description="Request multiple showcase sites — each with its own domain and template. Select a live site to edit its content."
+          defaultOpen={!hasDeployedSite}
           badge={
             <DeploymentSummaryBadge
               deployed={deployedRequests.length}
@@ -2437,6 +2494,7 @@ export default function AdvisorDashboard() {
                   ? `Choose a page to edit on ${activeDeployment.domain_name}.`
                   : 'Choose which page you want to edit sections on.'
               }
+              defaultOpen={checkedSectionIds.length === 0}
             >
               <select
                 value={selectedPageId}
@@ -2458,6 +2516,7 @@ export default function AdvisorDashboard() {
                   step={deployedRequests.length > 1 ? 4 : 3}
                   title={`Select Sections — ${selectedPage.title}`}
                   description="Check sections to lock them for editing. Locked sections appear in the editor below."
+                  defaultOpen={checkedSectionIds.length === 0}
                   badge={
                     checkedSectionIds.length > 0 ? (
                       <span className="inline-flex items-center gap-1.5 text-xs bg-[#C8102E]/10 text-[#C8102E] font-bold px-3 py-1.5 rounded-full border border-[#C8102E]/20">
@@ -2533,24 +2592,74 @@ export default function AdvisorDashboard() {
                 </StepCard>
 
                 {checkedSectionIds.length > 0 ? (
-                  <div className="space-y-6">
+                  <div className="space-y-4">
+                    {checkedSectionIds.length > 1 && (
+                      <div className="flex items-center justify-between flex-wrap gap-2 px-1">
+                        <p className="text-xs text-gray-500">
+                          {checkedSectionIds.length} section{checkedSectionIds.length === 1 ? '' : 's'} — expand only what you need
+                        </p>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setAllEditorsExpanded(true)}
+                            className="text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-[#C8102E]/30 hover:text-[#0B1B3D] transition"
+                          >
+                            Expand all
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setAllEditorsExpanded(false)}
+                            className="text-xs font-bold px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-600 hover:border-[#C8102E]/30 hover:text-[#0B1B3D] transition"
+                          >
+                            Collapse all
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {checkedSectionIds.map(secId => {
                       const section = visibleSections.find(s => s.id === secId)
                       if (!section) return null
                       const values = sectionEdits[secId] || {}
                       const isPreview = previewTab[secId]
+                      const isExpanded = isEditorExpanded(secId)
                       const SecIcon = sectionIcon(sectionTemplateKey(section))
 
                       return (
-                        <div key={secId} className="bg-white rounded-2xl shadow-sm border border-gray-200/80">
-                          <div className="sticky top-16 z-20 bg-white/95 backdrop-blur-sm border-b border-gray-100 px-6 py-3 flex items-center justify-between flex-wrap gap-3 shadow-sm">
-                            <div className="flex items-center gap-3 min-w-0">
+                        <div key={secId} className="bg-white rounded-2xl shadow-sm border border-gray-200/80 overflow-hidden">
+                          <div
+                            className={`px-6 py-3 flex items-center justify-between flex-wrap gap-3 ${
+                              isExpanded
+                                ? 'sticky top-16 z-20 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm'
+                                : 'bg-gray-50/80 hover:bg-gray-50 cursor-pointer'
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => toggleEditorExpanded(secId)}
+                              className="flex items-center gap-3 min-w-0 flex-1 text-left group"
+                            >
+                              <FaChevronDown
+                                className={`w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-200 group-hover:text-[#C8102E] ${
+                                  isExpanded ? 'rotate-180' : ''
+                                }`}
+                              />
                               <div className="w-9 h-9 rounded-lg bg-[#C8102E] text-white flex items-center justify-center shadow-sm shrink-0">
                                 <SecIcon className="w-4 h-4" />
                               </div>
-                              <h3 className="text-base font-bold text-[#0B1B3D] truncate">{sectionDisplayName(section)}</h3>
-                            </div>
-                            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl shrink-0">
+                              <div className="min-w-0">
+                                <h3 className="text-base font-bold text-[#0B1B3D] truncate group-hover:text-[#C8102E] transition-colors">
+                                  {sectionDisplayName(section)}
+                                </h3>
+                                {!isExpanded && (
+                                  <p className="text-[11px] text-gray-400 mt-0.5">
+                                    {isPreview ? 'Preview mode' : 'Fields mode'} · Click to expand
+                                  </p>
+                                )}
+                              </div>
+                            </button>
+                            {isExpanded ? (
+                              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl shrink-0">
                               <button
                                 type="button"
                                 onClick={() => setPreviewTab(prev => ({ ...prev, [secId]: false }))}
@@ -2568,9 +2677,11 @@ export default function AdvisorDashboard() {
                                 Preview
                               </button>
                             </div>
+                            ) : null}
                           </div>
 
-                          {!isPreview ? (
+                          {isExpanded && (
+                          !isPreview ? (
                             <div className="p-6">
                               {isHeroSection(sectionTemplateKey(section)) ? (
                                 (() => {
@@ -4516,6 +4627,7 @@ export default function AdvisorDashboard() {
                                 borderColor="border-[#C8102E]"
                               />
                             </div>
+                          )
                           )}
                         </div>
                       )
