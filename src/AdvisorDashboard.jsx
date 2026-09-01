@@ -1155,6 +1155,7 @@ export default function AdvisorDashboard() {
   const [templateRequests, setTemplateRequests] = useState([])
   const [availableTemplates, setAvailableTemplates] = useState([])
   const [templateSearch, setTemplateSearch] = useState('')
+  const [activeTab, setActiveTab] = useState('templates')
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [selectedTemplateName, setSelectedTemplateName] = useState('template4')
   const [domainName, setDomainName] = useState('')
@@ -1784,6 +1785,7 @@ export default function AdvisorDashboard() {
     setPreviewTab({})
     setActiveItemTab({})
     setExpandedEditors({})
+    setActiveTab('editor')
   }
 
   // Fetch pages for the selected deployed site
@@ -1828,8 +1830,9 @@ export default function AdvisorDashboard() {
     loadPages()
   }, [templateRequests, selectedDeploymentId])
 
-  const openDeploymentModal = (templateSlug) => {
+  const openDeploymentModal = (templateSlug, switchToDeployments = false) => {
     if (templateSlug) setSelectedTemplateName(templateSlug)
+    if (switchToDeployments) setActiveTab('deployments')
     setShowTemplateModal(true)
   }
 
@@ -1862,6 +1865,7 @@ export default function AdvisorDashboard() {
       setShowTemplateModal(false)
       setDomainName('')
       setLogoUrl('')
+      setActiveTab('deployments')
       fetchTemplateRequests()
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to submit template request.')
@@ -2277,6 +2281,12 @@ export default function AdvisorDashboard() {
     .filter((s) => isAdvisorVisibleSection(sectionTemplateKey(s)))
     .sort((a, b) => advisorSectionOrder(sectionTemplateKey(a)) - advisorSectionOrder(sectionTemplateKey(b)))
 
+  const tabs = [
+    { id: 'templates', label: 'Template Catalog', icon: FaThLarge, count: availableTemplates.length },
+    { id: 'deployments', label: 'Site Deployments', icon: FaRocket, count: templateRequests.length },
+    { id: 'editor', label: 'Content Editor', icon: FaEdit, count: checkedSectionIds.length },
+  ]
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-gray-50 to-slate-100 font-sans text-gray-800">
       <Navbar />
@@ -2294,7 +2304,7 @@ export default function AdvisorDashboard() {
             </div>
             <button
               type="button"
-              onClick={() => openDeploymentModal()}
+              onClick={() => openDeploymentModal(null, true)}
               className="inline-flex items-center gap-2 bg-[#0B1B3D] text-white text-sm font-bold px-5 py-3 rounded-xl hover:bg-[#07122A] transition shadow-lg shadow-[#0B1B3D]/20"
             >
               <FaPlus className="w-4 h-4" />
@@ -2368,8 +2378,37 @@ export default function AdvisorDashboard() {
         {message && <AlertBanner type="success" message={message} onDismiss={() => setMessage('')} />}
         {error && <AlertBanner type="error" message={error} onDismiss={() => setError('')} />}
 
-        {/* Showcase Template Catalog */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+        {/* Tabs */}
+        <div className="flex items-center gap-2 mb-6 flex-wrap">
+          {tabs.map(tab => {
+            const Icon = tab.icon
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition ${
+                  activeTab === tab.id
+                    ? 'bg-[#0B1B3D] text-white shadow-md'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {tab.label}
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                    activeTab === tab.id ? 'bg-white/20' : 'bg-gray-100 text-gray-500'
+                  }`}
+                >
+                  {tab.count}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {activeTab === 'templates' && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
               <h2 className="text-lg font-bold text-[#0B1B3D]">Showcase Templates</h2>
@@ -2459,8 +2498,9 @@ export default function AdvisorDashboard() {
             )}
           </div>
         </div>
+        )}
 
-        {/* Step 1: Template Deployment Status & Selection */}
+        {activeTab === 'deployments' && (
         <StepCard
           step={1}
           title="Site Deployments"
@@ -2527,16 +2567,17 @@ export default function AdvisorDashboard() {
             </p>
           )}
         </StepCard>
+        )}
 
-        {/* Step 2: Page Selection & Section Editing (Gated by Template Deployment) */}
-        {!hasDeployedSite ? (
+        {activeTab === 'editor' && (
+        !hasDeployedSite ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200/80 p-12 text-center">
             <div className="w-16 h-16 rounded-2xl bg-gray-100 text-gray-400 flex items-center justify-center mx-auto mb-4">
               <FaLock className="w-7 h-7" />
             </div>
             <h3 className="text-lg font-bold text-[#0B1B3D]">Section Editor Locked</h3>
             <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto leading-relaxed">
-              At least one deployment must be live before you can edit content. Request a deployment above — you can submit multiple requests for different domains.
+              At least one deployment must be live before you can edit content. Request a deployment from the Site Deployments tab.
             </p>
             {pendingRequests.length > 0 ? (
               <div className="mt-5 inline-flex items-center gap-2 bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold px-4 py-2.5 rounded-xl">
@@ -2546,7 +2587,10 @@ export default function AdvisorDashboard() {
             ) : (
               <button
                 type="button"
-                onClick={() => openDeploymentModal()}
+                onClick={() => {
+                  setActiveTab('deployments')
+                  openDeploymentModal()
+                }}
                 className="mt-5 inline-flex items-center gap-2 bg-[#0B1B3D] text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-[#07122A] transition shadow-md"
               >
                 <FaPlus className="w-3.5 h-3.5" />
@@ -4412,6 +4456,7 @@ export default function AdvisorDashboard() {
               </div>
             )}
           </div>
+        )
         )}
       </div>
 
