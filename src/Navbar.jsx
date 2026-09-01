@@ -42,7 +42,7 @@ export default function Navbar() {
         .toUpperCase() || '?'
 
     return (
-        <nav className="bg-[#0B1B3D] text-white border-b border-white/10 shadow-lg">
+        <nav className="sticky top-0 z-30 bg-[#0B1B3D] text-white border-b border-white/10 shadow-lg">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
                 {/* Brand */}
                 <div className="flex items-center gap-3 min-w-0">

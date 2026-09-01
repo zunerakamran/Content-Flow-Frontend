@@ -2595,9 +2595,6 @@ export default function AdvisorDashboard() {
                   <div className="space-y-4">
                     {checkedSectionIds.length > 1 && (
                       <div className="flex items-center justify-between flex-wrap gap-2 px-1">
-                        <p className="text-xs text-gray-500">
-                          {checkedSectionIds.length} section{checkedSectionIds.length === 1 ? '' : 's'} — expand only what you need
-                        </p>
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
@@ -2626,12 +2623,12 @@ export default function AdvisorDashboard() {
                       const SecIcon = sectionIcon(sectionTemplateKey(section))
 
                       return (
-                        <div key={secId} className="bg-white rounded-2xl shadow-sm border border-gray-200/80 overflow-hidden">
+                        <div key={secId} className="bg-white rounded-2xl shadow-sm border border-gray-200/80">
                           <div
                             className={`px-6 py-3 flex items-center justify-between flex-wrap gap-3 ${
                               isExpanded
-                                ? 'sticky top-16 z-20 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm'
-                                : 'bg-gray-50/80 hover:bg-gray-50 cursor-pointer'
+                                ? 'border-b border-gray-100'
+                                : 'bg-gray-50/80 hover:bg-gray-50 cursor-pointer rounded-2xl'
                             }`}
                           >
                             <button
@@ -2658,27 +2655,30 @@ export default function AdvisorDashboard() {
                                 )}
                               </div>
                             </button>
-                            {isExpanded ? (
-                              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl shrink-0">
-                              <button
-                                type="button"
-                                onClick={() => setPreviewTab(prev => ({ ...prev, [secId]: false }))}
-                                className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition ${!isPreview ? 'bg-white text-[#0B1B3D] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                              >
-                                <FaEdit className="w-3 h-3" />
-                                Fields
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setPreviewTab(prev => ({ ...prev, [secId]: true }))}
-                                className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition ${isPreview ? 'bg-white text-[#0B1B3D] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-                              >
-                                <FaEye className="w-3 h-3" />
-                                Preview
-                              </button>
-                            </div>
-                            ) : null}
                           </div>
+
+                          {isExpanded && (
+                            <div className="sticky top-16 z-20 px-6 py-2.5 flex items-center justify-end bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm">
+                              <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewTab(prev => ({ ...prev, [secId]: false }))}
+                                  className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition ${!isPreview ? 'bg-white text-[#0B1B3D] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                  <FaEdit className="w-3 h-3" />
+                                  Fields
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewTab(prev => ({ ...prev, [secId]: true }))}
+                                  className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition ${isPreview ? 'bg-white text-[#0B1B3D] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                                >
+                                  <FaEye className="w-3 h-3" />
+                                  Preview
+                                </button>
+                              </div>
+                            </div>
+                          )}
 
                           {isExpanded && (
                           !isPreview ? (
