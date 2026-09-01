@@ -54,6 +54,7 @@ import {
   FaChevronDown,
   FaSearch,
   FaThLarge,
+  FaArrowLeft,
 } from 'react-icons/fa'
 
 const LOCAL_TEMPLATE_IMAGES = [
@@ -1139,8 +1140,9 @@ function aboutPreviewPayload(values) {
   })
 }
 
-export default function AdvisorDashboard() {
+export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExitPowerAdmin = null } = {}) {
   const { user } = useAuth()
+  const isPowerAdminPublishMode = Boolean(powerAdminDeploymentId)
   const [pages, setPages] = useState([])
   const [selectedPageId, setSelectedPageId] = useState('')
   const [sections, setSections] = useState([])
@@ -1749,8 +1751,16 @@ export default function AdvisorDashboard() {
 
   useEffect(() => {
     fetchTemplateRequests()
-    fetchAvailableTemplates()
-  }, [])
+    if (!isPowerAdminPublishMode) {
+      fetchAvailableTemplates()
+    }
+  }, [isPowerAdminPublishMode])
+
+  useEffect(() => {
+    if (!isPowerAdminPublishMode || !powerAdminDeploymentId) return
+    setSelectedDeploymentId(powerAdminDeploymentId)
+    setActiveTab('editor')
+  }, [isPowerAdminPublishMode, powerAdminDeploymentId])
 
   const applyPages = (data) => {
     const list = Array.isArray(data) ? data : (data?.pages || [])
@@ -1874,13 +1884,14 @@ export default function AdvisorDashboard() {
     }
   }
 
-  const fetchAdvisorSections = async (pageId) => {
+  const fetchAdvisorSections = async (pageId, advisorIdOverride = null) => {
+    const advisorId = advisorIdOverride ?? (isPowerAdminPublishMode ? null : user?.id)
     const res = await api.get(`/pages/${pageId}/sections`, {
-      params: user?.id ? { advisor_id: user.id } : {},
+      params: advisorId ? { advisor_id: advisorId } : {},
     })
     const list = Array.isArray(res.data) ? res.data : []
-    if (!user?.id) return list
-    return list.filter(s => String(s.advisor_id) === String(user.id))
+    if (!advisorId) return list
+    return list.filter(s => String(s.advisor_id) === String(advisorId))
   }
 
   const handlePageSelect = async (pageId) => {
@@ -1895,8 +1906,17 @@ export default function AdvisorDashboard() {
       return
     }
 
-    const sectionsForAdvisor = await fetchAdvisorSections(pageId)
+    const deployment = templateRequests.find(
+      r => r.id === (powerAdminDeploymentId || selectedDeploymentId) && r.status === 'deployed'
+    ) || templateRequests.find(r => r.status === 'deployed')
+    const targetAdvisorId = deployment?.advisor_id ?? deployment?.assigned_advisor_id ?? null
+
+    const sectionsForAdvisor = await fetchAdvisorSections(pageId, targetAdvisorId)
     setSections(sectionsForAdvisor)
+
+    if (isPowerAdminPublishMode) {
+      return
+    }
 
     const lockedByMeIds = sectionsForAdvisor
       .filter(s => s.is_locked && s.locked_by === user?.id && isAdvisorVisibleSection(sectionTemplateKey(s)))
@@ -1941,12 +1961,53 @@ export default function AdvisorDashboard() {
     setError('')
 
     if (!isChecked) {
+      if (isPowerAdminPublishMode) {
+        setCheckedSectionIds(prev => prev.filter(id => id !== section.id))
+        setSectionEdits(prev => {
+          const next = { ...prev }
+          delete next[section.id]
+          return next
+        })
+        return
+      }
       setError(`Cannot unlock section "${sectionDisplayName(section)}". Sections remain locked until submitted or reviewed by an approver.`)
       return
     }
 
-    if (section.is_locked && section.locked_by !== user?.id) {
+    if (!isPowerAdminPublishMode && section.is_locked && section.locked_by !== user?.id) {
       setError(`Section "${sectionDisplayName(section)}" is locked by ${section.locked_by_user?.name || 'another advisor'}.`)
+      return
+    }
+
+    const parsed = parseJson(section.content)
+    const editorContent = isAboutSection(sectionTemplateKey(section))
+      ? normalizeAboutEditorContent(parsed)
+      : isCompanyHistorySection(sectionTemplateKey(section))
+        ? normalizeCompanyHistoryEditorContent(parsed)
+        : isFeaturedServicesSection(sectionTemplateKey(section))
+          ? normalizeFeaturedServicesEditorContent(parsed)
+          : isAnnualProgressionSection(sectionTemplateKey(section))
+            ? normalizeAnnualProgressionEditorContent(parsed)
+            : isPortfolioSection(sectionTemplateKey(section))
+              ? normalizePortfolioEditorContent(parsed)
+              : isBranchesSection(sectionTemplateKey(section))
+                ? normalizeBranchesEditorContent(parsed)
+                : isCounterStatsSection(sectionTemplateKey(section))
+                  ? normalizeCounterStatsEditorContent(parsed)
+                  : isTestimonialsSection(sectionTemplateKey(section))
+                    ? normalizeTestimonialsEditorContent(parsed)
+                    : isLatestNewsSection(sectionTemplateKey(section))
+                      ? normalizeLatestNewsEditorContent(parsed)
+                      : isClientLogosSection(sectionTemplateKey(section))
+                        ? normalizeClientLogosEditorContent(parsed)
+                        : isCtaBannerSection(sectionTemplateKey(section))
+                          ? normalizeCtaBannerEditorContent(parsed)
+                          : parsed
+
+    if (isPowerAdminPublishMode) {
+      setCheckedSectionIds(prev => [...new Set([...prev, section.id])])
+      setSectionEdits(prev => ({ ...prev, [section.id]: editorContent }))
+      setMessage(`Section "${sectionDisplayName(section)}" selected for editing. Changes publish directly to the live site.`)
       return
     }
 
@@ -1957,32 +2018,9 @@ export default function AdvisorDashboard() {
       }
 
       setCheckedSectionIds(prev => [...new Set([...prev, section.id])])
-      const parsed = parseJson(section.content)
       setSectionEdits(prev => ({
         ...prev,
-        [section.id]: isAboutSection(sectionTemplateKey(section))
-          ? normalizeAboutEditorContent(parsed)
-          : isCompanyHistorySection(sectionTemplateKey(section))
-            ? normalizeCompanyHistoryEditorContent(parsed)
-            : isFeaturedServicesSection(sectionTemplateKey(section))
-              ? normalizeFeaturedServicesEditorContent(parsed)
-              : isAnnualProgressionSection(sectionTemplateKey(section))
-                ? normalizeAnnualProgressionEditorContent(parsed)
-                : isPortfolioSection(sectionTemplateKey(section))
-                  ? normalizePortfolioEditorContent(parsed)
-                  : isBranchesSection(sectionTemplateKey(section))
-                    ? normalizeBranchesEditorContent(parsed)
-                    : isCounterStatsSection(sectionTemplateKey(section))
-                      ? normalizeCounterStatsEditorContent(parsed)
-                      : isTestimonialsSection(sectionTemplateKey(section))
-                        ? normalizeTestimonialsEditorContent(parsed)
-                        : isLatestNewsSection(sectionTemplateKey(section))
-                          ? normalizeLatestNewsEditorContent(parsed)
-                          : isClientLogosSection(sectionTemplateKey(section))
-                            ? normalizeClientLogosEditorContent(parsed)
-                            : isCtaBannerSection(sectionTemplateKey(section))
-                              ? normalizeCtaBannerEditorContent(parsed)
-                              : parsed
+        [section.id]: editorContent,
       }))
       setMessage(`🔒 Section "${sectionDisplayName(section)}" locked for you. You can now edit its content.`)
     } catch (err) {
@@ -2197,6 +2235,12 @@ export default function AdvisorDashboard() {
                       : section && isCtaBannerSection(sectionTemplateKey(section))
                         ? normalizeCtaBannerEditorContent(raw)
                         : raw
+      if (isPowerAdminPublishMode) {
+        return {
+          section_id: secId,
+          content: JSON.stringify(content, null, 2),
+        }
+      }
       return {
         section_id: secId,
         current_content: section?.content || '',
@@ -2205,17 +2249,29 @@ export default function AdvisorDashboard() {
     })
 
     try {
-      await api.post('/change-requests', { section_edits: batchPayload })
-      setMessage(`🎉 Successfully submitted a single request containing edits for ${checkedSectionIds.length} section(s).`)
+      if (isPowerAdminPublishMode) {
+        await api.post(`/template-requests/${powerAdminDeploymentId}/publish-content`, { section_edits: batchPayload })
+        setMessage(`Published ${checkedSectionIds.length} section(s) directly to the live site.`)
+      } else {
+        await api.post('/change-requests', { section_edits: batchPayload })
+        setMessage(`🎉 Successfully submitted a single request containing edits for ${checkedSectionIds.length} section(s).`)
+      }
 
       if (selectedPageId) {
-        const refreshed = await fetchAdvisorSections(selectedPageId)
+        const deployment = templateRequests.find(
+          r => r.id === (powerAdminDeploymentId || selectedDeploymentId) && r.status === 'deployed'
+        ) || templateRequests.find(r => r.status === 'deployed')
+        const targetAdvisorId = deployment?.advisor_id ?? deployment?.assigned_advisor_id ?? null
+        const refreshed = await fetchAdvisorSections(selectedPageId, targetAdvisorId)
         setSections(refreshed)
       }
       setCheckedSectionIds([])
       setSectionEdits({})
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to submit change request.')
+      setError(
+        err.response?.data?.message
+          || (isPowerAdminPublishMode ? 'Failed to publish content to the live site.' : 'Failed to submit change request.')
+      )
     } finally {
       setIsSubmitting(false)
     }
@@ -2226,9 +2282,12 @@ export default function AdvisorDashboard() {
   const deployedRequests = templateRequests.filter(r => r.status === 'deployed')
   const pendingRequests = templateRequests.filter(r => r.status === 'pending')
   const rejectedRequests = templateRequests.filter(r => r.status === 'rejected')
-  const activeDeployment =
-    deployedRequests.find(r => r.id === selectedDeploymentId) || deployedRequests[0] || null
-  const hasDeployedSite = deployedRequests.length > 0
+  const activeDeployment = isPowerAdminPublishMode
+    ? deployedRequests.find(r => r.id === powerAdminDeploymentId) || null
+    : deployedRequests.find(r => r.id === selectedDeploymentId) || deployedRequests[0] || null
+  const hasDeployedSite = isPowerAdminPublishMode
+    ? Boolean(activeDeployment)
+    : deployedRequests.length > 0
 
   const getItemTab = (secId, group, fallback = 0) => activeItemTab[itemTabKey(secId, group)] ?? fallback
   const selectItemTab = (secId, group, index) => {
@@ -2281,11 +2340,13 @@ export default function AdvisorDashboard() {
     .filter((s) => isAdvisorVisibleSection(sectionTemplateKey(s)))
     .sort((a, b) => advisorSectionOrder(sectionTemplateKey(a)) - advisorSectionOrder(sectionTemplateKey(b)))
 
-  const tabs = [
-    { id: 'templates', label: 'Template Catalog', icon: FaThLarge, count: availableTemplates.length },
-    { id: 'deployments', label: 'Site Deployments', icon: FaRocket, count: templateRequests.length },
-    { id: 'editor', label: 'Content Editor', icon: FaEdit, count: checkedSectionIds.length },
-  ]
+  const tabs = isPowerAdminPublishMode
+    ? [{ id: 'editor', label: 'Content Editor', icon: FaEdit, count: checkedSectionIds.length }]
+    : [
+        { id: 'templates', label: 'Template Catalog', icon: FaThLarge, count: availableTemplates.length },
+        { id: 'deployments', label: 'Site Deployments', icon: FaRocket, count: templateRequests.length },
+        { id: 'editor', label: 'Content Editor', icon: FaEdit, count: checkedSectionIds.length },
+      ]
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-100 via-gray-50 to-slate-100 font-sans text-gray-800">
@@ -2296,20 +2357,44 @@ export default function AdvisorDashboard() {
         <div className="mb-8">
           <div className="flex items-start justify-between flex-wrap gap-4 mb-6">
             <div>
-              <p className="text-xs font-extrabold text-[#C8102E] uppercase tracking-widest mb-1">Advisor Console</p>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1B3D] tracking-tight">Content Management</h1>
-              <p className="text-gray-500 text-sm mt-2 max-w-xl">
-                Request multiple showcase sites, manage deployments, and edit content for each live site.
+              <p className="text-xs font-extrabold text-[#C8102E] uppercase tracking-widest mb-1">
+                {isPowerAdminPublishMode ? 'Power Admin — Direct Publish' : 'Advisor Console'}
               </p>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1B3D] tracking-tight">
+                {isPowerAdminPublishMode ? 'Edit Deployment Content' : 'Content Management'}
+              </h1>
+              <p className="text-gray-500 text-sm mt-2 max-w-xl">
+                {isPowerAdminPublishMode
+                  ? 'Edit section content for this deployed site. Changes are published directly to the live site without approver review.'
+                  : 'Request multiple showcase sites, manage deployments, and edit content for each live site.'}
+              </p>
+              {isPowerAdminPublishMode && activeDeployment && (
+                <p className="text-xs text-gray-500 mt-2">
+                  Editing: <strong className="text-[#0B1B3D]">{activeDeployment.advisor?.name || 'Advisor'}</strong>
+                  {' · '}
+                  <span className="font-mono">{activeDeployment.domain_name || activeDeployment.cpanel_domain}</span>
+                </p>
+              )}
             </div>
-            <button
-              type="button"
-              onClick={() => openDeploymentModal(null, true)}
-              className="inline-flex items-center gap-2 bg-[#0B1B3D] text-white text-sm font-bold px-5 py-3 rounded-xl hover:bg-[#07122A] transition shadow-lg shadow-[#0B1B3D]/20"
-            >
-              <FaPlus className="w-4 h-4" />
-              New Deployment
-            </button>
+            {isPowerAdminPublishMode ? (
+              <button
+                type="button"
+                onClick={() => onExitPowerAdmin?.()}
+                className="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 text-sm font-bold px-5 py-3 rounded-xl hover:bg-gray-50 transition shadow-sm"
+              >
+                <FaArrowLeft className="w-4 h-4" />
+                Back to Deployments
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => openDeploymentModal(null, true)}
+                className="inline-flex items-center gap-2 bg-[#0B1B3D] text-white text-sm font-bold px-5 py-3 rounded-xl hover:bg-[#07122A] transition shadow-lg shadow-[#0B1B3D]/20"
+              >
+                <FaPlus className="w-4 h-4" />
+                New Deployment
+              </button>
+            )}
           </div>
 
           {/* Quick stats */}
@@ -2359,7 +2444,9 @@ export default function AdvisorDashboard() {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Editing</p>
-                  <p className="text-sm font-extrabold text-[#0B1B3D]">{checkedSectionIds.length} locked</p>
+                  <p className="text-sm font-extrabold text-[#0B1B3D]">
+                    {checkedSectionIds.length} {isPowerAdminPublishMode ? 'selected' : 'locked'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -2367,12 +2454,14 @@ export default function AdvisorDashboard() {
         </div>
 
         {/* Workflow progress */}
+        {!isPowerAdminPublishMode && (
         <WorkflowStepper
           isSiteDeployed={hasDeployedSite}
           hasPage={Boolean(selectedPageId)}
           hasSections={checkedSectionIds.length > 0}
           isComplete={false}
         />
+        )}
 
         {/* Global Notifications */}
         {message && <AlertBanner type="success" message={message} onDismiss={() => setMessage('')} />}
@@ -2575,11 +2664,24 @@ export default function AdvisorDashboard() {
             <div className="w-16 h-16 rounded-2xl bg-gray-100 text-gray-400 flex items-center justify-center mx-auto mb-4">
               <FaLock className="w-7 h-7" />
             </div>
-            <h3 className="text-lg font-bold text-[#0B1B3D]">Section Editor Locked</h3>
+            <h3 className="text-lg font-bold text-[#0B1B3D]">
+              {isPowerAdminPublishMode ? 'Deployment Not Available' : 'Section Editor Locked'}
+            </h3>
             <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto leading-relaxed">
-              At least one deployment must be live before you can edit content. Request a deployment from the Site Deployments tab.
+              {isPowerAdminPublishMode
+                ? 'This deployment was not found or is not live yet. Return to the deployment hub and try again.'
+                : 'At least one deployment must be live before you can edit content. Request a deployment from the Site Deployments tab.'}
             </p>
-            {pendingRequests.length > 0 ? (
+            {isPowerAdminPublishMode ? (
+              <button
+                type="button"
+                onClick={() => onExitPowerAdmin?.()}
+                className="mt-5 inline-flex items-center gap-2 bg-[#0B1B3D] text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-[#07122A] transition shadow-md"
+              >
+                <FaArrowLeft className="w-3.5 h-3.5" />
+                Back to Deployments
+              </button>
+            ) : pendingRequests.length > 0 ? (
               <div className="mt-5 inline-flex items-center gap-2 bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold px-4 py-2.5 rounded-xl">
                 <FaClock className="w-3.5 h-3.5" />
                 {pendingRequests.length} deployment{pendingRequests.length === 1 ? '' : 's'} pending review
@@ -2600,7 +2702,7 @@ export default function AdvisorDashboard() {
           </div>
         ) : (
           <div>
-            {deployedRequests.length > 1 && (
+            {!isPowerAdminPublishMode && deployedRequests.length > 1 && (
               <StepCard
                 step={2}
                 title="Select Active Site"
@@ -2662,15 +2764,19 @@ export default function AdvisorDashboard() {
             {selectedPage && (
               <div className="space-y-8">
                 <StepCard
-                  step={deployedRequests.length > 1 ? 4 : 3}
+                  step={deployedRequests.length > 1 && !isPowerAdminPublishMode ? 4 : 3}
                   title={`Select Sections — ${selectedPage.title}`}
-                  description="Check sections to lock them for editing. Locked sections appear in the editor below."
+                  description={
+                    isPowerAdminPublishMode
+                      ? 'Check sections to edit them. Changes publish directly to the live site when you click Publish to Live.'
+                      : 'Check sections to lock them for editing. Locked sections appear in the editor below.'
+                  }
                   defaultOpen={checkedSectionIds.length === 0}
                   badge={
                     checkedSectionIds.length > 0 ? (
                       <span className="inline-flex items-center gap-1.5 text-xs bg-[#C8102E]/10 text-[#C8102E] font-bold px-3 py-1.5 rounded-full border border-[#C8102E]/20">
-                        <FaLock className="w-3 h-3" />
-                        {checkedSectionIds.length} locked
+                        {isPowerAdminPublishMode ? <FaEdit className="w-3 h-3" /> : <FaLock className="w-3 h-3" />}
+                        {checkedSectionIds.length} {isPowerAdminPublishMode ? 'selected' : 'locked'}
                       </span>
                     ) : null
                   }
@@ -2678,8 +2784,8 @@ export default function AdvisorDashboard() {
                   <div className="grid sm:grid-cols-2 gap-3">
                     {visibleSections.map(section => {
                       const isChecked = checkedSectionIds.includes(section.id)
-                      const isLockedByMe = section.is_locked && section.locked_by === user?.id
-                      const isLockedByOther = section.is_locked && section.locked_by !== user?.id
+                      const isLockedByMe = !isPowerAdminPublishMode && section.is_locked && section.locked_by === user?.id
+                      const isLockedByOther = !isPowerAdminPublishMode && section.is_locked && section.locked_by !== user?.id
                       const SecIcon = sectionIcon(sectionTemplateKey(section))
 
                       return (
@@ -2696,7 +2802,7 @@ export default function AdvisorDashboard() {
                           <input
                             type="checkbox"
                             checked={isChecked || isLockedByMe}
-                            disabled={isLockedByOther || isChecked || isLockedByMe}
+                            disabled={isLockedByOther || (!isPowerAdminPublishMode && (isChecked || isLockedByMe))}
                             onChange={(e) => handleSectionCheckboxChange(section, e.target.checked)}
                             className="w-4 h-4 mt-1 text-[#C8102E] rounded border-gray-300 focus:ring-[#C8102E] shrink-0"
                           />
@@ -4438,7 +4544,9 @@ export default function AdvisorDashboard() {
                         className="inline-flex items-center gap-2 bg-[#C8102E] text-white text-base font-extrabold px-8 py-3.5 rounded-xl hover:bg-[#A00C23] shadow-lg shadow-[#C8102E]/25 transition disabled:opacity-50"
                       >
                         <FaPaperPlane className="w-4 h-4" />
-                        {isSubmitting ? 'Submitting...' : 'Submit All Section Edits'}
+                        {isSubmitting
+                          ? (isPowerAdminPublishMode ? 'Publishing...' : 'Submitting...')
+                          : (isPowerAdminPublishMode ? 'Publish to Live' : 'Submit All Section Edits')}
                       </button>
                     </div>
                   </div>
@@ -4449,7 +4557,9 @@ export default function AdvisorDashboard() {
                     </div>
                     <h3 className="text-lg font-bold text-[#0B1B3D]">No Sections Selected</h3>
                     <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
-                      Select one or more sections above to lock them and start editing content.
+                      {isPowerAdminPublishMode
+                        ? 'Select one or more sections above to start editing content.'
+                        : 'Select one or more sections above to lock them and start editing content.'}
                     </p>
                   </div>
                 )}

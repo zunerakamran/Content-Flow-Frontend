@@ -8,6 +8,7 @@ const AdvisorDashboard = lazy(() => import('./AdvisorDashboard'))
 const ApproverDashboard = lazy(() => import('./ApproverDashboard'))
 const ManagerDashboard = lazy(() => import('./ManagerDashboard'))
 const PowerAdminDashboard = lazy(() => import('./PowerAdminDashboard'))
+const PowerAdminSectionEditor = lazy(() => import('./PowerAdminSectionEditor'))
 const ClientAdminDashboard = lazy(() => import('./ClientAdminDashboard'))
 
 const DashboardFallback = () => (
@@ -59,6 +60,17 @@ const AppRoutes = () => {
           )}
         />
       ))}
+
+      <Route
+        path="/power_admin/deployments/:deploymentId/edit"
+        element={(
+          <PrivateRoute roles={['power_admin']}>
+            <Suspense fallback={<DashboardFallback />}>
+              <PowerAdminSectionEditor />
+            </Suspense>
+          </PrivateRoute>
+        )}
+      />
 
       <Route path="/dashboard/:role" element={<LegacyDashboardRedirect />} />
       <Route path="*" element={<Navigate to="/" replace />} />

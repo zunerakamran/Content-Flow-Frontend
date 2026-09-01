@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import {
     FaPlus,
     FaEdit,
@@ -20,6 +21,7 @@ import {
     FaEyeSlash,
     FaThLarge,
     FaList,
+    FaPen,
 } from 'react-icons/fa'
 import Navbar from './Navbar'
 import api from './api/axios'
@@ -408,14 +410,23 @@ export default function PowerAdminDashboard() {
     const renderRequestActions = req => (
         <div className="flex items-center gap-2 flex-wrap">
             {req.status === 'deployed' && (
-                <button
-                    type="button"
-                    onClick={() => openSectionManageModal(req)}
-                    className="inline-flex items-center gap-1.5 bg-white border border-[#0B1B3D] text-[#0B1B3D] text-xs font-bold px-3 py-2 rounded-lg hover:bg-slate-50 transition"
-                >
-                    <FaLayerGroup className="w-3 h-3" />
-                    Sections
-                </button>
+                <>
+                    <Link
+                        to={`/power_admin/deployments/${req.id}/edit`}
+                        className="inline-flex items-center gap-1.5 bg-[#C8102E] text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-[#A00C23] transition shadow-sm"
+                    >
+                        <FaPen className="w-3 h-3" />
+                        Edit Content
+                    </Link>
+                    <button
+                        type="button"
+                        onClick={() => openSectionManageModal(req)}
+                        className="inline-flex items-center gap-1.5 bg-white border border-[#0B1B3D] text-[#0B1B3D] text-xs font-bold px-3 py-2 rounded-lg hover:bg-slate-50 transition"
+                    >
+                        <FaLayerGroup className="w-3 h-3" />
+                        Sections
+                    </button>
+                </>
             )}
             <button
                 type="button"
@@ -447,7 +458,7 @@ export default function PowerAdminDashboard() {
                     <div>
                         <h1 className="text-3xl font-extrabold text-[#0B1B3D]">Template & Deployment Hub</h1>
                         <p className="text-gray-500 text-sm mt-1 max-w-2xl">
-                            Register showcase templates, deploy advisor websites to cPanel, and manage live section visibility.
+                            Register showcase templates, deploy advisor websites to cPanel, edit live section content, and manage section visibility.
                         </p>
                     </div>
 
