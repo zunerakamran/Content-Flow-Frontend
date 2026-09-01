@@ -2658,7 +2658,15 @@ export default function AdvisorDashboard() {
                           </div>
 
                           {isExpanded && (
-                            <div className="sticky top-16 z-20 px-6 py-2.5 flex items-center justify-end bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm">
+                            <div className="sticky top-16 z-20 px-6 py-2.5 flex items-center justify-between gap-3 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="w-8 h-8 rounded-lg bg-[#C8102E] text-white flex items-center justify-center shadow-sm shrink-0">
+                                  <SecIcon className="w-3.5 h-3.5" />
+                                </div>
+                                <h3 className="text-sm font-bold text-[#0B1B3D] truncate">
+                                  {sectionDisplayName(section)}
+                                </h3>
+                              </div>
                               <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl shrink-0">
                                 <button
                                   type="button"
