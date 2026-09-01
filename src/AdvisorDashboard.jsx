@@ -2481,23 +2481,6 @@ export default function AdvisorDashboard() {
 
                 {checkedSectionIds.length > 0 ? (
                   <div className="space-y-6">
-                    <div className="sticky top-0 z-20 flex items-center justify-between bg-gradient-to-r from-[#0B1B3D] to-[#132952] text-white px-6 py-4 rounded-2xl shadow-lg border border-white/10">
-                      <div>
-                        <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-0.5">Step {deployedRequests.length > 1 ? 5 : 4}</p>
-                        <h2 className="text-lg font-bold">Edit & Submit Changes</h2>
-                        <p className="text-xs text-white/60 mt-0.5">All edits are submitted together as one request.</p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={handleBatchSubmit}
-                        disabled={isSubmitting}
-                        className="inline-flex items-center gap-2 bg-[#C8102E] text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-[#A00C23] shadow-lg shadow-[#C8102E]/30 transition disabled:opacity-50"
-                      >
-                        <FaPaperPlane className="w-4 h-4" />
-                        {isSubmitting ? 'Submitting...' : 'Submit All'}
-                      </button>
-                    </div>
-
                     {checkedSectionIds.map(secId => {
                       const section = visibleSections.find(s => s.id === secId)
                       if (!section) return null
@@ -2506,15 +2489,15 @@ export default function AdvisorDashboard() {
                       const SecIcon = sectionIcon(sectionTemplateKey(section))
 
                       return (
-                        <div key={secId} className="bg-white rounded-2xl shadow-sm border border-gray-200/80 overflow-hidden">
-                          <div className="bg-gradient-to-r from-slate-50 to-white border-b border-gray-100 px-6 py-4 flex items-center justify-between flex-wrap gap-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-lg bg-[#C8102E] text-white flex items-center justify-center shadow-sm">
+                        <div key={secId} className="bg-white rounded-2xl shadow-sm border border-gray-200/80">
+                          <div className="sticky top-16 z-20 bg-white/95 backdrop-blur-sm border-b border-gray-100 px-6 py-3 flex items-center justify-between flex-wrap gap-3 shadow-sm">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-lg bg-[#C8102E] text-white flex items-center justify-center shadow-sm shrink-0">
                                 <SecIcon className="w-4 h-4" />
                               </div>
-                              <h3 className="text-base font-bold text-[#0B1B3D]">{sectionDisplayName(section)}</h3>
+                              <h3 className="text-base font-bold text-[#0B1B3D] truncate">{sectionDisplayName(section)}</h3>
                             </div>
-                            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
+                            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl shrink-0">
                               <button
                                 type="button"
                                 onClick={() => setPreviewTab(prev => ({ ...prev, [secId]: false }))}
