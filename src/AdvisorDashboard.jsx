@@ -2624,49 +2624,42 @@ export default function AdvisorDashboard() {
 
                       return (
                         <div key={secId} className="bg-white rounded-2xl shadow-sm border border-gray-200/80">
-                          <div
-                            className={`px-6 py-3 flex items-center justify-between flex-wrap gap-3 ${
-                              isExpanded
-                                ? 'border-b border-gray-100'
-                                : 'bg-gray-50/80 hover:bg-gray-50 cursor-pointer rounded-2xl'
-                            }`}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => toggleEditorExpanded(secId)}
-                              className="flex items-center gap-3 min-w-0 flex-1 text-left group"
-                            >
-                              <FaChevronDown
-                                className={`w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-200 group-hover:text-[#C8102E] ${
-                                  isExpanded ? 'rotate-180' : ''
-                                }`}
-                              />
-                              <div className="w-9 h-9 rounded-lg bg-[#C8102E] text-white flex items-center justify-center shadow-sm shrink-0">
-                                <SecIcon className="w-4 h-4" />
-                              </div>
-                              <div className="min-w-0">
-                                <h3 className="text-base font-bold text-[#0B1B3D] truncate group-hover:text-[#C8102E] transition-colors">
-                                  {sectionDisplayName(section)}
-                                </h3>
-                                {!isExpanded && (
+                          {!isExpanded ? (
+                            <div className="px-6 py-3 flex items-center justify-between flex-wrap gap-3 bg-gray-50/80 hover:bg-gray-50 cursor-pointer rounded-2xl">
+                              <button
+                                type="button"
+                                onClick={() => toggleEditorExpanded(secId)}
+                                className="flex items-center gap-3 min-w-0 flex-1 text-left group"
+                              >
+                                <FaChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-200 group-hover:text-[#C8102E]" />
+                                <div className="w-9 h-9 rounded-lg bg-[#C8102E] text-white flex items-center justify-center shadow-sm shrink-0">
+                                  <SecIcon className="w-4 h-4" />
+                                </div>
+                                <div className="min-w-0">
+                                  <h3 className="text-base font-bold text-[#0B1B3D] truncate group-hover:text-[#C8102E] transition-colors">
+                                    {sectionDisplayName(section)}
+                                  </h3>
                                   <p className="text-[11px] text-gray-400 mt-0.5">
                                     {isPreview ? 'Preview mode' : 'Fields mode'} · Click to expand
                                   </p>
-                                )}
-                              </div>
-                            </button>
-                          </div>
-
-                          {isExpanded && (
-                            <div className="sticky top-16 z-20 px-6 py-2.5 flex items-center justify-between gap-3 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm">
-                              <div className="flex items-center gap-2.5 min-w-0">
+                                </div>
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="sticky top-16 z-20 px-6 py-2.5 flex items-center justify-between gap-3 bg-white/95 backdrop-blur-sm border-b border-gray-100 shadow-sm rounded-t-2xl">
+                              <button
+                                type="button"
+                                onClick={() => toggleEditorExpanded(secId)}
+                                className="flex items-center gap-2.5 min-w-0 flex-1 text-left group"
+                              >
+                                <FaChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0 transition-transform duration-200 rotate-180 group-hover:text-[#C8102E]" />
                                 <div className="w-8 h-8 rounded-lg bg-[#C8102E] text-white flex items-center justify-center shadow-sm shrink-0">
                                   <SecIcon className="w-3.5 h-3.5" />
                                 </div>
-                                <h3 className="text-sm font-bold text-[#0B1B3D] truncate">
+                                <h3 className="text-sm font-bold text-[#0B1B3D] truncate group-hover:text-[#C8102E] transition-colors">
                                   {sectionDisplayName(section)}
                                 </h3>
-                              </div>
+                              </button>
                               <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl shrink-0">
                                 <button
                                   type="button"
