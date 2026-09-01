@@ -1085,7 +1085,7 @@ export default function PowerAdminDashboard() {
                     title="Deploy to cPanel"
                     subtitle={
                         <>
-                            Domain: <strong>{selectedRequest.domain_name}</strong> · Template:{' '}
+                            Domain: {sectionManageRequest.domain} · Template:{' '}
                             <strong>{selectedRequest.template_name || 'template4'}</strong>
                         </>
                     }
@@ -1098,7 +1098,7 @@ export default function PowerAdminDashboard() {
                             <input
                                 type="url"
                                 required
-                                placeholder="https://webiste-template"
+                                placeholder="https://website-template"
                                 value={cpanelDomain}
                                 onChange={e => setCpanelDomain(e.target.value)}
                                 className={inputClass}
