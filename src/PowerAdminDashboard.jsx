@@ -958,7 +958,6 @@ export default function PowerAdminDashboard() {
                     subtitle={
                         <>
                             {sectionManageRequest.advisor?.name || 'Advisor'} —{' '}
-                            {sectionManageRequest.domain_name || sectionManageRequest.domain}
                             {sectionManageRequest.cpanel_domain && (
                                 <>
                                     {' '}
@@ -1097,13 +1096,6 @@ export default function PowerAdminDashboard() {
                     maxWidth="max-w-xl"
                 >
                     <form onSubmit={handleDeploySubmit} className="space-y-4">
-                        <div className="p-3 rounded-xl bg-blue-50 border border-blue-100 text-xs text-blue-800 flex items-start gap-2">
-                            <FaServer className="w-4 h-4 shrink-0 mt-0.5" />
-                            <span>
-                                Enter the advisor template folder URL where <code className="font-mono">api.php</code>{' '}
-                                lives — e.g. <code className="font-mono">https://epatronus.space/template4</code>
-                            </span>
-                        </div>
 
                         <div>
                             <label className={labelClass}>Advisor Site URL *</label>
