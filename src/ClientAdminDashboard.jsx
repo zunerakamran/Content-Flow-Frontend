@@ -1,27 +1,96 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import {
+  FaTimes,
+  FaSync,
+  FaSearch,
+  FaUser,
+  FaClock,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaUsers,
+  FaListAlt,
+  FaChartBar,
+  FaDownload,
+  FaBuilding,
+  FaCalendarDay,
+  FaCalendarWeek,
+  FaHistory,
+  FaFilter,
+} from 'react-icons/fa'
 import Navbar from './Navbar'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 
-function actionBadge(action) {
+const ACTION_COLORS = {
+  approved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+  rejected: 'bg-rose-100 text-rose-800 border-rose-200',
+  submitted: 'bg-amber-100 text-amber-800 border-amber-200',
+  deployed: 'bg-blue-100 text-blue-800 border-blue-200',
+  assigned: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+  created: 'bg-teal-100 text-teal-800 border-teal-200',
+  updated: 'bg-sky-100 text-sky-800 border-sky-200',
+  deleted: 'bg-red-100 text-red-800 border-red-200',
+  login: 'bg-violet-100 text-violet-800 border-violet-200',
+  logout: 'bg-slate-100 text-slate-800 border-slate-200',
+}
+
+const BREAKDOWN_BAR_COLORS = [
+  'bg-[#0B1B3D]',
+  'bg-[#C8102E]',
+  'bg-blue-500',
+  'bg-emerald-500',
+  'bg-purple-500',
+  'bg-amber-500',
+]
+
+function ActionBadge({ action }) {
   const normalized = action?.toLowerCase().replace(/_/g, ' ') || 'unknown'
-  const colors = {
-    approved: 'bg-emerald-100 text-emerald-800',
-    rejected: 'bg-rose-100 text-rose-800',
-    submitted: 'bg-amber-100 text-amber-800',
-    deployed: 'bg-blue-100 text-blue-800',
-    assigned: 'bg-indigo-100 text-indigo-800',
-    created: 'bg-teal-100 text-teal-800',
-    updated: 'bg-sky-100 text-sky-800',
-    deleted: 'bg-red-100 text-red-800',
-    login: 'bg-violet-100 text-violet-800',
-    logout: 'bg-slate-100 text-slate-800',
-  }
   const key = action?.toLowerCase()
   return (
-    <span className={`text-xs font-bold px-2.5 py-1 rounded-full capitalize ${colors[key] || 'bg-gray-100 text-gray-700'}`}>
+    <span className={`inline-flex items-center text-[11px] font-bold px-2 py-0.5 rounded-full capitalize border ${ACTION_COLORS[key] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
       {normalized}
     </span>
+  )
+}
+
+function RoleBadge({ role }) {
+  return (
+    <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border bg-slate-100 text-slate-800 border-slate-200">
+      {role?.replace(/_/g, ' ')}
+    </span>
+  )
+}
+
+function AlertBanner({ message, onDismiss }) {
+  return (
+    <div
+      className="bg-rose-50 border-l-4 border-rose-500 text-rose-800 p-4 mb-6 rounded-lg shadow-sm flex items-start justify-between gap-3 text-sm font-medium"
+      role="alert"
+    >
+      <span className="flex-1">{message}</span>
+      <button
+        type="button"
+        onClick={onDismiss}
+        className="shrink-0 p-1 rounded hover:bg-black/5 transition"
+        aria-label="Dismiss"
+      >
+        <FaTimes className="w-4 h-4" />
+      </button>
+    </div>
+  )
+}
+
+function StatCard({ label, value, icon: Icon, accent }) {
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-3 sm:gap-4">
+      <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shrink-0 ${accent}`}>
+        <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-xl sm:text-2xl font-extrabold text-[#0B1B3D] leading-none">{value}</p>
+        <p className="text-[11px] sm:text-xs text-gray-500 font-semibold mt-1 truncate">{label}</p>
+      </div>
+    </div>
   )
 }
 
@@ -56,6 +125,36 @@ function exportLogsToCsv(logs) {
   link.download = `activity-report-${new Date().toISOString().slice(0, 10)}.csv`
   link.click()
   URL.revokeObjectURL(url)
+}
+
+function ActivityRow({ log, showIndex, index }) {
+  return (
+    <div className="px-5 py-4 hover:bg-gray-50/80 transition flex flex-col sm:flex-row sm:items-start gap-3 sm:gap-6">
+      {showIndex && (
+        <span className="text-xs text-gray-400 font-bold shrink-0 sm:w-6">{index}</span>
+      )}
+      <div className="flex items-center gap-3 min-w-0 sm:w-44 shrink-0">
+        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+          <FaUser className="w-3.5 h-3.5 text-slate-500" />
+        </div>
+        <span className="font-semibold text-gray-800 text-sm truncate">
+          {log.user?.name || 'System'}
+        </span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <ActionBadge action={log.action} />
+        {(log.details || log.description) && (
+          <p className="text-sm text-gray-500 mt-1.5 leading-relaxed">
+            {log.details || log.description}
+          </p>
+        )}
+      </div>
+      <div className="text-xs text-gray-400 shrink-0 flex items-center gap-1.5 sm:self-center">
+        <FaClock className="w-3 h-3 shrink-0" />
+        {formatDate(log.created_at)}
+      </div>
+    </div>
+  )
 }
 
 export default function ClientAdminDashboard() {
@@ -152,86 +251,133 @@ export default function ClientAdminDashboard() {
 
   const recentLogs = useMemo(() => logs.slice(0, 8), [logs])
 
+  const hasActiveFilters = search.trim() || actionFilter !== 'all' || dateFilter !== 'all'
+
+  const clearFilters = () => {
+    setSearch('')
+    setActionFilter('all')
+    setDateFilter('all')
+  }
+
   const tabs = [
-    { id: 'overview', label: 'Overview' },
-    { id: 'reports', label: 'Activity Reports', count: logs.length },
+    { id: 'overview', label: 'Overview', icon: FaChartBar },
+    { id: 'reports', label: 'Activity Reports', count: logs.length, icon: FaListAlt },
   ]
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans text-gray-800">
+    <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {/* Page header */}
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-extrabold text-[#0B1B3D]">Client Admin Dashboard</h1>
-            <p className="text-gray-500 text-sm mt-1">
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1B3D]">Client Admin Dashboard</h1>
+            <p className="text-gray-500 text-sm mt-1 max-w-xl">
               Monitor team activity, review audit logs, and export compliance reports.
             </p>
           </div>
-          {user && (
-            <div className="bg-white border rounded-lg px-4 py-2 text-right shadow-sm">
-              <span className="text-xs text-gray-400 block uppercase font-bold tracking-wider">Logged in as</span>
-              <span className="text-sm font-bold text-[#C8102E]">{user.name} (client admin)</span>
-              {user.firm && (
-                <span className="text-xs text-gray-500 block">{user.firm.name}</span>
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => fetchLogs(true)}
+              disabled={refreshing || loading}
+              className="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition shadow-sm disabled:opacity-60"
+            >
+              <FaSync className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+            {user && (
+              <div className="bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm text-right">
+                <span className="text-[10px] text-gray-400 block uppercase font-bold tracking-wider">Logged in as</span>
+                <span className="text-sm font-bold text-[#C8102E]">{user.name}</span>
+                <RoleBadge role="client_admin" />
+                {user.firm && (
+                  <span className="text-xs text-gray-500 block mt-0.5 flex items-center gap-1 justify-end">
+                    <FaBuilding className="w-3 h-3" />
+                    {user.firm.name}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
-        {error && (
-          <div className="bg-rose-50 border-l-4 border-rose-500 text-rose-800 p-4 mb-6 rounded-lg shadow-sm flex items-center justify-between text-sm font-medium">
-            <span>{error}</span>
-            <button onClick={() => setError('')} className="font-bold hover:opacity-75 text-lg">✕</button>
+        {error && <AlertBanner message={error} onDismiss={() => setError('')} />}
+
+        {/* Stats */}
+        {!loading && (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
+            <StatCard
+              label="Total Events"
+              value={stats.total}
+              icon={FaListAlt}
+              accent="bg-slate-100 text-slate-600"
+            />
+            <StatCard
+              label="Today"
+              value={stats.today}
+              icon={FaCalendarDay}
+              accent="bg-blue-100 text-blue-600"
+            />
+            <StatCard
+              label="This Week"
+              value={stats.thisWeek}
+              icon={FaCalendarWeek}
+              accent="bg-indigo-100 text-indigo-600"
+            />
+            <StatCard
+              label="Approved"
+              value={stats.approved}
+              icon={FaCheckCircle}
+              accent="bg-emerald-100 text-emerald-600"
+            />
+            <StatCard
+              label="Rejected"
+              value={stats.rejected}
+              icon={FaTimesCircle}
+              accent="bg-rose-100 text-rose-600"
+            />
+            <StatCard
+              label="Active Users"
+              value={stats.uniqueUsers}
+              icon={FaUsers}
+              accent="bg-violet-100 text-violet-600"
+            />
           </div>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">Total Events</p>
-            <p className="text-3xl font-extrabold text-[#0B1B3D] mt-1">{stats.total}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">Today</p>
-            <p className="text-3xl font-extrabold text-blue-600 mt-1">{stats.today}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">This Week</p>
-            <p className="text-3xl font-extrabold text-indigo-600 mt-1">{stats.thisWeek}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">Approved</p>
-            <p className="text-3xl font-extrabold text-emerald-600 mt-1">{stats.approved}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">Rejected</p>
-            <p className="text-3xl font-extrabold text-rose-600 mt-1">{stats.rejected}</p>
-          </div>
-          <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase text-gray-400 tracking-wider">Active Users</p>
-            <p className="text-3xl font-extrabold text-[#C8102E] mt-1">{stats.uniqueUsers}</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 mb-6 flex-wrap">
-          {tabs.map(tab => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-2 rounded-lg text-sm font-bold transition ${
-                activeTab === tab.id
-                  ? 'bg-[#0B1B3D] text-white'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              {tab.label}{tab.count != null ? ` (${tab.count})` : ''}
-            </button>
-          ))}
+        {/* Tab navigation */}
+        <div className="flex flex-wrap items-center gap-2 mb-6">
+          {tabs.map(tab => {
+            const Icon = tab.icon
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition ${
+                  activeTab === tab.id
+                    ? 'bg-[#0B1B3D] text-white shadow-sm'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                {tab.label}
+                {tab.count != null && (
+                  <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-extrabold ${
+                    activeTab === tab.id ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
         </div>
 
         {loading ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center text-gray-500">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center text-gray-500">
             <div className="w-10 h-10 mx-auto mb-4 rounded-full border-4 border-[#C8102E] border-t-transparent animate-spin" />
             <p className="text-sm font-semibold">Loading activity reports…</p>
           </div>
@@ -239,25 +385,43 @@ export default function ClientAdminDashboard() {
           <>
             {activeTab === 'overview' && (
               <div className="grid lg:grid-cols-2 gap-6">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                  <h2 className="text-lg font-bold text-[#0B1B3D] mb-4">Action Breakdown</h2>
+                {/* Action breakdown */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+                  <div className="flex items-center gap-3 mb-5">
+                    <div className="w-10 h-10 rounded-xl bg-[#0B1B3D]/10 flex items-center justify-center">
+                      <FaChartBar className="w-5 h-5 text-[#0B1B3D]" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-[#0B1B3D]">Action Breakdown</h2>
+                      <p className="text-xs text-gray-500">Top activity types across all events</p>
+                    </div>
+                  </div>
+
                   {actionBreakdown.length === 0 ? (
-                    <p className="text-sm text-gray-400 text-center py-8">No activity recorded yet.</p>
+                    <div className="text-center py-10">
+                      <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
+                        <FaChartBar className="w-6 h-6 text-gray-400" />
+                      </div>
+                      <p className="text-sm text-gray-500 font-medium">No activity recorded yet.</p>
+                    </div>
                   ) : (
-                    <div className="space-y-3">
-                      {actionBreakdown.map(([action, count]) => {
+                    <div className="space-y-4">
+                      {actionBreakdown.map(([action, count], idx) => {
                         const pct = stats.total > 0 ? Math.round((count / stats.total) * 100) : 0
+                        const barColor = BREAKDOWN_BAR_COLORS[idx % BREAKDOWN_BAR_COLORS.length]
                         return (
                           <div key={action}>
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm font-medium capitalize text-gray-700">
-                                {action.replace(/_/g, ' ')}
+                            <div className="flex items-center justify-between mb-1.5 gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <ActionBadge action={action} />
+                              </div>
+                              <span className="text-xs text-gray-500 font-bold shrink-0">
+                                {count} <span className="text-gray-400">({pct}%)</span>
                               </span>
-                              <span className="text-xs text-gray-500 font-bold">{count} ({pct}%)</span>
                             </div>
                             <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                               <div
-                                className="h-full bg-[#0B1B3D] rounded-full transition-all"
+                                className={`h-full rounded-full transition-all duration-500 ${barColor}`}
                                 style={{ width: `${pct}%` }}
                               />
                             </div>
@@ -268,136 +432,213 @@ export default function ClientAdminDashboard() {
                   )}
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-                    <h2 className="text-lg font-bold text-[#0B1B3D]">Recent Activity</h2>
+                {/* Recent activity */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-[#C8102E]/10 flex items-center justify-center">
+                        <FaHistory className="w-5 h-5 text-[#C8102E]" />
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-bold text-[#0B1B3D]">Recent Activity</h2>
+                        <p className="text-xs text-gray-500">Latest 8 events</p>
+                      </div>
+                    </div>
                     <button
+                      type="button"
                       onClick={() => setActiveTab('reports')}
-                      className="text-xs font-bold text-[#C8102E] hover:underline"
+                      className="text-xs font-bold text-[#C8102E] hover:underline shrink-0"
                     >
                       View all →
                     </button>
                   </div>
-                  <div className="divide-y">
-                    {recentLogs.length === 0 ? (
-                      <p className="text-sm text-gray-400 text-center py-8">No recent activity.</p>
-                    ) : (
-                      recentLogs.map(log => (
-                        <div key={log.id} className="px-6 py-3 flex items-start gap-3 hover:bg-gray-50">
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-sm font-semibold text-gray-800">
-                                {log.user?.name || 'System'}
-                              </span>
-                              {actionBadge(log.action)}
-                            </div>
-                            <p className="text-xs text-gray-500 mt-0.5 truncate">
-                              {log.details || log.description || '—'}
-                            </p>
-                          </div>
-                          <span className="text-[11px] text-gray-400 whitespace-nowrap">
-                            {formatDate(log.created_at)}
-                          </span>
-                        </div>
-                      ))
-                    )}
+
+                  {recentLogs.length === 0 ? (
+                    <div className="text-center py-12 px-6">
+                      <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
+                        <FaHistory className="w-6 h-6 text-gray-400" />
+                      </div>
+                      <p className="text-sm text-gray-500 font-medium">No recent activity.</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-gray-100">
+                      {recentLogs.map(log => (
+                        <ActivityRow key={log.id} log={log} />
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Quick export card */}
+                <div className="lg:col-span-2 bg-[#0B1B3D] rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-bold text-white">Export Compliance Report</h3>
+                    <p className="text-sm text-white/70 mt-1 max-w-lg">
+                      Download a CSV of all activity logs for auditing, compliance, or record-keeping.
+                    </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => exportLogsToCsv(logs)}
+                    disabled={logs.length === 0}
+                    className="inline-flex items-center justify-center gap-2 bg-white text-[#0B1B3D] text-sm font-bold px-5 py-3 rounded-xl hover:bg-gray-100 transition shadow-md disabled:opacity-50 shrink-0"
+                  >
+                    <FaDownload className="w-4 h-4" />
+                    Export All ({logs.length})
+                  </button>
                 </div>
               </div>
             )}
 
             {activeTab === 'reports' && (
               <div className="space-y-4">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 flex flex-wrap items-center gap-3">
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={e => setSearch(e.target.value)}
-                    placeholder="Search by user, action, or details…"
-                    className="flex-1 min-w-[200px] border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]"
-                  />
-                  <select
-                    value={actionFilter}
-                    onChange={e => setActionFilter(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D] bg-white"
-                  >
-                    <option value="all">All Actions</option>
-                    {uniqueActions.map(action => (
-                      <option key={action} value={action.toLowerCase()}>
-                        {action.replace(/_/g, ' ')}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={dateFilter}
-                    onChange={e => setDateFilter(e.target.value)}
-                    className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D] bg-white"
-                  >
-                    <option value="all">All Time</option>
-                    <option value="today">Today</option>
-                    <option value="week">This Week</option>
-                    <option value="month">This Month</option>
-                  </select>
-                  <button
-                    onClick={() => fetchLogs(true)}
-                    disabled={refreshing}
-                    className="bg-gray-100 text-gray-700 text-xs font-bold px-4 py-2 rounded-lg hover:bg-gray-200 transition disabled:opacity-60"
-                  >
-                    {refreshing ? 'Refreshing…' : '↻ Refresh'}
-                  </button>
-                  <button
-                    onClick={() => exportLogsToCsv(filteredLogs)}
-                    disabled={filteredLogs.length === 0}
-                    className="bg-[#0B1B3D] text-white text-xs font-bold px-4 py-2 rounded-lg hover:bg-slate-800 transition disabled:opacity-50"
-                  >
-                    ⬇ Export CSV ({filteredLogs.length})
-                  </button>
+                {/* Filters */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-5">
+                  <div className="flex items-center gap-2 mb-4">
+                    <FaFilter className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Filters</span>
+                    {hasActiveFilters && (
+                      <button
+                        type="button"
+                        onClick={clearFilters}
+                        className="text-xs font-bold text-[#C8102E] hover:underline ml-auto"
+                      >
+                        Clear all
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+                    <div className="relative flex-1 min-w-[200px]">
+                      <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                      <input
+                        type="search"
+                        value={search}
+                        onChange={e => setSearch(e.target.value)}
+                        placeholder="Search by user, action, or details…"
+                        className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E] transition"
+                      />
+                    </div>
+
+                    <select
+                      value={actionFilter}
+                      onChange={e => setActionFilter(e.target.value)}
+                      className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]/20 focus:border-[#0B1B3D] bg-white transition sm:min-w-[160px]"
+                    >
+                      <option value="all">All Actions</option>
+                      {uniqueActions.map(action => (
+                        <option key={action} value={action.toLowerCase()}>
+                          {action.replace(/_/g, ' ')}
+                        </option>
+                      ))}
+                    </select>
+
+                    <select
+                      value={dateFilter}
+                      onChange={e => setDateFilter(e.target.value)}
+                      className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]/20 focus:border-[#0B1B3D] bg-white transition sm:min-w-[140px]"
+                    >
+                      <option value="all">All Time</option>
+                      <option value="today">Today</option>
+                      <option value="week">This Week</option>
+                      <option value="month">This Month</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      onClick={() => exportLogsToCsv(filteredLogs)}
+                      disabled={filteredLogs.length === 0}
+                      className="inline-flex items-center justify-center gap-2 bg-[#0B1B3D] text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-slate-800 transition shadow-sm disabled:opacity-50 shrink-0"
+                    >
+                      <FaDownload className="w-3.5 h-3.5" />
+                      Export CSV ({filteredLogs.length})
+                    </button>
+                  </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead className="bg-gray-50 border-b">
-                        <tr>
-                          <th className="text-left px-4 py-3 text-gray-600 font-bold uppercase text-xs tracking-wider">#</th>
-                          <th className="text-left px-4 py-3 text-gray-600 font-bold uppercase text-xs tracking-wider">User</th>
-                          <th className="text-left px-4 py-3 text-gray-600 font-bold uppercase text-xs tracking-wider">Action</th>
-                          <th className="text-left px-4 py-3 text-gray-600 font-bold uppercase text-xs tracking-wider">Details</th>
-                          <th className="text-left px-4 py-3 text-gray-600 font-bold uppercase text-xs tracking-wider">Date & Time</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y">
-                        {filteredLogs.map((log, idx) => (
-                          <tr key={log.id} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-gray-400 text-xs">{idx + 1}</td>
-                            <td className="px-4 py-3">
-                              <span className="font-medium text-gray-800">{log.user?.name || '—'}</span>
-                            </td>
-                            <td className="px-4 py-3">{actionBadge(log.action)}</td>
-                            <td className="px-4 py-3 text-gray-600 max-w-md">
-                              <span className="line-clamp-2">{log.details || log.description || '—'}</span>
-                            </td>
-                            <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
-                              {formatDate(log.created_at)}
-                            </td>
-                          </tr>
-                        ))}
-                        {filteredLogs.length === 0 && (
-                          <tr>
-                            <td colSpan="5" className="px-4 py-12 text-center text-gray-400">
-                              <div className="text-4xl mb-2">📋</div>
-                              <p className="font-semibold text-gray-500">No matching records</p>
-                              <p className="text-xs mt-1">Try adjusting your search or filters.</p>
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                  {filteredLogs.length > 0 && (
-                    <div className="px-4 py-3 bg-gray-50 border-t text-xs text-gray-500 font-medium">
-                      Showing {filteredLogs.length} of {logs.length} total events
+                {/* Results */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                  {filteredLogs.length === 0 ? (
+                    <div className="p-16 text-center">
+                      <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
+                        <FaListAlt className="w-6 h-6 text-gray-400" />
+                      </div>
+                      <h3 className="text-lg font-bold text-[#0B1B3D]">No matching records</h3>
+                      <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
+                        {hasActiveFilters
+                          ? 'Try adjusting your search or filters.'
+                          : 'No activity has been recorded yet.'}
+                      </p>
+                      {hasActiveFilters && (
+                        <button
+                          type="button"
+                          onClick={clearFilters}
+                          className="mt-4 text-sm font-bold text-[#C8102E] hover:underline"
+                        >
+                          Clear filters
+                        </button>
+                      )}
                     </div>
+                  ) : (
+                    <>
+                      {/* Desktop table */}
+                      <div className="hidden lg:block overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead className="bg-gray-50 border-b border-gray-100">
+                            <tr>
+                              <th className="text-left px-5 py-3 text-gray-500 font-bold uppercase text-[11px] tracking-wider w-12">#</th>
+                              <th className="text-left px-5 py-3 text-gray-500 font-bold uppercase text-[11px] tracking-wider">User</th>
+                              <th className="text-left px-5 py-3 text-gray-500 font-bold uppercase text-[11px] tracking-wider">Action</th>
+                              <th className="text-left px-5 py-3 text-gray-500 font-bold uppercase text-[11px] tracking-wider">Details</th>
+                              <th className="text-left px-5 py-3 text-gray-500 font-bold uppercase text-[11px] tracking-wider">Date & Time</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {filteredLogs.map((log, idx) => (
+                              <tr key={log.id} className="hover:bg-gray-50/80 transition">
+                                <td className="px-5 py-3.5 text-gray-400 text-xs font-bold">{idx + 1}</td>
+                                <td className="px-5 py-3.5">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                                      <FaUser className="w-3.5 h-3.5 text-slate-500" />
+                                    </div>
+                                    <span className="font-semibold text-gray-800">{log.user?.name || '—'}</span>
+                                  </div>
+                                </td>
+                                <td className="px-5 py-3.5">
+                                  <ActionBadge action={log.action} />
+                                </td>
+                                <td className="px-5 py-3.5 text-gray-600 max-w-md">
+                                  <span className="line-clamp-2 leading-relaxed">
+                                    {log.details || log.description || '—'}
+                                  </span>
+                                </td>
+                                <td className="px-5 py-3.5 text-gray-500 text-xs whitespace-nowrap">
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <FaClock className="w-3 h-3 text-gray-400" />
+                                    {formatDate(log.created_at)}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {/* Mobile / tablet list */}
+                      <div className="lg:hidden divide-y divide-gray-100">
+                        {filteredLogs.map((log, idx) => (
+                          <ActivityRow key={log.id} log={log} showIndex index={idx + 1} />
+                        ))}
+                      </div>
+
+                      <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 text-xs text-gray-500 font-medium flex items-center justify-between gap-2">
+                        <span>Showing {filteredLogs.length} of {logs.length} total events</span>
+                        {hasActiveFilters && (
+                          <span className="text-[#C8102E] font-bold">Filtered</span>
+                        )}
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
