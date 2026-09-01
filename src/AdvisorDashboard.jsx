@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Navbar from './Navbar'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
@@ -52,6 +52,8 @@ import {
   FaTimesCircle,
   FaPlus,
   FaChevronDown,
+  FaSearch,
+  FaThLarge,
 } from 'react-icons/fa'
 
 const LOCAL_TEMPLATE_IMAGES = [
@@ -1152,6 +1154,7 @@ export default function AdvisorDashboard() {
   // Template Request States
   const [templateRequests, setTemplateRequests] = useState([])
   const [availableTemplates, setAvailableTemplates] = useState([])
+  const [templateSearch, setTemplateSearch] = useState('')
   const [showTemplateModal, setShowTemplateModal] = useState(false)
   const [selectedTemplateName, setSelectedTemplateName] = useState('template4')
   const [domainName, setDomainName] = useState('')
@@ -1825,6 +1828,22 @@ export default function AdvisorDashboard() {
     loadPages()
   }, [templateRequests, selectedDeploymentId])
 
+  const openDeploymentModal = (templateSlug) => {
+    if (templateSlug) setSelectedTemplateName(templateSlug)
+    setShowTemplateModal(true)
+  }
+
+  const filteredTemplates = useMemo(() => {
+    const q = templateSearch.trim().toLowerCase()
+    if (!q) return availableTemplates
+    return availableTemplates.filter(
+      tpl =>
+        tpl.name?.toLowerCase().includes(q) ||
+        tpl.slug?.toLowerCase().includes(q) ||
+        tpl.description?.toLowerCase().includes(q)
+    )
+  }, [availableTemplates, templateSearch])
+
   const handleTemplateSubmit = async (e) => {
     e.preventDefault()
     if (!domainName) return
@@ -2275,7 +2294,7 @@ export default function AdvisorDashboard() {
             </div>
             <button
               type="button"
-              onClick={() => setShowTemplateModal(true)}
+              onClick={() => openDeploymentModal()}
               className="inline-flex items-center gap-2 bg-[#0B1B3D] text-white text-sm font-bold px-5 py-3 rounded-xl hover:bg-[#07122A] transition shadow-lg shadow-[#0B1B3D]/20"
             >
               <FaPlus className="w-4 h-4" />
@@ -2349,6 +2368,98 @@ export default function AdvisorDashboard() {
         {message && <AlertBanner type="success" message={message} onDismiss={() => setMessage('')} />}
         {error && <AlertBanner type="error" message={error} onDismiss={() => setError('')} />}
 
+        {/* Showcase Template Catalog */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden mb-6">
+          <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-[#0B1B3D]">Showcase Templates</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Browse available website templates — hover to preview the full page, then request a deployment.
+              </p>
+            </div>
+            <div className="relative w-full sm:w-72">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+              <input
+                type="search"
+                placeholder="Search templates…"
+                value={templateSearch}
+                onChange={e => setTemplateSearch(e.target.value)}
+                className="w-full pl-9 pr-3 py-2.5 text-sm border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E]"
+              />
+            </div>
+          </div>
+
+          <div className="p-6">
+            {filteredTemplates.length === 0 ? (
+              <div className="py-12 text-center">
+                <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-slate-100 flex items-center justify-center">
+                  <FaThLarge className="w-6 h-6 text-slate-400" />
+                </div>
+                <h3 className="font-bold text-[#0B1B3D] mb-1">
+                  {templateSearch ? 'No templates match your search' : 'No templates available yet'}
+                </h3>
+                <p className="text-sm text-gray-500">
+                  {templateSearch
+                    ? 'Try a different search term.'
+                    : 'Contact your administrator to register showcase templates.'}
+                </p>
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                {filteredTemplates.map(tpl => {
+                  const isInUse = templateRequests.some(req => req.template_name === tpl.slug)
+                  return (
+                    <article
+                      key={tpl.id}
+                      className="group border border-gray-200 rounded-2xl overflow-hidden bg-white flex flex-col hover:border-[#0B1B3D]/20 hover:shadow-lg transition-all duration-300"
+                    >
+                      <div className="relative overflow-hidden">
+                        <TemplateScrollPreview
+                          template={tpl}
+                          className="h-40 w-full"
+                          overlay={
+                            <>
+                              <div className="absolute top-3 left-3 bg-[#0B1B3D]/90 backdrop-blur-sm text-white font-mono text-[10px] font-bold px-2.5 py-1 rounded-md z-10">
+                                {tpl.slug}
+                              </div>
+                              {isInUse && (
+                                <div className="absolute top-3 right-3 z-10">
+                                  <span className="inline-flex items-center gap-1 bg-indigo-500 text-white text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider">
+                                    <FaCheckCircle className="w-2.5 h-2.5" />
+                                    In Use
+                                  </span>
+                                </div>
+                              )}
+                            </>
+                          }
+                        />
+                      </div>
+
+                      <div className="p-4 flex-1 flex flex-col">
+                        <h3 className="font-extrabold text-[#0B1B3D] text-base leading-tight">
+                          {tpl.name}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-2 line-clamp-2 flex-1">
+                          {tpl.description || 'No description provided.'}
+                        </p>
+
+                        <button
+                          type="button"
+                          onClick={() => openDeploymentModal(tpl.slug)}
+                          className="mt-4 w-full inline-flex items-center justify-center gap-2 text-xs font-bold text-white bg-[#0B1B3D] hover:bg-[#07122A] px-3 py-2.5 rounded-xl transition"
+                        >
+                          <FaRocket className="w-3 h-3" />
+                          Request Deployment
+                        </button>
+                      </div>
+                    </article>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Step 1: Template Deployment Status & Selection */}
         <StepCard
           step={1}
@@ -2370,7 +2481,7 @@ export default function AdvisorDashboard() {
             </p>
             <button
               type="button"
-              onClick={() => setShowTemplateModal(true)}
+              onClick={() => openDeploymentModal()}
               className="inline-flex items-center gap-2 text-xs font-bold px-4 py-2 rounded-xl bg-[#0B1B3D] text-white hover:bg-[#07122A] transition shadow-sm"
             >
               <FaPlus className="w-3 h-3" />
@@ -2389,7 +2500,7 @@ export default function AdvisorDashboard() {
               </p>
               <button
                 type="button"
-                onClick={() => setShowTemplateModal(true)}
+                onClick={() => openDeploymentModal()}
                 className="mt-5 inline-flex items-center gap-2 bg-[#C8102E] text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-[#A00C23] transition shadow-md"
               >
                 <FaPlus className="w-4 h-4" />
@@ -2435,7 +2546,7 @@ export default function AdvisorDashboard() {
             ) : (
               <button
                 type="button"
-                onClick={() => setShowTemplateModal(true)}
+                onClick={() => openDeploymentModal()}
                 className="mt-5 inline-flex items-center gap-2 bg-[#0B1B3D] text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-[#07122A] transition shadow-md"
               >
                 <FaPlus className="w-3.5 h-3.5" />
