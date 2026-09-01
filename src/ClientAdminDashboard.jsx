@@ -18,8 +18,11 @@ import {
   FaFilter,
 } from 'react-icons/fa'
 import Navbar from './Navbar'
+import Pagination from './components/Pagination'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
+
+const LOGS_PER_PAGE = 15
 
 const ACTION_COLORS = {
   approved: 'bg-emerald-100 text-emerald-800 border-emerald-200',
@@ -168,6 +171,7 @@ export default function ClientAdminDashboard() {
   const [search, setSearch] = useState('')
   const [actionFilter, setActionFilter] = useState('all')
   const [dateFilter, setDateFilter] = useState('all')
+  const [logPage, setLogPage] = useState(1)
 
   const fetchLogs = useCallback(async (silent = false) => {
     if (!silent) setLoading(true)
@@ -248,6 +252,15 @@ export default function ClientAdminDashboard() {
       return matchesSearch && matchesAction && matchesDate
     })
   }, [logs, search, actionFilter, dateFilter])
+
+  useEffect(() => {
+    setLogPage(1)
+  }, [search, actionFilter, dateFilter])
+
+  const paginatedLogs = useMemo(() => {
+    const start = (logPage - 1) * LOGS_PER_PAGE
+    return filteredLogs.slice(start, start + LOGS_PER_PAGE)
+  }, [filteredLogs, logPage])
 
   const recentLogs = useMemo(() => logs.slice(0, 8), [logs])
 
@@ -581,9 +594,9 @@ export default function ClientAdminDashboard() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
-                            {filteredLogs.map((log, idx) => (
+                            {paginatedLogs.map((log, idx) => (
                               <tr key={log.id} className="hover:bg-gray-50/80 transition">
-                                <td className="px-5 py-3.5 text-gray-400 text-xs font-bold">{idx + 1}</td>
+                                <td className="px-5 py-3.5 text-gray-400 text-xs font-bold">{(logPage - 1) * LOGS_PER_PAGE + idx + 1}</td>
                                 <td className="px-5 py-3.5">
                                   <div className="flex items-center gap-3">
                                     <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
@@ -614,17 +627,23 @@ export default function ClientAdminDashboard() {
 
                       {/* Mobile / tablet list */}
                       <div className="lg:hidden divide-y divide-gray-100">
-                        {filteredLogs.map((log, idx) => (
-                          <ActivityRow key={log.id} log={log} showIndex index={idx + 1} />
+                        {paginatedLogs.map((log, idx) => (
+                          <ActivityRow
+                            key={log.id}
+                            log={log}
+                            showIndex
+                            index={(logPage - 1) * LOGS_PER_PAGE + idx + 1}
+                          />
                         ))}
                       </div>
 
-                      <div className="px-5 py-3.5 bg-gray-50 border-t border-gray-100 text-xs text-gray-500 font-medium flex items-center justify-between gap-2">
-                        <span>Showing {filteredLogs.length} of {logs.length} total events</span>
-                        {hasActiveFilters && (
-                          <span className="text-[#C8102E] font-bold">Filtered</span>
-                        )}
-                      </div>
+                      <Pagination
+                        currentPage={logPage}
+                        totalItems={filteredLogs.length}
+                        pageSize={LOGS_PER_PAGE}
+                        onPageChange={setLogPage}
+                        endLabel={hasActiveFilters ? 'Filtered' : undefined}
+                      />
                     </>
                   )}
                 </div>

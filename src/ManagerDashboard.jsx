@@ -25,6 +25,7 @@ import {
   FaHistory,
 } from 'react-icons/fa'
 import Navbar from './Navbar'
+import Pagination from './components/Pagination'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import { parseJson } from './utils/parseJson'
@@ -38,6 +39,7 @@ import {
 } from './utils/changeRequestPreview'
 import SectionIframePreview from './SectionIframePreview'
 
+const LOGS_PER_PAGE = 15
 const PENDING_STATUS = 'pending'
 const PREVIOUS_STATUSES = new Set(['under_review', 'scheduled', 'approved', 'rejected'])
 
@@ -626,6 +628,7 @@ export default function ManagerDashboard() {
   const [requestSearch, setRequestSearch] = useState('')
   const [userSearch, setUserSearch] = useState('')
   const [logSearch, setLogSearch] = useState('')
+  const [logPage, setLogPage] = useState(1)
 
   const [userForm, setUserForm] = useState({
     name: '',
@@ -739,6 +742,15 @@ export default function ManagerDashboard() {
       (log.details || log.description || '').toLowerCase().includes(q)
     )
   }, [logs, logSearch])
+
+  useEffect(() => {
+    setLogPage(1)
+  }, [logSearch])
+
+  const paginatedLogs = useMemo(() => {
+    const start = (logPage - 1) * LOGS_PER_PAGE
+    return filteredLogs.slice(start, start + LOGS_PER_PAGE)
+  }, [filteredLogs, logPage])
 
   const handleAssign = async (requestId, approverId) => {
     setAssigningId(requestId)
@@ -1297,7 +1309,7 @@ export default function ManagerDashboard() {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {filteredLogs.map(log => (
+                  {paginatedLogs.map(log => (
                     <div key={log.id} className="px-5 py-4 hover:bg-gray-50/80 transition flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6">
                       <div className="flex items-center gap-3 min-w-0 sm:w-48 shrink-0">
                         <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
@@ -1324,6 +1336,15 @@ export default function ManagerDashboard() {
                     </div>
                   ))}
                 </div>
+              )}
+
+              {filteredLogs.length > 0 && (
+                <Pagination
+                  currentPage={logPage}
+                  totalItems={filteredLogs.length}
+                  pageSize={LOGS_PER_PAGE}
+                  onPageChange={setLogPage}
+                />
               )}
             </div>
           </div>
