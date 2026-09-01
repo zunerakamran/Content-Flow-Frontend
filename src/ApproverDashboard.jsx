@@ -92,8 +92,9 @@ function getRequestSections(req) {
 
 function getRequestSearchText(req) {
   const { type, names } = getRequestSections(req)
-  if (type === 'single') return names[0]
-  if (type === 'batch') return names.join(' ')
+  const idText = `request ${req.id}`
+  if (type === 'single') return `${names[0]} ${idText}`
+  if (type === 'batch') return `${names.join(' ')} ${idText}`
   return `Change Request ${req.id}`
 }
 
@@ -118,7 +119,7 @@ function RequestTitle({ req }) {
     return (
       <div className="min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <h3 className="text-base sm:text-lg font-bold text-[#0B1B3D]">Batch Request</h3>
+          <h3 className="text-base sm:text-lg font-bold text-[#0B1B3D]">Request #{req.id}</h3>
           <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
             <FaLayerGroup className="w-3 h-3" />
             {count} {count === 1 ? 'section' : 'sections'}
@@ -238,6 +239,7 @@ const RequestCard = memo(function RequestCard({
 }) {
   const [previewData, setPreviewData] = useState(null)
   const [previewMode, setPreviewMode] = useState('visual')
+  const [expandedPreviewSections, setExpandedPreviewSections] = useState(() => new Set())
   const [rejectionReason, setRejectionReason] = useState('')
   const [scheduleDate, setScheduleDate] = useState('')
   const [busy, setBusy] = useState(null)
@@ -266,6 +268,7 @@ const RequestCard = memo(function RequestCard({
   const handleTogglePreview = async () => {
     if (previewData) {
       setPreviewData(null)
+      setExpandedPreviewSections(new Set())
       return
     }
 
@@ -351,6 +354,25 @@ const RequestCard = memo(function RequestCard({
   const isHistorical = isHistoricalRequest(req)
   const canPreview = req.status === 'under_review' || req.status === 'pending' || isAssignedToMe || isHistorical
   const showReviewPanel = req.status === 'under_review' && isAssignedToMe
+  const batchEdits = previewData?.is_batch && Array.isArray(previewData.edits) ? previewData.edits : null
+
+  const togglePreviewSection = (idx) => {
+    setExpandedPreviewSections(prev => {
+      const next = new Set(prev)
+      if (next.has(idx)) next.delete(idx)
+      else next.add(idx)
+      return next
+    })
+  }
+
+  const expandAllPreviewSections = () => {
+    if (!batchEdits) return
+    setExpandedPreviewSections(new Set(batchEdits.map((_, idx) => idx)))
+  }
+
+  const collapseAllPreviewSections = () => {
+    setExpandedPreviewSections(new Set())
+  }
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
@@ -581,71 +603,114 @@ const RequestCard = memo(function RequestCard({
               </a>
             </div>
 
-            <div className="flex items-center gap-1 bg-white border border-gray-200 p-1 rounded-xl shadow-sm">
-              <button
-                type="button"
-                onClick={() => setPreviewMode('visual')}
-                className={`text-[11px] font-bold px-3 py-1.5 rounded-lg transition ${
-                  previewMode === 'visual' ? 'bg-[#0B1B3D] text-white' : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                Visual Preview
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreviewMode('json')}
-                className={`text-[11px] font-bold px-3 py-1.5 rounded-lg transition ${
-                  previewMode === 'json' ? 'bg-[#0B1B3D] text-white' : 'text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                JSON Diff
-              </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1 bg-white border border-gray-200 p-1 rounded-xl shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode('visual')}
+                  className={`text-[11px] font-bold px-3 py-1.5 rounded-lg transition ${
+                    previewMode === 'visual' ? 'bg-[#0B1B3D] text-white' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  Visual Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewMode('json')}
+                  className={`text-[11px] font-bold px-3 py-1.5 rounded-lg transition ${
+                    previewMode === 'json' ? 'bg-[#0B1B3D] text-white' : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  JSON Diff
+                </button>
+              </div>
+
+              {batchEdits && (
+                <div className="flex items-center gap-1 bg-white border border-gray-200 p-1 rounded-xl shadow-sm">
+                  <button
+                    type="button"
+                    onClick={expandAllPreviewSections}
+                    className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 transition"
+                  >
+                    Expand all
+                  </button>
+                  <button
+                    type="button"
+                    onClick={collapseAllPreviewSections}
+                    className="text-[11px] font-bold px-3 py-1.5 rounded-lg text-gray-600 hover:bg-gray-50 transition"
+                  >
+                    Collapse all
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
-          {previewData.is_batch && Array.isArray(previewData.edits) ? (
-            previewData.edits.map((item, idx) => {
-              const curParsed = parseJson(item.current_content)
-              const propParsed = parseJson(item.proposed_content)
+          {batchEdits ? (
+            <div className="space-y-2">
+              {batchEdits.map((item, idx) => {
+                const curParsed = parseJson(item.current_content)
+                const propParsed = parseJson(item.proposed_content)
+                const isExpanded = expandedPreviewSections.has(idx)
 
-              return (
-                <div key={idx} className="bg-white p-5 rounded-xl border border-gray-200 shadow-sm space-y-3">
-                  <h5 className="font-extrabold text-[#0B1B3D] text-sm">
-                    Section #{idx + 1}: {item.section_name}
-                  </h5>
+                return (
+                  <div key={idx} className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => togglePreviewSection(idx)}
+                      className="w-full flex items-center justify-between gap-3 px-5 py-3.5 text-left hover:bg-slate-50 transition"
+                      aria-expanded={isExpanded}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="shrink-0 text-[10px] font-extrabold uppercase tracking-wider text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
+                          {idx + 1}
+                        </span>
+                        <h5 className="font-extrabold text-[#0B1B3D] text-sm truncate">
+                          {item.section_name}
+                        </h5>
+                      </div>
+                      <FaChevronDown
+                        className={`w-3.5 h-3.5 shrink-0 text-gray-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`}
+                      />
+                    </button>
 
-                  {previewMode === 'visual' ? (
-                    <div className="grid lg:grid-cols-2 gap-6">
-                      <SectionIframePreview
-                        sectionName={item.section_name}
-                        data={curParsed}
-                        height={480}
-                        label={isHistorical ? 'Live Published Content (at submission)' : 'Current Live Published Content'}
-                        borderColor="border-gray-300"
-                      />
-                      <SectionIframePreview
-                        sectionName={item.section_name}
-                        data={propParsed}
-                        height={480}
-                        label={isHistorical ? 'Proposed Draft Content (at submission)' : 'Proposed Draft Content'}
-                        borderColor="border-emerald-500"
-                      />
-                    </div>
-                  ) : (
-                    <div className="grid lg:grid-cols-2 gap-4 font-mono text-xs">
-                      <div className="bg-gray-50 border p-3 rounded-lg">
-                        <span className="block font-sans font-bold text-gray-500 mb-1 text-[11px]">Current (Raw)</span>
-                        <pre className="whitespace-pre-wrap">{item.current_content || 'None'}</pre>
+                    {isExpanded && (
+                      <div className="px-5 pb-5 border-t border-gray-100 pt-4">
+                        {previewMode === 'visual' ? (
+                          <div className="grid lg:grid-cols-2 gap-6">
+                            <SectionIframePreview
+                              sectionName={item.section_name}
+                              data={curParsed}
+                              height={480}
+                              label={isHistorical ? 'Live Published Content (at submission)' : 'Current Live Published Content'}
+                              borderColor="border-gray-300"
+                            />
+                            <SectionIframePreview
+                              sectionName={item.section_name}
+                              data={propParsed}
+                              height={480}
+                              label={isHistorical ? 'Proposed Draft Content (at submission)' : 'Proposed Draft Content'}
+                              borderColor="border-emerald-500"
+                            />
+                          </div>
+                        ) : (
+                          <div className="grid lg:grid-cols-2 gap-4 font-mono text-xs">
+                            <div className="bg-gray-50 border p-3 rounded-lg">
+                              <span className="block font-sans font-bold text-gray-500 mb-1 text-[11px]">Current (Raw)</span>
+                              <pre className="whitespace-pre-wrap">{item.current_content || 'None'}</pre>
+                            </div>
+                            <div className="bg-emerald-50/50 border border-emerald-300 p-3 rounded-lg">
+                              <span className="block font-sans font-bold text-emerald-800 mb-1 text-[11px]">Proposed (Raw)</span>
+                              <pre className="whitespace-pre-wrap">{item.proposed_content}</pre>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      <div className="bg-emerald-50/50 border border-emerald-300 p-3 rounded-lg">
-                        <span className="block font-sans font-bold text-emerald-800 mb-1 text-[11px]">Proposed (Raw)</span>
-                        <pre className="whitespace-pre-wrap">{item.proposed_content}</pre>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           ) : (
             <div className="grid lg:grid-cols-2 gap-6">
               <SectionIframePreview
