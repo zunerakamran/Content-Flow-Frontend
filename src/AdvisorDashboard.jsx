@@ -28,6 +28,23 @@ import {
   FaUserTie,
   FaUsers,
   FaAward,
+  FaRocket,
+  FaLock,
+  FaUnlock,
+  FaCheckCircle,
+  FaClock,
+  FaTimes,
+  FaEdit,
+  FaEye,
+  FaServer,
+  FaLayerGroup,
+  FaFileAlt,
+  FaArrowUp,
+  FaPalette,
+  FaImages,
+  FaPaperPlane,
+  FaGlobeAmericas,
+  FaExclamationTriangle,
 } from 'react-icons/fa'
 
 const API_BASE = String(api.defaults.baseURL || '').replace(/\/$/, '')
@@ -275,6 +292,162 @@ function advisorSectionOrder(name) {
   if (isCtaBannerSection(name)) return 12
   return 99
 }
+
+function sectionIcon(name) {
+  if (isHeroSection(name)) return FaImages
+  if (isWhatWeDoSection(name)) return FaLightbulb
+  if (isAboutSection(name)) return FaUserTie
+  if (isCompanyHistorySection(name)) return FaLandmark
+  if (isFeaturedServicesSection(name)) return FaBriefcase
+  if (isAnnualProgressionSection(name)) return FaChartLine
+  if (isPortfolioSection(name)) return FaLayerGroup
+  if (isBranchesSection(name)) return FaBuilding
+  if (isCounterStatsSection(name)) return FaChartPie
+  if (isTestimonialsSection(name)) return FaComments
+  if (isLatestNewsSection(name)) return FaFileAlt
+  if (isClientLogosSection(name)) return FaAward
+  if (isCtaBannerSection(name)) return FaHandHoldingUsd
+  return FaLayerGroup
+}
+
+const DEPLOYMENT_STATUS = {
+  deployed: {
+    label: 'Site Active & Deployed',
+    icon: FaCheckCircle,
+    className: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+    dot: 'bg-emerald-500',
+  },
+  pending: {
+    label: 'Deployment Pending',
+    icon: FaClock,
+    className: 'bg-amber-50 text-amber-700 border-amber-200',
+    dot: 'bg-amber-500',
+  },
+  not_deployed: {
+    label: 'Template Not Deployed',
+    icon: FaExclamationTriangle,
+    className: 'bg-slate-50 text-slate-600 border-slate-200',
+    dot: 'bg-slate-400',
+  },
+}
+
+function DeploymentBadge({ status }) {
+  const config = DEPLOYMENT_STATUS[status]
+  if (!config) return null
+  const Icon = config.icon
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border ${config.className}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${config.dot}`} />
+      <Icon className="w-3 h-3" />
+      {config.label}
+    </span>
+  )
+}
+
+function AlertBanner({ type, message, onDismiss }) {
+  const isSuccess = type === 'success'
+  return (
+    <div
+      className={`${
+        isSuccess ? 'bg-emerald-50 border-emerald-500 text-emerald-800' : 'bg-rose-50 border-rose-500 text-rose-800'
+      } border-l-4 p-4 mb-6 rounded-xl shadow-sm flex items-start justify-between gap-3 text-sm font-medium`}
+      role="alert"
+    >
+      <span className="flex items-start gap-2 flex-1">
+        {isSuccess ? <FaCheckCircle className="w-4 h-4 mt-0.5 shrink-0" /> : <FaExclamationTriangle className="w-4 h-4 mt-0.5 shrink-0" />}
+        {message}
+      </span>
+      <button type="button" onClick={onDismiss} className="shrink-0 p-1 rounded-lg hover:bg-black/5 transition" aria-label="Dismiss">
+        <FaTimes className="w-4 h-4" />
+      </button>
+    </div>
+  )
+}
+
+function ModalShell({ title, subtitle, onClose, children, maxWidth = 'max-w-lg' }) {
+  return (
+    <div className="fixed inset-0 bg-[#0B1B3D]/60 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div
+        className={`bg-white rounded-2xl ${maxWidth} w-full shadow-2xl border border-gray-200 max-h-[90vh] overflow-y-auto`}
+        role="dialog"
+        aria-modal="true"
+      >
+        <div className="sticky top-0 bg-white z-10 flex items-start justify-between gap-4 p-6 border-b border-gray-100">
+          <div>
+            <h3 className="text-lg font-bold text-[#0B1B3D]">{title}</h3>
+            {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
+          </div>
+          <button type="button" onClick={onClose} className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition" aria-label="Close">
+            <FaTimes className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="p-6">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+function StepCard({ step, title, description, badge, children, className = '' }) {
+  return (
+    <div className={`bg-white rounded-2xl shadow-sm border border-gray-200/80 overflow-hidden mb-8 ${className}`}>
+      <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-gray-100 bg-gradient-to-r from-white to-gray-50/80">
+        <div className="flex items-start gap-4 min-w-0">
+          <div className="shrink-0 w-10 h-10 rounded-xl bg-[#0B1B3D] text-white flex items-center justify-center text-sm font-extrabold shadow-md shadow-[#0B1B3D]/20">
+            {step}
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-base font-extrabold text-[#0B1B3D]">{title}</h2>
+            {description && <p className="text-sm text-gray-500 mt-0.5">{description}</p>}
+          </div>
+        </div>
+        {badge}
+      </div>
+      <div className="p-6">{children}</div>
+    </div>
+  )
+}
+
+function WorkflowStepper({ isSiteDeployed, hasPage, hasSections, isComplete }) {
+  const steps = [
+    { label: 'Deploy', done: isSiteDeployed, active: !isSiteDeployed },
+    { label: 'Select Page', done: hasPage, active: isSiteDeployed && !hasPage },
+    { label: 'Lock Sections', done: hasSections, active: isSiteDeployed && hasPage && !hasSections },
+    { label: 'Edit & Submit', done: isComplete, active: isSiteDeployed && hasSections && !isComplete },
+  ]
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm p-5 mb-8">
+      <div className="flex items-center justify-between gap-2 overflow-x-auto">
+        {steps.map((s, i) => (
+          <div key={s.label} className="flex items-center flex-1 min-w-0">
+            <div className="flex flex-col items-center gap-1.5 flex-1 min-w-[72px]">
+              <div
+                className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-extrabold transition-all ${
+                  s.done
+                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/30'
+                    : s.active
+                      ? 'bg-[#C8102E] text-white shadow-md shadow-[#C8102E]/30 ring-4 ring-[#C8102E]/15'
+                      : 'bg-gray-100 text-gray-400 border border-gray-200'
+                }`}
+              >
+                {s.done ? <FaCheckCircle className="w-4 h-4" /> : i + 1}
+              </div>
+              <span className={`text-[10px] sm:text-xs font-bold text-center leading-tight ${s.done || s.active ? 'text-[#0B1B3D]' : 'text-gray-400'}`}>
+                {s.label}
+              </span>
+            </div>
+            {i < steps.length - 1 && (
+              <div className={`h-0.5 flex-1 mx-1 sm:mx-2 rounded-full min-w-[16px] ${s.done ? 'bg-emerald-400' : 'bg-gray-200'}`} />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+const inputClass =
+  'w-full text-sm p-2.5 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E] transition bg-white'
+const labelClass = 'block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1.5'
 
 const SERVICE_ICON_OPTIONS = [
   { value: 'chart-pie', label: 'Chart pie', Icon: FaChartPie },
@@ -1845,129 +2018,157 @@ export default function AdvisorDashboard() {
     .sort((a, b) => advisorSectionOrder(sectionTemplateKey(a)) - advisorSectionOrder(sectionTemplateKey(b)))
 
   return (
-    <div className="min-h-screen bg-gray-100 font-sans text-gray-800">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-gray-50 to-slate-100 font-sans text-gray-800">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-          <div>
-            <h1 className="text-3xl font-extrabold text-[#0B1B3D]">Advisor Dashboard</h1>
-            <p className="text-gray-500 text-sm mt-1">
-              Select showcase template, request cPanel deployment, lock sections, edit content, and submit change requests.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
+        <div className="mb-8">
+          <div className="flex items-start justify-between flex-wrap gap-4 mb-6">
+            <div>
+              <p className="text-xs font-extrabold text-[#C8102E] uppercase tracking-widest mb-1">Advisor Console</p>
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1B3D] tracking-tight">Content Management</h1>
+              <p className="text-gray-500 text-sm mt-2 max-w-xl">
+                Deploy your showcase site, lock sections, edit content, and submit changes for approval — all in one place.
+              </p>
+            </div>
             <button
+              type="button"
               onClick={() => setShowTemplateModal(true)}
-              className="bg-[#0B1B3D] text-white text-xs font-bold px-4 py-2.5 rounded-lg hover:bg-slate-800 transition shadow-sm flex items-center gap-2"
+              className="inline-flex items-center gap-2 bg-[#0B1B3D] text-white text-sm font-bold px-5 py-3 rounded-xl hover:bg-[#07122A] transition shadow-lg shadow-[#0B1B3D]/20"
             >
-              🎨 Request Template Deployment
+              <FaPalette className="w-4 h-4" />
+              Request Deployment
             </button>
-            {user && (
-              <div className="bg-white border rounded-lg px-4 py-2 text-right shadow-sm">
-                <span className="text-xs text-gray-400 block uppercase font-bold tracking-wider">Logged in as</span>
-                <span className="text-sm font-bold text-[#C8102E]">{user.name} ({user.role})</span>
+          </div>
+
+          {/* Quick stats */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="bg-white rounded-xl border border-gray-200/80 p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${isSiteDeployed ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                  <FaServer className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Site Status</p>
+                  <p className="text-sm font-extrabold text-[#0B1B3D]">{isSiteDeployed ? 'Live' : pendingRequest ? 'Pending' : 'Not Deployed'}</p>
+                </div>
               </div>
-            )}
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200/80 p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center">
+                  <FaFileAlt className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Pages</p>
+                  <p className="text-sm font-extrabold text-[#0B1B3D]">{pages.length}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200/80 p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-violet-100 text-violet-600 flex items-center justify-center">
+                  <FaLayerGroup className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Sections</p>
+                  <p className="text-sm font-extrabold text-[#0B1B3D]">{visibleSections.length}</p>
+                </div>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl border border-gray-200/80 p-4 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${checkedSectionIds.length > 0 ? 'bg-[#C8102E]/10 text-[#C8102E]' : 'bg-gray-100 text-gray-400'}`}>
+                  <FaEdit className="w-4 h-4" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">Editing</p>
+                  <p className="text-sm font-extrabold text-[#0B1B3D]">{checkedSectionIds.length} locked</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Global Notifications */}
-        {message && (
-          <div className="bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 p-4 mb-6 rounded-lg shadow-sm flex items-center justify-between text-sm font-medium">
-            <span>{message}</span>
-            <button onClick={() => setMessage('')} className="font-bold hover:opacity-75 text-lg">✕</button>
-          </div>
-        )}
+        {/* Workflow progress */}
+        <WorkflowStepper
+          isSiteDeployed={isSiteDeployed}
+          hasPage={Boolean(selectedPageId)}
+          hasSections={checkedSectionIds.length > 0}
+          isComplete={false}
+        />
 
-        {error && (
-          <div className="bg-rose-50 border-l-4 border-rose-500 text-rose-800 p-4 mb-6 rounded-lg shadow-sm flex items-center justify-between text-sm font-medium">
-            <span>{error}</span>
-            <button onClick={() => setError('')} className="font-bold hover:opacity-75 text-lg">✕</button>
-          </div>
-        )}
+        {/* Global Notifications */}
+        {message && <AlertBanner type="success" message={message} onDismiss={() => setMessage('')} />}
+        {error && <AlertBanner type="error" message={error} onDismiss={() => setError('')} />}
 
         {/* Step 1: Template Deployment Status & Selection */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-8">
-          <div className="flex items-center justify-between border-b pb-4 mb-4">
-            <div>
-              <h2 className="text-xs font-extrabold text-gray-400 uppercase tracking-wider">
-                1. cPanel Template Deployment Status
-              </h2>
-              <p className="text-sm text-gray-600 mt-0.5">
-                Each advisor site must be requested and deployed to cPanel before section editing is enabled.
-              </p>
-            </div>
-            {isSiteDeployed && (
-              <span className="bg-emerald-100 text-emerald-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider">
-                ✅ Site Active & Deployed
-              </span>
-            )}
-            {!isSiteDeployed && pendingRequest && (
-              <span className="bg-amber-100 text-amber-800 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider">
-                ⏳ Deployment Pending
-              </span>
-            )}
-            {!isSiteDeployed && !pendingRequest && (
-              <span className="bg-slate-100 text-slate-700 text-xs font-extrabold px-3 py-1.5 rounded-full uppercase tracking-wider">
-                ⚠️ Template Not Deployed
-              </span>
-            )}
-          </div>
-
+        <StepCard
+          step={1}
+          title="cPanel Template Deployment"
+          description="Each advisor site must be deployed to cPanel before section editing is enabled."
+          badge={
+            <DeploymentBadge
+              status={isSiteDeployed ? 'deployed' : pendingRequest ? 'pending' : 'not_deployed'}
+            />
+          }
+        >
           {/* Active Deployed State */}
           {isSiteDeployed && (
-            <div className="bg-emerald-50/60 border border-emerald-200 rounded-xl p-5">
+            <div className="bg-gradient-to-br from-emerald-50 to-emerald-50/30 border border-emerald-200 rounded-xl p-5">
               <div className="flex items-start justify-between flex-wrap gap-4">
                 <div>
                   <h3 className="font-extrabold text-emerald-950 text-base flex items-center gap-2">
-                    <span>🌐 {deployedRequest.domain_name}</span>
-                    <span className="text-xs bg-emerald-200 text-emerald-900 font-bold px-2 py-0.5 rounded">
+                    <FaGlobeAmericas className="w-4 h-4 text-emerald-600" />
+                    {deployedRequest.domain_name}
+                    <span className="text-xs bg-emerald-200 text-emerald-900 font-bold px-2.5 py-0.5 rounded-full">
                       {deployedRequest.template_name || 'template4'}
                     </span>
                   </h3>
-                  <p className="text-xs text-emerald-700 mt-1">
-                    cPanel Target Domain: <code className="bg-emerald-100 px-1.5 py-0.5 rounded font-mono font-semibold">{deployedRequest.cpanel_domain || deployedRequest.domain_name}</code>
+                  <p className="text-xs text-emerald-700 mt-2">
+                    cPanel Target: <code className="bg-white/80 px-2 py-0.5 rounded-md font-mono font-semibold border border-emerald-200">{deployedRequest.cpanel_domain || deployedRequest.domain_name}</code>
                   </p>
-                  <div className="flex items-center gap-3 mt-3">
-                    <span className="text-xs text-emerald-800 font-bold">Theme Colors:</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-4 h-4 rounded-full border border-gray-300 shadow-sm" style={{ backgroundColor: deployedRequest.primary_color }} title="Primary Color"></span>
-                      <span className="w-4 h-4 rounded-full border border-gray-300 shadow-sm" style={{ backgroundColor: deployedRequest.secondary_color }} title="Secondary Color"></span>
+                  <div className="flex items-center flex-wrap gap-3 mt-3">
+                    <span className="text-xs text-emerald-800 font-bold">Theme:</span>
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full border-2 border-white shadow-sm ring-1 ring-emerald-200" style={{ backgroundColor: deployedRequest.primary_color }} title="Primary" />
+                      <span className="w-5 h-5 rounded-full border-2 border-white shadow-sm ring-1 ring-emerald-200" style={{ backgroundColor: deployedRequest.secondary_color }} title="Secondary" />
                     </div>
                     {deployedRequest.logo_url && (
-                      <span className="text-xs bg-white text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded font-medium">
-                        🖼️ Logo Attached
+                      <span className="text-xs bg-white text-emerald-800 border border-emerald-200 px-2.5 py-1 rounded-full font-medium">
+                        Logo attached
                       </span>
                     )}
                   </div>
                 </div>
-                <div className="text-right">
-                  <span className="text-xs font-bold text-emerald-800 bg-white border border-emerald-300 px-3 py-1.5 rounded-lg shadow-sm inline-block">
-                    ⚡ Live Content Sync Active
-                  </span>
-                </div>
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-white border border-emerald-200 px-3 py-2 rounded-xl shadow-sm">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  Live sync active
+                </span>
               </div>
             </div>
           )}
 
           {/* Pending Deployment State */}
           {!isSiteDeployed && pendingRequest && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
-              <div className="flex items-start justify-between flex-wrap gap-4">
+            <div className="bg-gradient-to-br from-amber-50 to-orange-50/30 border border-amber-200 rounded-xl p-5">
+              <div className="flex items-start gap-4">
+                <div className="shrink-0 w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center">
+                  <FaClock className="w-5 h-5" />
+                </div>
                 <div>
-                  <h3 className="font-bold text-amber-900 text-base flex items-center gap-2">
-                    <span>⏳ Deployment Request Submitted</span>
-                    <span className="text-xs bg-amber-200 text-amber-900 font-bold px-2 py-0.5 rounded uppercase">
-                      Pending Power Admin
+                  <h3 className="font-bold text-amber-900 text-base flex items-center flex-wrap gap-2">
+                    Deployment Request Submitted
+                    <span className="text-[10px] bg-amber-200 text-amber-900 font-bold px-2.5 py-0.5 rounded-full uppercase">
+                      Pending Review
                     </span>
                   </h3>
-                  <p className="text-xs text-amber-800 mt-1">
-                    Requested Domain: <strong>{pendingRequest.domain_name}</strong> | Template: <strong>{pendingRequest.template_name || 'template4'}</strong>
+                  <p className="text-xs text-amber-800 mt-1.5">
+                    Domain: <strong>{pendingRequest.domain_name}</strong> · Template: <strong>{pendingRequest.template_name || 'template4'}</strong>
                   </p>
-                  <p className="text-xs text-amber-700 mt-2 bg-amber-100/70 p-2.5 rounded-lg border border-amber-200">
-                    💡 Power Admin will review your request and manually deploy the template to your cPanel environment. Once completed, your page and section editor below will unlock automatically.
+                  <p className="text-xs text-amber-700 mt-3 bg-white/70 p-3 rounded-lg border border-amber-200/80 leading-relaxed">
+                    Power Admin will review and deploy your template to cPanel. Once complete, the section editor below unlocks automatically.
                   </p>
                 </div>
               </div>
@@ -1976,52 +2177,54 @@ export default function AdvisorDashboard() {
 
           {/* Rejected State */}
           {!isSiteDeployed && !pendingRequest && rejectedRequest && (
-            <div className="bg-rose-50 border border-rose-200 rounded-xl p-5 mb-4">
-              <h3 className="font-bold text-rose-900 text-sm">❌ Previous Template Request Rejected</h3>
-              <p className="text-xs text-rose-700 mt-1">Reason: {rejectedRequest.rejection_reason}</p>
+            <div className="bg-rose-50 border border-rose-200 rounded-xl p-5 mb-4 flex items-start gap-3">
+              <FaExclamationTriangle className="w-5 h-5 text-rose-500 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="font-bold text-rose-900 text-sm">Previous Request Rejected</h3>
+                <p className="text-xs text-rose-700 mt-1">{rejectedRequest.rejection_reason}</p>
+              </div>
             </div>
           )}
 
           {/* Setup / Request Form Card if No Deployed Site */}
           {!isSiteDeployed && !pendingRequest && (
             <div className="space-y-4">
-              <div className="bg-slate-50 border border-slate-200 rounded-xl p-5">
-                <h3 className="text-sm font-bold text-[#0B1B3D] mb-1">
-                  🎨 Choose a Showcase Template & Request Deployment
+              <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-5">
+                <h3 className="text-sm font-bold text-[#0B1B3D] mb-1 flex items-center gap-2">
+                  <FaPalette className="w-4 h-4 text-[#C8102E]" />
+                  Choose a Template & Request Deployment
                 </h3>
                 <p className="text-xs text-gray-500 mb-4">
-                  Select from available React templates, customize your domain and color palette, and submit a deployment request.
+                  Select a showcase template, customize your domain and colors, then submit for deployment.
                 </p>
 
-                <form onSubmit={handleTemplateSubmit} className="space-y-4">
-                  {/* Dynamic Template Selection Grid */}
+                <form onSubmit={handleTemplateSubmit} className="space-y-5">
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase mb-2">Select Showcase Template *</label>
-                    <div className="grid md:grid-cols-2 gap-3">
+                    <label className={labelClass}>Select Showcase Template *</label>
+                    <div className="grid md:grid-cols-2 gap-4">
                       {availableTemplates.map(tpl => {
                         const isSelected = selectedTemplateName === tpl.slug
                         return (
                           <div
                             key={tpl.id}
                             onClick={() => setSelectedTemplateName(tpl.slug)}
-                            className={`rounded-xl border cursor-pointer transition flex flex-col overflow-hidden ${
+                            className={`rounded-xl border cursor-pointer transition-all flex flex-col overflow-hidden group ${
                               isSelected
-                                ? 'bg-blue-50/70 border-[#0B1B3D] ring-2 ring-[#0B1B3D]/20 shadow-sm'
-                                : 'bg-white border-gray-200 hover:border-gray-300'
+                                ? 'bg-blue-50/50 border-[#0B1B3D] ring-2 ring-[#0B1B3D]/15 shadow-md'
+                                : 'bg-white border-gray-200 hover:border-[#C8102E]/30 hover:shadow-md'
                             }`}
                           >
-                            <TemplateScrollPreview template={tpl} className="h-32" viewportHeight="8rem" />
+                            <TemplateScrollPreview template={tpl} className="h-36" viewportHeight="9rem" />
                             <div className="p-4 flex flex-col justify-between flex-1">
                               <div>
                                 <div className="flex items-center justify-between mb-1">
                                   <span className="font-extrabold text-sm text-[#0B1B3D]">{tpl.name}</span>
                                   {isSelected && (
-                                    <span className="text-[10px] bg-[#0B1B3D] text-white font-bold px-2 py-0.5 rounded uppercase">Selected</span>
+                                    <span className="text-[10px] bg-[#C8102E] text-white font-bold px-2 py-0.5 rounded-full">Selected</span>
                                   )}
                                 </div>
                                 <p className="text-xs text-gray-600 line-clamp-2">{tpl.description || 'Showcase template layout'}</p>
                               </div>
-                              <div className="mt-2 text-[10px] font-mono text-gray-400">slug: {tpl.slug}</div>
                             </div>
                           </div>
                         )
@@ -2040,62 +2243,62 @@ export default function AdvisorDashboard() {
 
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Target Domain Name *</label>
+                      <label className={labelClass}>Target Domain Name *</label>
                       <input
                         type="text"
                         required
                         placeholder="e.g. advisor.myfirm.com"
                         value={domainName}
                         onChange={e => setDomainName(e.target.value)}
-                        className="w-full text-sm p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E]"
+                        className={inputClass}
                       />
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Logo URL (Optional)</label>
+                      <label className={labelClass}>Logo URL (Optional)</label>
                       <input
                         type="url"
                         placeholder="https://myfirm.com/logo.png"
                         value={logoUrl}
                         onChange={e => setLogoUrl(e.target.value)}
-                        className="w-full text-sm p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E]"
+                        className={inputClass}
                       />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Primary Color</label>
+                      <label className={labelClass}>Primary Color</label>
                       <div className="flex items-center gap-2">
                         <input
                           type="color"
                           value={primaryColor}
                           onChange={e => setPrimaryColor(e.target.value)}
-                          className="w-10 h-10 border rounded cursor-pointer"
+                          className="w-11 h-11 border border-gray-200 rounded-xl cursor-pointer"
                         />
                         <input
                           type="text"
                           value={primaryColor}
                           onChange={e => setPrimaryColor(e.target.value)}
-                          className="w-full text-xs p-2 border rounded font-mono"
+                          className="w-full text-xs p-2.5 border border-gray-200 rounded-xl font-mono focus:ring-2 focus:ring-[#C8102E]/30 outline-none"
                         />
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Secondary Color</label>
+                      <label className={labelClass}>Secondary Color</label>
                       <div className="flex items-center gap-2">
                         <input
                           type="color"
                           value={secondaryColor}
                           onChange={e => setSecondaryColor(e.target.value)}
-                          className="w-10 h-10 border rounded cursor-pointer"
+                          className="w-11 h-11 border border-gray-200 rounded-xl cursor-pointer"
                         />
                         <input
                           type="text"
                           value={secondaryColor}
                           onChange={e => setSecondaryColor(e.target.value)}
-                          className="w-full text-xs p-2 border rounded font-mono"
+                          className="w-full text-xs p-2.5 border border-gray-200 rounded-xl font-mono focus:ring-2 focus:ring-[#C8102E]/30 outline-none"
                         />
                       </div>
                     </div>
@@ -2105,48 +2308,55 @@ export default function AdvisorDashboard() {
                     <button
                       type="submit"
                       disabled={isSubmittingTemplate}
-                      className="bg-[#0B1B3D] text-white text-xs font-extrabold px-6 py-3 rounded-lg hover:bg-slate-800 transition disabled:opacity-50 shadow-md"
+                      className="inline-flex items-center gap-2 bg-[#0B1B3D] text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-[#07122A] transition disabled:opacity-50 shadow-lg shadow-[#0B1B3D]/20"
                     >
-                      {isSubmittingTemplate ? 'Submitting Request...' : '🚀 Submit Deployment Request to Power Admin'}
+                      <FaRocket className="w-4 h-4" />
+                      {isSubmittingTemplate ? 'Submitting...' : 'Submit Deployment Request'}
                     </button>
                   </div>
                 </form>
               </div>
             </div>
           )}
-        </div>
+        </StepCard>
 
         {/* Step 2: Page Selection & Section Editing (Gated by Template Deployment) */}
         {!isSiteDeployed ? (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center text-gray-500">
-            <div className="text-4xl mb-3">🔒</div>
-            <h3 className="text-lg font-bold text-[#0B1B3D]">Page & Section Content Editor Locked</h3>
-            <p className="text-sm text-gray-500 mt-2 max-w-lg mx-auto">
-              Before you can lock sections and edit content, your template deployment request must be submitted and manually deployed to cPanel by Power Admin.
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200/80 p-12 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-gray-100 text-gray-400 flex items-center justify-center mx-auto mb-4">
+              <FaLock className="w-7 h-7" />
+            </div>
+            <h3 className="text-lg font-bold text-[#0B1B3D]">Section Editor Locked</h3>
+            <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto leading-relaxed">
+              Complete template deployment first. Once Power Admin deploys your site, you can lock sections and edit content here.
             </p>
             {pendingRequest ? (
-              <div className="mt-4 inline-block bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold px-4 py-2 rounded-lg">
-                ⏳ Deployment pending with Power Admin. Check back shortly!
+              <div className="mt-5 inline-flex items-center gap-2 bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold px-4 py-2.5 rounded-xl">
+                <FaClock className="w-3.5 h-3.5" />
+                Deployment pending — check back soon
               </div>
             ) : (
               <button
+                type="button"
                 onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-                className="mt-4 bg-[#0B1B3D] text-white text-xs font-bold px-5 py-2.5 rounded-lg hover:bg-slate-800 transition shadow-sm"
+                className="mt-5 inline-flex items-center gap-2 bg-[#0B1B3D] text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-[#07122A] transition shadow-md"
               >
-                👆 Request Template Deployment Above
+                <FaArrowUp className="w-3.5 h-3.5" />
+                Request Deployment Above
               </button>
             )}
           </div>
         ) : (
           <div>
-            <div className="bg-white rounded-xl shadow-sm p-6 mb-8 border border-gray-200">
-              <label className="block text-xs font-extrabold text-gray-400 uppercase tracking-wider mb-2">
-                2. Select Page
-              </label>
+            <StepCard
+              step={2}
+              title="Select Page"
+              description="Choose which page you want to edit sections on."
+            >
               <select
                 value={selectedPageId}
                 onChange={(e) => handlePageSelect(e.target.value)}
-                className="w-full md:w-96 text-sm font-semibold p-3 border border-gray-300 rounded-lg bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#C8102E] outline-none transition"
+                className="w-full md:w-96 text-sm font-semibold p-3 border border-gray-200 rounded-xl bg-gray-50 focus:bg-white focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E] outline-none transition"
               >
                 <option value="">-- Choose a Page --</option>
                 {pages.map(page => (
@@ -2155,94 +2365,104 @@ export default function AdvisorDashboard() {
                   </option>
                 ))}
               </select>
-            </div>
+            </StepCard>
 
             {selectedPage && (
               <div className="space-y-8">
-                <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-200">
-                  <div className="flex items-center justify-between mb-4">
-                    <div>
-                      <h2 className="text-xs font-extrabold text-gray-400 uppercase tracking-wider">
-                        3. Select Sections to Edit & Lock ({selectedPage.title})
-                      </h2>
-                      <p className="text-xs text-gray-500 mt-1">Checking a checkbox locks that section instantly.</p>
-                    </div>
-                    {checkedSectionIds.length > 0 && (
-                      <span className="text-xs bg-red-100 text-[#C8102E] font-bold px-3 py-1 rounded-full">
-                        {checkedSectionIds.length} Section(s) Selected & Locked
+                <StepCard
+                  step={3}
+                  title={`Select Sections — ${selectedPage.title}`}
+                  description="Check sections to lock them for editing. Locked sections appear in the editor below."
+                  badge={
+                    checkedSectionIds.length > 0 ? (
+                      <span className="inline-flex items-center gap-1.5 text-xs bg-[#C8102E]/10 text-[#C8102E] font-bold px-3 py-1.5 rounded-full border border-[#C8102E]/20">
+                        <FaLock className="w-3 h-3" />
+                        {checkedSectionIds.length} locked
                       </span>
-                    )}
-                  </div>
-
-                  <div className="flex flex-col gap-3">
+                    ) : null
+                  }
+                >
+                  <div className="grid sm:grid-cols-2 gap-3">
                     {visibleSections.map(section => {
                       const isChecked = checkedSectionIds.includes(section.id)
                       const isLockedByMe = section.is_locked && section.locked_by === user?.id
                       const isLockedByOther = section.is_locked && section.locked_by !== user?.id
+                      const SecIcon = sectionIcon(sectionTemplateKey(section))
 
                       return (
                         <label
                           key={section.id}
-                          className={`p-4 rounded-xl border flex items-start gap-3 transition-all ${isLockedByOther
-                            ? 'bg-gray-100 border-gray-200 cursor-not-allowed opacity-75'
-                            : isChecked || isLockedByMe
-                              ? 'bg-red-50/40 border-[#C8102E] ring-2 ring-[#C8102E]/20 cursor-default'
-                              : 'bg-white border-gray-200 hover:border-gray-300 cursor-pointer'
-                            }`}
+                          className={`p-4 rounded-xl border flex items-start gap-3 transition-all ${
+                            isLockedByOther
+                              ? 'bg-gray-50 border-gray-200 cursor-not-allowed opacity-60'
+                              : isChecked || isLockedByMe
+                                ? 'bg-[#C8102E]/5 border-[#C8102E] ring-2 ring-[#C8102E]/10 cursor-default shadow-sm'
+                                : 'bg-white border-gray-200 hover:border-[#C8102E]/30 hover:shadow-md cursor-pointer'
+                          }`}
                         >
                           <input
                             type="checkbox"
                             checked={isChecked || isLockedByMe}
                             disabled={isLockedByOther || isChecked || isLockedByMe}
                             onChange={(e) => handleSectionCheckboxChange(section, e.target.checked)}
-                            className="w-5 h-5 text-[#C8102E] rounded border-gray-300 focus:ring-[#C8102E] mt-0.5"
+                            className="w-4 h-4 mt-1 text-[#C8102E] rounded border-gray-300 focus:ring-[#C8102E] shrink-0"
                           />
-                          <div className="flex-1">
-                            <div className="font-bold text-[#0B1B3D] text-sm flex items-center justify-between">
-                              <span className="flex items-center gap-2">
+                          <div className="flex items-start gap-3 flex-1 min-w-0">
+                            <div className={`shrink-0 w-9 h-9 rounded-lg flex items-center justify-center ${
+                              isChecked || isLockedByMe ? 'bg-[#C8102E] text-white' : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              <SecIcon className="w-4 h-4" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="font-bold text-[#0B1B3D] text-sm flex items-center flex-wrap gap-2">
                                 {sectionDisplayName(section)}
                                 {section.is_visible === false && (
-                                  <span className="text-[10px] bg-gray-200 text-gray-600 font-bold px-2 py-0.5 rounded">Hidden on site</span>
+                                  <span className="text-[10px] bg-gray-200 text-gray-600 font-bold px-2 py-0.5 rounded-full">Hidden</span>
                                 )}
-                              </span>
-                              {isLockedByOther && (
-                                <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded">
-                                  🔒 Locked by {section.locked_by_user?.name || 'Other'}
-                                </span>
-                              )}
-                              {(isChecked || isLockedByMe) && (
-                                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded">
-                                  🔒 Locked by You
-                                </span>
-                              )}
+                                {isLockedByOther && (
+                                  <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                                    <FaLock className="w-2.5 h-2.5" />
+                                    {section.locked_by_user?.name || 'Other'}
+                                  </span>
+                                )}
+                                {(isChecked || isLockedByMe) && (
+                                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                                    <FaCheckCircle className="w-2.5 h-2.5" />
+                                    Locked by you
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {isLockedByOther
+                                  ? 'Locked by another advisor'
+                                  : isChecked || isLockedByMe
+                                    ? 'Ready to edit below'
+                                    : 'Click to lock & edit'}
+                              </p>
                             </div>
-                            <p className="text-xs text-gray-500 mt-1">
-                              {isLockedByOther
-                                ? 'Locked by another advisor'
-                                : isChecked || isLockedByMe
-                                  ? 'Locked & active in editor below'
-                                  : 'Click checkbox to lock & edit'}
-                            </p>
                           </div>
                         </label>
                       )
                     })}
                   </div>
-                </div>
+                </StepCard>
 
                 {checkedSectionIds.length > 0 ? (
                   <div className="space-y-6">
-                    <div className="flex items-center justify-between bg-[#0B1B3D] text-white px-6 py-4 rounded-xl shadow-sm">
+                    <div className="sticky top-0 z-20 flex items-center justify-between bg-gradient-to-r from-[#0B1B3D] to-[#132952] text-white px-6 py-4 rounded-2xl shadow-lg border border-white/10">
                       <div>
-                        <h2 className="text-lg font-bold">4. Edit Selected Sections & Submit</h2>
-                        <p className="text-xs text-gray-300 mt-0.5">All edits will be submitted together as one single request.</p>
+                        <p className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-0.5">Step 4</p>
+                        <h2 className="text-lg font-bold">Edit & Submit Changes</h2>
+                        <p className="text-xs text-white/60 mt-0.5">All edits are submitted together as one request.</p>
                       </div>
                       <button
+                        type="button"
                         onClick={handleBatchSubmit}
                         disabled={isSubmitting}
-                        className="bg-[#C8102E] text-white text-sm font-bold px-6 py-2.5 rounded-lg hover:bg-red-700 shadow-md transition disabled:opacity-50"
+                        className="inline-flex items-center gap-2 bg-[#C8102E] text-white text-sm font-bold px-6 py-3 rounded-xl hover:bg-[#A00C23] shadow-lg shadow-[#C8102E]/30 transition disabled:opacity-50"
                       >
-                        {isSubmitting ? 'Submitting...' : '🚀 Submit All Changes'}
+                        <FaPaperPlane className="w-4 h-4" />
+                        {isSubmitting ? 'Submitting...' : 'Submit All'}
                       </button>
                     </div>
 
@@ -2251,27 +2471,32 @@ export default function AdvisorDashboard() {
                       if (!section) return null
                       const values = sectionEdits[secId] || {}
                       const isPreview = previewTab[secId]
+                      const SecIcon = sectionIcon(sectionTemplateKey(section))
 
                       return (
-                        <div key={secId} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                          <div className="bg-slate-50 border-b px-6 py-4 flex items-center justify-between">
+                        <div key={secId} className="bg-white rounded-2xl shadow-sm border border-gray-200/80 overflow-hidden">
+                          <div className="bg-gradient-to-r from-slate-50 to-white border-b border-gray-100 px-6 py-4 flex items-center justify-between flex-wrap gap-3">
                             <div className="flex items-center gap-3">
-                              <span className="w-3 h-3 rounded-full bg-[#C8102E]"></span>
-                              <h3 className="text-base font-bold text-[#0B1B3D]">Editing: {sectionDisplayName(section)}</h3>
+                              <div className="w-9 h-9 rounded-lg bg-[#C8102E] text-white flex items-center justify-center shadow-sm">
+                                <SecIcon className="w-4 h-4" />
+                              </div>
+                              <h3 className="text-base font-bold text-[#0B1B3D]">{sectionDisplayName(section)}</h3>
                             </div>
-                            <div className="flex items-center gap-2 bg-white border p-1 rounded-lg">
+                            <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl">
                               <button
                                 type="button"
                                 onClick={() => setPreviewTab(prev => ({ ...prev, [secId]: false }))}
-                                className={`text-xs font-bold px-3 py-1 rounded transition ${!isPreview ? 'bg-[#0B1B3D] text-white' : 'text-gray-600'}`}
+                                className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition ${!isPreview ? 'bg-white text-[#0B1B3D] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                               >
-                                Form Fields
+                                <FaEdit className="w-3 h-3" />
+                                Fields
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setPreviewTab(prev => ({ ...prev, [secId]: true }))}
-                                className={`text-xs font-bold px-3 py-1 rounded transition ${isPreview ? 'bg-[#0B1B3D] text-white' : 'text-gray-600'}`}
+                                className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg transition ${isPreview ? 'bg-white text-[#0B1B3D] shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
                               >
+                                <FaEye className="w-3 h-3" />
                                 Preview
                               </button>
                             </div>
@@ -4056,13 +4281,13 @@ export default function AdvisorDashboard() {
                               )}
                             </div>
                           ) : (
-                            <div className="p-4 bg-slate-100 space-y-3">
-                              <div className="bg-white px-5 py-3 rounded-xl border border-gray-200 shadow-sm flex items-center justify-between">
+                            <div className="p-4 bg-gradient-to-b from-slate-50 to-slate-100/50 space-y-3">
+                              <div className="bg-white px-5 py-3 rounded-xl border border-gray-200/80 shadow-sm flex items-center justify-between">
                                 <span className="text-xs font-extrabold text-[#0B1B3D] flex items-center gap-2">
-                                  <span className="w-2.5 h-2.5 rounded-full bg-[#C8102E]"></span>
-                                  Live Template Preview — reflects your current edits
+                                  <FaEye className="w-3.5 h-3.5 text-[#C8102E]" />
+                                  Live Preview — reflects your edits
                                 </span>
-                                <span className="text-[11px] text-gray-400 font-mono">
+                                <span className="text-[11px] text-gray-400 font-mono bg-gray-50 px-2 py-0.5 rounded">
                                   {sectionDisplayName(section)}
                                 </span>
                               </div>
@@ -4105,22 +4330,26 @@ export default function AdvisorDashboard() {
                       )
                     })}
 
-                    <div className="pt-4 flex justify-end">
+                    <div className="pt-2 flex justify-end">
                       <button
+                        type="button"
                         onClick={handleBatchSubmit}
                         disabled={isSubmitting}
-                        className="bg-[#C8102E] text-white text-base font-extrabold px-8 py-3 rounded-xl hover:bg-red-700 shadow-lg transition disabled:opacity-50"
+                        className="inline-flex items-center gap-2 bg-[#C8102E] text-white text-base font-extrabold px-8 py-3.5 rounded-xl hover:bg-[#A00C23] shadow-lg shadow-[#C8102E]/25 transition disabled:opacity-50"
                       >
-                        {isSubmitting ? 'Submitting...' : '🚀 Submit All Section Edits'}
+                        <FaPaperPlane className="w-4 h-4" />
+                        {isSubmitting ? 'Submitting...' : 'Submit All Section Edits'}
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center text-gray-500">
-                    <div className="text-4xl mb-3">☑️</div>
-                    <h3 className="text-lg font-bold text-[#0B1B3D]">No Sections Checked Yet</h3>
-                    <p className="text-sm text-gray-500 mt-1 max-w-md mx-auto">
-                      Check one or more section checkboxes above to lock them for editing.
+                  <div className="bg-white rounded-2xl shadow-sm border border-gray-200/80 p-12 text-center">
+                    <div className="w-16 h-16 rounded-2xl bg-indigo-50 text-indigo-400 flex items-center justify-center mx-auto mb-4">
+                      <FaUnlock className="w-7 h-7" />
+                    </div>
+                    <h3 className="text-lg font-bold text-[#0B1B3D]">No Sections Selected</h3>
+                    <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
+                      Select one or more sections above to lock them and start editing content.
                     </p>
                   </div>
                 )}
@@ -4132,20 +4361,18 @@ export default function AdvisorDashboard() {
 
       {/* Template Deployment Request Modal */}
       {showTemplateModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-gray-200 space-y-4">
-            <div className="flex items-center justify-between border-b pb-3">
-              <h3 className="text-lg font-bold text-[#0B1B3D]">🎨 Request Template Deployment</h3>
-              <button onClick={() => setShowTemplateModal(false)} className="text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
-            </div>
-
+        <ModalShell
+          title="Request Template Deployment"
+          subtitle="Submit a deployment request to Power Admin"
+          onClose={() => setShowTemplateModal(false)}
+        >
             <form onSubmit={handleTemplateSubmit} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Showcase Template</label>
+                <label className={labelClass}>Showcase Template</label>
                 <select
                   value={selectedTemplateName}
                   onChange={e => setSelectedTemplateName(e.target.value)}
-                  className="w-full text-sm p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E]"
+                  className={inputClass}
                 >
                   {availableTemplates.map(tpl => (
                     <option key={tpl.id} value={tpl.slug}>
@@ -4159,85 +4386,85 @@ export default function AdvisorDashboard() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Target Domain Name *</label>
+                <label className={labelClass}>Target Domain Name *</label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. advisor.myfirm.com"
                   value={domainName}
                   onChange={e => setDomainName(e.target.value)}
-                  className="w-full text-sm p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E]"
+                  className={inputClass}
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Logo URL (Optional)</label>
+                <label className={labelClass}>Logo URL (Optional)</label>
                 <input
                   type="url"
                   placeholder="https://myfirm.com/logo.png"
                   value={logoUrl}
                   onChange={e => setLogoUrl(e.target.value)}
-                  className="w-full text-sm p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E]"
+                  className={inputClass}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Primary Color</label>
+                  <label className={labelClass}>Primary Color</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
                       value={primaryColor}
                       onChange={e => setPrimaryColor(e.target.value)}
-                      className="w-10 h-10 border rounded cursor-pointer"
+                      className="w-11 h-11 border border-gray-200 rounded-xl cursor-pointer"
                     />
                     <input
                       type="text"
                       value={primaryColor}
                       onChange={e => setPrimaryColor(e.target.value)}
-                      className="w-full text-xs p-2 border rounded font-mono"
+                      className="w-full text-xs p-2.5 border border-gray-200 rounded-xl font-mono focus:ring-2 focus:ring-[#C8102E]/30 outline-none"
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-gray-700 uppercase mb-1">Secondary Color</label>
+                  <label className={labelClass}>Secondary Color</label>
                   <div className="flex items-center gap-2">
                     <input
                       type="color"
                       value={secondaryColor}
                       onChange={e => setSecondaryColor(e.target.value)}
-                      className="w-10 h-10 border rounded cursor-pointer"
+                      className="w-11 h-11 border border-gray-200 rounded-xl cursor-pointer"
                     />
                     <input
                       type="text"
                       value={secondaryColor}
                       onChange={e => setSecondaryColor(e.target.value)}
-                      className="w-full text-xs p-2 border rounded font-mono"
+                      className="w-full text-xs p-2.5 border border-gray-200 rounded-xl font-mono focus:ring-2 focus:ring-[#C8102E]/30 outline-none"
                     />
                   </div>
                 </div>
               </div>
 
-              <div className="pt-3 flex items-center justify-end gap-3 border-t">
+              <div className="pt-3 flex items-center justify-end gap-3 border-t border-gray-100">
                 <button
                   type="button"
                   onClick={() => setShowTemplateModal(false)}
-                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                  className="px-4 py-2.5 text-sm font-bold text-gray-600 hover:bg-gray-100 rounded-xl transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmittingTemplate}
-                  className="px-5 py-2 text-xs font-bold bg-[#0B1B3D] text-white rounded-lg hover:bg-slate-800 transition disabled:opacity-50 shadow-md"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-bold bg-[#0B1B3D] text-white rounded-xl hover:bg-[#07122A] transition disabled:opacity-50 shadow-md"
                 >
-                  {isSubmittingTemplate ? 'Submitting...' : 'Submit Deployment Request'}
+                  <FaRocket className="w-3.5 h-3.5" />
+                  {isSubmittingTemplate ? 'Submitting...' : 'Submit Request'}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   )
