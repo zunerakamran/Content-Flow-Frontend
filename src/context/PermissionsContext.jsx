@@ -107,14 +107,33 @@ export function PermissionsProvider({ children }) {
         fetchPermissions()
     }, [fetchPermissions])
 
+    useEffect(() => {
+        const refresh = () => { fetchPermissions() }
+        const onVisibility = () => {
+            if (document.visibilityState === 'visible') refresh()
+        }
+        window.addEventListener('focus', refresh)
+        document.addEventListener('visibilitychange', onVisibility)
+        const interval = window.setInterval(refresh, 30000)
+        return () => {
+            window.removeEventListener('focus', refresh)
+            document.removeEventListener('visibilitychange', onVisibility)
+            window.clearInterval(interval)
+        }
+    }, [fetchPermissions])
+
     const roleKey = normalizeRoleKey(user?.role)
 
     const can = useCallback((permissionKey) => {
-        if (!permissionKey) return false
+        if (!permissionKey || !roleKey) return false
+        // Live matrix is the source of truth so Power Admin changes apply without re-login
+        if (Object.prototype.hasOwnProperty.call(matrix[roleKey] || {}, permissionKey)) {
+            return Boolean(matrix[roleKey][permissionKey])
+        }
         if (Array.isArray(user?.permissions) && user.permissions.length > 0) {
             return user.permissions.includes(permissionKey)
         }
-        return Boolean(matrix[roleKey]?.[permissionKey])
+        return false
     }, [user?.permissions, matrix, roleKey])
 
     const isLocked = useCallback((role, permissionKey) => {

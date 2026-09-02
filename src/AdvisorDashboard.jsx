@@ -1144,7 +1144,7 @@ function aboutPreviewPayload(values) {
   })
 }
 
-export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExitPowerAdmin = null } = {}) {
+export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExitPowerAdmin = null, embedded = false } = {}) {
   const { user } = useAuth()
   const { getRoleLabel, getConsoleTitle } = useRoleLabels()
   const { can } = usePermissions()
@@ -2357,11 +2357,9 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
         { id: 'editor', label: 'Content Editor', icon: FaEdit, count: checkedSectionIds.length },
       ]
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-gray-50 to-slate-100 font-sans text-gray-800">
-      <Navbar />
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+  const pageContent = (
+    <>
+      <div className={embedded ? undefined : 'max-w-7xl mx-auto px-4 sm:px-6 py-8'}>
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-start justify-between flex-wrap gap-4 mb-6">
@@ -4536,6 +4534,17 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
             </form>
         </ModalShell>
       )}
+    </>
+  )
+
+  if (embedded) {
+    return pageContent
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 via-gray-50 to-slate-100 font-sans text-gray-800">
+      <Navbar />
+      {pageContent}
     </div>
   )
 }

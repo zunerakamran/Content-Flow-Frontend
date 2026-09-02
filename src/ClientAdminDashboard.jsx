@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react'
 import {
   FaTimes,
   FaSync,
@@ -17,14 +17,23 @@ import {
   FaHistory,
   FaFilter,
   FaUserPlus,
+  FaInbox,
+  FaClipboardCheck,
+  FaRocket,
+  FaEdit,
 } from 'react-icons/fa'
 import Navbar from './Navbar'
 import Pagination from './components/Pagination'
+import ChangeRequestAssignmentPanel from './components/ChangeRequestAssignmentPanel'
+import ReviewQueuePanel from './components/ReviewQueuePanel'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import { useRoleLabels } from './context/RoleLabelsContext'
 import { usePermissions } from './context/PermissionsContext'
 import { CreateUserPanel, TeamUsersPanel } from './components/TeamUserManagement'
+
+const AdvisorDashboard = lazy(() => import('./AdvisorDashboard'))
+const PowerAdminDashboard = lazy(() => import('./PowerAdminDashboard'))
 
 const LOGS_PER_PAGE = 15
 
@@ -171,6 +180,10 @@ export default function ClientAdminDashboard() {
   const canManageUsers = can('manage_users')
   const canViewUsers = can('view_users') || canManageUsers
   const canViewLogs = can('view_activity_logs')
+  const canAssignRequests = can('assign_change_requests') || can('view_all_change_requests')
+  const canReview = can('review_change_requests')
+  const canContentEditor = can('submit_change_requests') || can('edit_sections') || can('request_deployments')
+  const canDeploymentHub = can('deploy_websites') || can('manage_templates') || can('manage_deployment_sections') || can('publish_live_content') || can('view_all_deployments')
   const [logs, setLogs] = useState([])
   const [activeTab, setActiveTab] = useState('overview')
   const [loading, setLoading] = useState(true)
@@ -289,9 +302,22 @@ export default function ClientAdminDashboard() {
   const tabs = useMemo(() => [
     canViewLogs && { id: 'overview', label: 'Overview', icon: FaChartBar },
     canViewLogs && { id: 'reports', label: 'Activity Reports', count: logs.length, icon: FaListAlt },
+    canAssignRequests && { id: 'change-requests', label: 'Change Requests', icon: FaInbox },
+    canReview && { id: 'review-queue', label: 'Review Queue', icon: FaClipboardCheck },
     canManageUsers && { id: 'create-user', label: 'Create User', icon: FaUserPlus },
     canViewUsers && { id: 'users', label: 'Team', icon: FaUsers },
-  ].filter(Boolean), [canViewLogs, canManageUsers, canViewUsers, logs.length])
+    canContentEditor && { id: 'content-editor', label: 'Content Editor', icon: FaEdit },
+    canDeploymentHub && { id: 'deployment-hub', label: 'Deployment Hub', icon: FaRocket },
+  ].filter(Boolean), [
+    canViewLogs,
+    canManageUsers,
+    canViewUsers,
+    canAssignRequests,
+    canReview,
+    canContentEditor,
+    canDeploymentHub,
+    logs.length,
+  ])
 
   useEffect(() => {
     if (tabs.length && !tabs.some(t => t.id === activeTab)) {
@@ -406,14 +432,14 @@ export default function ClientAdminDashboard() {
           })}
         </div>
 
-        {loading ? (
+        {loading && (activeTab === 'overview' || activeTab === 'reports') ? (
           <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center text-gray-500">
             <div className="w-10 h-10 mx-auto mb-4 rounded-full border-4 border-[#C8102E] border-t-transparent animate-spin" />
             <p className="text-sm font-semibold">Loading activity reports…</p>
           </div>
         ) : (
           <>
-            {activeTab === 'overview' && (
+            {activeTab === 'overview' && canViewLogs && (
               <div className="grid lg:grid-cols-2 gap-6">
                 {/* Action breakdown */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
@@ -520,7 +546,7 @@ export default function ClientAdminDashboard() {
               </div>
             )}
 
-            {activeTab === 'reports' && (
+            {activeTab === 'reports' && canViewLogs && (
               <div className="space-y-4">
                 {/* Filters */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4 sm:p-5">
@@ -678,6 +704,36 @@ export default function ClientAdminDashboard() {
                   )}
                 </div>
               </div>
+            )}
+
+            {activeTab === 'change-requests' && canAssignRequests && (
+              <ChangeRequestAssignmentPanel onMessage={setMessage} onError={setError} />
+            )}
+
+            {activeTab === 'review-queue' && canReview && (
+              <ReviewQueuePanel />
+            )}
+
+            {activeTab === 'content-editor' && canContentEditor && (
+              <Suspense fallback={
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center text-gray-500">
+                  <div className="w-10 h-10 mx-auto mb-4 rounded-full border-4 border-[#C8102E] border-t-transparent animate-spin" />
+                  <p className="text-sm font-semibold">Loading content editor…</p>
+                </div>
+              }>
+                <AdvisorDashboard embedded />
+              </Suspense>
+            )}
+
+            {activeTab === 'deployment-hub' && canDeploymentHub && (
+              <Suspense fallback={
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center text-gray-500">
+                  <div className="w-10 h-10 mx-auto mb-4 rounded-full border-4 border-[#C8102E] border-t-transparent animate-spin" />
+                  <p className="text-sm font-semibold">Loading deployment hub…</p>
+                </div>
+              }>
+                <PowerAdminDashboard embedded />
+              </Suspense>
             )}
 
             {activeTab === 'create-user' && canManageUsers && (

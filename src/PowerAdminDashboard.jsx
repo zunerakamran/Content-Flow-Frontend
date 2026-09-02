@@ -135,7 +135,7 @@ const inputClass =
     'w-full text-sm p-2.5 border border-gray-200 rounded-lg outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E] transition'
 const labelClass = 'block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1.5'
 
-export default function PowerAdminDashboard() {
+export default function PowerAdminDashboard({ embedded = false } = {}) {
     const { refreshUser } = useAuth()
     const { records: roleLabelRecords, getRoleLabel, updateRoleLabel } = useRoleLabels()
     const {
@@ -556,11 +556,9 @@ export default function PowerAdminDashboard() {
         </div>
     )
 
-    return (
-        <div className="min-h-screen bg-gradient-to-b from-slate-100 to-gray-100 font-sans text-gray-800">
-            <Navbar />
-
-            <div className="max-w-7xl mx-auto px-4 py-8">
+    const pageContent = (
+        <>
+            <div className={embedded ? undefined : 'max-w-7xl mx-auto px-4 py-8'}>
                 {/* Page header */}
                 <div className="flex items-start justify-between mb-8 flex-wrap gap-4">
                     <div>
@@ -1471,6 +1469,17 @@ export default function PowerAdminDashboard() {
                     </form>
                 </ModalShell>
             )}
+        </>
+    )
+
+    if (embedded) {
+        return pageContent
+    }
+
+    return (
+        <div className="min-h-screen bg-gradient-to-b from-slate-100 to-gray-100 font-sans text-gray-800">
+            <Navbar />
+            {pageContent}
         </div>
     )
 }

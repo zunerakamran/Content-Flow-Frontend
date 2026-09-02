@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react'
+import { useState, useEffect, useCallback, useMemo, memo, lazy, Suspense } from 'react'
 import {
   FaCheckCircle,
   FaClock,
@@ -23,9 +23,14 @@ import {
   FaEnvelope,
   FaBuilding,
   FaHistory,
+  FaRocket,
+  FaEdit,
 } from 'react-icons/fa'
 import Navbar from './Navbar'
 import Pagination from './components/Pagination'
+import ChangeRequestAssignmentPanel from './components/ChangeRequestAssignmentPanel'
+import ReviewQueuePanel from './components/ReviewQueuePanel'
+import { CreateUserPanel, TeamUsersPanel } from './components/TeamUserManagement'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import { useRoleLabels } from './context/RoleLabelsContext'
@@ -40,6 +45,9 @@ import {
   savePreviewSnapshot,
 } from './utils/changeRequestPreview'
 import SectionIframePreview from './SectionIframePreview'
+
+const AdvisorDashboard = lazy(() => import('./AdvisorDashboard'))
+const PowerAdminDashboard = lazy(() => import('./PowerAdminDashboard'))
 
 const LOGS_PER_PAGE = 15
 const PENDING_STATUS = 'pending'
@@ -616,11 +624,14 @@ export default function ManagerDashboard() {
   const canManageUsers = can('manage_users')
   const canViewUsers = can('view_users') || canManageUsers
   const canAssignRequests = can('assign_change_requests') || can('view_all_change_requests')
+  const canReview = can('review_change_requests')
   const canViewLogs = can('view_activity_logs')
+  const canContentEditor = can('submit_change_requests') || can('edit_sections') || can('request_deployments')
+  const canDeploymentHub = can('deploy_websites') || can('manage_templates') || can('manage_deployment_sections') || can('publish_live_content') || can('view_all_deployments')
   const [requests, setRequests] = useState([])
   const [users, setUsers] = useState([])
   const [logs, setLogs] = useState([])
-  const [activeTab, setActiveTab] = useState('new')
+  const [activeTab, setActiveTab] = useState('change-requests')
   const [selectedApprover, setSelectedApprover] = useState({})
   const [assigningId, setAssigningId] = useState(null)
   const [previewSnapshots, setPreviewSnapshots] = useState(() => loadPreviewSnapshots())
@@ -849,18 +860,22 @@ export default function ManagerDashboard() {
   }
 
   const tabs = useMemo(() => [
-    canAssignRequests && { id: 'new', label: 'New Requests', count: newRequests.length, icon: FaInbox },
-    canAssignRequests && { id: 'previous', label: 'History', count: previousRequests.length, icon: FaClipboardList },
+    canAssignRequests && { id: 'change-requests', label: 'Change Requests', count: newRequests.length, icon: FaInbox },
+    canReview && { id: 'review-queue', label: 'Review Queue', icon: FaClipboardCheck },
     canManageUsers && { id: 'create-user', label: 'Create User', icon: FaUserPlus },
     canViewUsers && { id: 'users', label: 'Team', count: users.length, icon: FaUsers },
+    canContentEditor && { id: 'content-editor', label: 'Content Editor', icon: FaEdit },
+    canDeploymentHub && { id: 'deployment-hub', label: 'Deployment Hub', icon: FaRocket },
     canViewLogs && { id: 'logs', label: 'Activity', icon: FaListAlt },
   ].filter(Boolean), [
     canAssignRequests,
+    canReview,
     canManageUsers,
     canViewUsers,
+    canContentEditor,
+    canDeploymentHub,
     canViewLogs,
     newRequests.length,
-    previousRequests.length,
     users.length,
   ])
 
@@ -1017,30 +1032,36 @@ export default function ManagerDashboard() {
           })}
         </div>
 
-        {/* Request tabs: search bar */}
-        {(activeTab === 'new' || activeTab === 'previous') && (
-          <div className="relative mb-6 max-w-md">
-            <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-            <input
-              type="search"
-              placeholder="Search by section, editor, approver, or ID…"
-              value={requestSearch}
-              onChange={e => setRequestSearch(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E] transition"
-            />
-          </div>
+        {/* Request tabs: search bar — handled inside ChangeRequestAssignmentPanel */}
+
+        {activeTab === 'change-requests' && canAssignRequests && (
+          <ChangeRequestAssignmentPanel onMessage={setMessage} onError={setError} />
         )}
 
-        {activeTab === 'new' && renderRequestList(
-          filteredNewRequests,
-          'No New Requests',
-          'All incoming change requests have been assigned to approvers.'
+        {activeTab === 'review-queue' && canReview && (
+          <ReviewQueuePanel />
         )}
 
-        {activeTab === 'previous' && renderRequestList(
-          filteredPreviousRequests,
-          'No Previous Requests',
-          'Completed, rejected, and in-review requests will appear here.'
+        {activeTab === 'content-editor' && canContentEditor && (
+          <Suspense fallback={
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center text-gray-500">
+              <div className="w-10 h-10 mx-auto mb-4 rounded-full border-4 border-[#C8102E] border-t-transparent animate-spin" />
+              <p className="text-sm font-semibold">Loading content editor…</p>
+            </div>
+          }>
+            <AdvisorDashboard embedded />
+          </Suspense>
+        )}
+
+        {activeTab === 'deployment-hub' && canDeploymentHub && (
+          <Suspense fallback={
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center text-gray-500">
+              <div className="w-10 h-10 mx-auto mb-4 rounded-full border-4 border-[#C8102E] border-t-transparent animate-spin" />
+              <p className="text-sm font-semibold">Loading deployment hub…</p>
+            </div>
+          }>
+            <PowerAdminDashboard embedded />
+          </Suspense>
         )}
 
         {activeTab === 'create-user' && (
