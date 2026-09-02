@@ -1,14 +1,7 @@
 import { FaSignOutAlt } from 'react-icons/fa'
 import { useAuth } from './context/AuthContext'
+import { useRoleLabels } from './context/RoleLabelsContext'
 import { useNavigate } from 'react-router-dom'
-
-const ROLE_LABELS = {
-    power_admin: 'Power Admin',
-    advisor: 'Advisor',
-    approver: 'Approver',
-    manager: 'Manager',
-    client_admin: 'Client Admin',
-}
 
 const ROLE_BADGE_STYLES = {
     power_admin: 'bg-orange-500/90 text-white',
@@ -18,13 +11,9 @@ const ROLE_BADGE_STYLES = {
     client_admin: 'bg-slate-500/90 text-white',
 }
 
-function formatRole(role) {
-    if (!role) return 'User'
-    return ROLE_LABELS[role] || role.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-}
-
 export default function Navbar() {
     const { user, logout } = useAuth()
+    const { getRoleLabel, getConsoleTitle } = useRoleLabels()
     const navigate = useNavigate()
 
     const handleLogout = async () => {
@@ -32,7 +21,7 @@ export default function Navbar() {
         navigate('/')
     }
 
-    const roleLabel = formatRole(user?.role)
+    const roleLabel = getRoleLabel(user?.role)
     const roleBadgeClass = ROLE_BADGE_STYLES[user?.role] || 'bg-[#C8102E] text-white'
     const initials = user?.name
         ?.split(' ')
@@ -54,7 +43,7 @@ export default function Navbar() {
                             Dashboard
                         </h1>
                         <p className="text-[10px] sm:text-xs text-white/50 font-semibold mt-0.5 truncate">
-                            {roleLabel} Console
+                            {getConsoleTitle(user?.role)}
                         </p>
                     </div>
                 </div>

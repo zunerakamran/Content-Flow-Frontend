@@ -22,9 +22,11 @@ import {
     FaThLarge,
     FaList,
     FaPen,
+    FaTags,
 } from 'react-icons/fa'
 import Navbar from './Navbar'
 import api from './api/axios'
+import { useRoleLabels } from './context/RoleLabelsContext'
 import { sectionDisplayName } from './utils/sectionDisplay'
 import TemplateScrollPreview from './components/TemplateScrollPreview'
 import { defaultTemplatePreviewUrl } from './utils/assetUrl'
@@ -131,6 +133,8 @@ const inputClass =
 const labelClass = 'block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1.5'
 
 export default function PowerAdminDashboard() {
+    const { records: roleLabelRecords, getRoleLabel, updateRoleLabel } = useRoleLabels()
+    const advisorLabel = getRoleLabel('advisor')
     const [requests, setRequests] = useState([])
     const [templates, setTemplates] = useState([])
     const [message, setMessage] = useState('')
@@ -168,6 +172,53 @@ export default function PowerAdminDashboard() {
     const [sectionDrafts, setSectionDrafts] = useState({})
     const [isLoadingSections, setIsLoadingSections] = useState(false)
     const [isSavingSections, setIsSavingSections] = useState(false)
+
+    const [roleLabelDrafts, setRoleLabelDrafts] = useState({})
+    const [savingRoleKey, setSavingRoleKey] = useState(null)
+
+    useEffect(() => {
+        const next = {}
+        for (const row of roleLabelRecords) {
+            next[row.role_key] = {
+                label: row.label || '',
+                description: row.description || '',
+            }
+        }
+        setRoleLabelDrafts(next)
+    }, [roleLabelRecords])
+
+    const handleRoleLabelDraftChange = (roleKey, field, value) => {
+        setRoleLabelDrafts(prev => ({
+            ...prev,
+            [roleKey]: {
+                ...prev[roleKey],
+                [field]: value,
+            },
+        }))
+    }
+
+    const handleSaveRoleLabel = async (roleKey) => {
+        const draft = roleLabelDrafts[roleKey]
+        if (!draft?.label?.trim()) {
+            setError('Role label cannot be empty.')
+            return
+        }
+
+        setSavingRoleKey(roleKey)
+        setError('')
+        setMessage('')
+        try {
+            await updateRoleLabel(roleKey, {
+                label: draft.label.trim(),
+                description: draft.description?.trim() || null,
+            })
+            setMessage(`Updated display name for ${draft.label.trim()}.`)
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to update role label.')
+        } finally {
+            setSavingRoleKey(null)
+        }
+    }
 
     const fetchData = useCallback(async (silent = false) => {
         if (!silent) setLoading(true)
@@ -405,6 +456,7 @@ export default function PowerAdminDashboard() {
     const tabs = [
         { id: 'templates', label: 'Template Catalog', icon: FaThLarge, count: templates.length },
         { id: 'deployments', label: 'Deployment Requests', icon: FaRocket, count: requests.length },
+        { id: 'role-labels', label: 'Role Labels', icon: FaTags, count: roleLabelRecords.length },
     ]
 
     const renderRequestActions = req => (
@@ -737,7 +789,7 @@ export default function PowerAdminDashboard() {
                                         <p className="text-sm text-gray-500">
                                             {requestSearch || statusFilter !== 'all'
                                                 ? 'Adjust your search or filter to see more results.'
-                                                : 'Advisor template requests will appear here when submitted.'}
+                                                : `${advisorLabel} template requests will appear here when submitted.`}
                                         </p>
                                     </div>
                                 ) : requestView === 'table' ? (
@@ -745,7 +797,7 @@ export default function PowerAdminDashboard() {
                                         <table className="w-full text-left border-collapse text-sm">
                                             <thead className="bg-slate-50 text-gray-500 text-[10px] font-extrabold uppercase tracking-wider">
                                                 <tr>
-                                                    <th className="px-6 py-4">Advisor & Firm</th>
+                                                    <th className="px-6 py-4">{advisorLabel} & Firm</th>
                                                     <th className="px-6 py-4">Template</th>
                                                     <th className="px-6 py-4">Domain</th>
                                                     <th className="px-6 py-4">Colors</th>
@@ -758,7 +810,7 @@ export default function PowerAdminDashboard() {
                                                     <tr key={req.id} className="hover:bg-slate-50/80 transition-colors">
                                                         <td className="px-6 py-4">
                                                             <div className="font-bold text-[#0B1B3D]">
-                                                                {req.advisor?.name || 'Advisor'}
+                                                                {req.advisor?.name || advisorLabel}
                                                             </div>
                                                             <div className="text-xs text-gray-500">
                                                                 {req.firm?.name || 'No Firm'}
@@ -812,7 +864,7 @@ export default function PowerAdminDashboard() {
                                                 <div className="flex items-start justify-between gap-3 mb-4">
                                                     <div>
                                                         <h3 className="font-bold text-[#0B1B3D]">
-                                                            {req.advisor?.name || 'Advisor'}
+                                                            {req.advisor?.name || advisorLabel}
                                                         </h3>
                                                         <p className="text-xs text-gray-500">{req.firm?.name || 'No Firm'}</p>
                                                     </div>
@@ -850,6 +902,74 @@ export default function PowerAdminDashboard() {
                                         ))}
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {activeTab === 'role-labels' && (
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                                <div className="p-6 border-b border-gray-100">
+                                    <h2 className="text-lg font-bold text-[#0B1B3D]">Dashboard Role Labels</h2>
+                                    <p className="text-xs text-gray-500 mt-0.5 max-w-2xl">
+                                        Customize the role names shown across the dashboard navbar, headers, and user management screens.
+                                    </p>
+                                </div>
+
+                                <div className="divide-y divide-gray-100">
+                                    {roleLabelRecords.map(row => {
+                                        const draft = roleLabelDrafts[row.role_key] || { label: row.label, description: row.description || '' }
+                                        const isSaving = savingRoleKey === row.role_key
+
+                                        return (
+                                            <div key={row.role_key} className="p-6 space-y-4">
+                                                <div className="flex items-center justify-between gap-3 flex-wrap">
+                                                    <div>
+                                                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">
+                                                            Role key
+                                                        </p>
+                                                        <p className="font-mono text-sm text-[#0B1B3D]">{row.role_key}</p>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleSaveRoleLabel(row.role_key)}
+                                                        disabled={isSaving || !draft.label?.trim()}
+                                                        className="inline-flex items-center gap-2 bg-[#0B1B3D] text-white text-xs font-bold px-4 py-2.5 rounded-lg hover:bg-slate-800 transition disabled:opacity-50"
+                                                    >
+                                                        {isSaving ? (
+                                                            <>
+                                                                <FaSync className="w-3 h-3 animate-spin" />
+                                                                Saving…
+                                                            </>
+                                                        ) : (
+                                                            'Save Label'
+                                                        )}
+                                                    </button>
+                                                </div>
+
+                                                <div className="grid md:grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className={labelClass}>Display Name</label>
+                                                        <input
+                                                            type="text"
+                                                            value={draft.label}
+                                                            onChange={e => handleRoleLabelDraftChange(row.role_key, 'label', e.target.value)}
+                                                            className={inputClass}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className={labelClass}>Description</label>
+                                                        <input
+                                                            type="text"
+                                                            value={draft.description}
+                                                            onChange={e => handleRoleLabelDraftChange(row.role_key, 'description', e.target.value)}
+                                                            placeholder="Shown when managers create users"
+                                                            className={inputClass}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )
+                                    })}
+                                </div>
                             </div>
                         )}
                     </>
@@ -980,7 +1100,7 @@ export default function PowerAdminDashboard() {
                     title="Manage Deployment Sections"
                     subtitle={
                         <>
-                            {sectionManageRequest.advisor?.name || 'Advisor'} —{' '}
+                            {sectionManageRequest.advisor?.name || advisorLabel} —{' '}
                             {sectionManageRequest.cpanel_domain && (
                                 <>
                                     {' '}
@@ -1134,7 +1254,7 @@ export default function PowerAdminDashboard() {
                     <form onSubmit={handleDeploySubmit} className="space-y-4">
 
                         <div>
-                            <label className={labelClass}>Advisor Site URL *</label>
+                            <label className={labelClass}>{advisorLabel} Site URL *</label>
                             <input
                                 type="url"
                                 required

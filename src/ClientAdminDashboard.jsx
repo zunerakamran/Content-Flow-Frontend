@@ -21,6 +21,7 @@ import Navbar from './Navbar'
 import Pagination from './components/Pagination'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
+import { useRoleLabels } from './context/RoleLabelsContext'
 
 const LOGS_PER_PAGE = 15
 
@@ -162,6 +163,7 @@ function ActivityRow({ log, showIndex, index }) {
 
 export default function ClientAdminDashboard() {
   const { user } = useAuth()
+  const { getDashboardTitle } = useRoleLabels()
   const [logs, setLogs] = useState([])
   const [activeTab, setActiveTab] = useState('overview')
   const [loading, setLoading] = useState(true)
@@ -285,7 +287,7 @@ export default function ClientAdminDashboard() {
         {/* Page header */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1B3D]">Client Admin Dashboard</h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1B3D]">{getDashboardTitle('client_admin')}</h1>
             <p className="text-gray-500 text-sm mt-1 max-w-xl">
               Monitor team activity, review audit logs, and export compliance reports.
             </p>

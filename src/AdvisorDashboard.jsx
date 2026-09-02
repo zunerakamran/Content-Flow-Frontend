@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import Navbar from './Navbar'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
+import { useRoleLabels } from './context/RoleLabelsContext'
 import SectionIframePreview from './SectionIframePreview'
 import TemplateScrollPreview from './components/TemplateScrollPreview'
 import ImageFieldPicker from './components/ImageFieldPicker'
@@ -328,6 +329,8 @@ function DeploymentSummaryBadge({ deployed, pending, rejected }) {
 }
 
 function DeploymentRequestCard({ request, isActive, onSelect }) {
+  const { getRoleLabel } = useRoleLabels()
+  const powerAdminLabel = getRoleLabel('power_admin')
   const config = REQUEST_STATUS_CONFIG[request.status] || REQUEST_STATUS_CONFIG.pending
   const isDeployed = request.status === 'deployed'
 
@@ -367,7 +370,7 @@ function DeploymentRequestCard({ request, isActive, onSelect }) {
             )}
             {request.status === 'pending' && (
               <p className="text-xs text-amber-700 mt-2">
-                Awaiting Power Admin review and cPanel deployment.
+                Awaiting {powerAdminLabel} review and cPanel deployment.
               </p>
             )}
             <div className="flex items-center flex-wrap gap-2 mt-2">
@@ -1142,6 +1145,9 @@ function aboutPreviewPayload(values) {
 
 export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExitPowerAdmin = null } = {}) {
   const { user } = useAuth()
+  const { getRoleLabel, getConsoleTitle } = useRoleLabels()
+  const powerAdminLabel = getRoleLabel('power_admin')
+  const advisorLabel = getRoleLabel('advisor')
   const isPowerAdminPublishMode = Boolean(powerAdminDeploymentId)
   const [pages, setPages] = useState([])
   const [selectedPageId, setSelectedPageId] = useState('')
@@ -1871,7 +1877,7 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
         secondary_color: secondaryColor,
         request_type: 'advisor_website'
       })
-      setMessage('Deployment request submitted! Power Admin will review it. You can request additional deployments anytime.')
+      setMessage(`Deployment request submitted! ${powerAdminLabel} will review it. You can request additional deployments anytime.`)
       setShowTemplateModal(false)
       setDomainName('')
       setLogoUrl('')
@@ -2358,7 +2364,7 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
           <div className="flex items-start justify-between flex-wrap gap-4 mb-6">
             <div>
               <p className="text-xs font-extrabold text-[#C8102E] uppercase tracking-widest mb-1">
-                {isPowerAdminPublishMode ? 'Power Admin — Direct Publish' : 'Advisor Console'}
+                {isPowerAdminPublishMode ? `${powerAdminLabel} — Direct Publish` : getConsoleTitle('advisor')}
               </p>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1B3D] tracking-tight">
                 {isPowerAdminPublishMode ? 'Edit Deployment Content' : 'Content Management'}
@@ -2370,7 +2376,7 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
               </p>
               {isPowerAdminPublishMode && activeDeployment && (
                 <p className="text-xs text-gray-500 mt-2">
-                  Editing: <strong className="text-[#0B1B3D]">{activeDeployment.advisor?.name || 'Advisor'}</strong>
+                  Editing: <strong className="text-[#0B1B3D]">{activeDeployment.advisor?.name || advisorLabel}</strong>
                   {' · '}
                   <span className="font-mono">{activeDeployment.domain_name || activeDeployment.cpanel_domain}</span>
                 </p>

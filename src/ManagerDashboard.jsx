@@ -28,6 +28,7 @@ import Navbar from './Navbar'
 import Pagination from './components/Pagination'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
+import { useRoleLabels } from './context/RoleLabelsContext'
 import { parseJson } from './utils/parseJson'
 import {
   buildPreviewFromRequest,
@@ -42,12 +43,6 @@ import SectionIframePreview from './SectionIframePreview'
 const LOGS_PER_PAGE = 15
 const PENDING_STATUS = 'pending'
 const PREVIOUS_STATUSES = new Set(['under_review', 'scheduled', 'approved', 'rejected'])
-
-const CREATABLE_ROLES = [
-  { value: 'advisor', label: 'Advisor (Editor)', description: 'Can edit website sections and submit change requests' },
-  { value: 'approver', label: 'Approver', description: 'Reviews and approves or rejects submitted changes' },
-  { value: 'client_admin', label: 'Client Admin', description: 'Manages firm settings and user access' },
-]
 
 const STATUS_CONFIG = {
   pending: {
@@ -221,9 +216,10 @@ function StatusBadge({ status, scheduledAt }) {
 }
 
 function RoleBadge({ role }) {
+  const { getRoleLabel } = useRoleLabels()
   return (
     <span className={`inline-flex items-center text-[11px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider border ${ROLE_COLORS[role] || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-      {role?.replace(/_/g, ' ')}
+      {getRoleLabel(role)}
     </span>
   )
 }
@@ -276,6 +272,8 @@ const ManagerRequestCard = memo(function ManagerRequestCard({
   getCachedPreview,
   cachePreview,
 }) {
+  const { getRoleLabel } = useRoleLabels()
+  const approverLabel = getRoleLabel('approver')
   const [previewData, setPreviewData] = useState(null)
   const [previewMode, setPreviewMode] = useState('visual')
   const [expandedPreviewSections, setExpandedPreviewSections] = useState(() => new Set())
@@ -318,7 +316,7 @@ const ManagerRequestCard = memo(function ManagerRequestCard({
 
   const handleAssign = () => {
     if (!selectedApproverId) {
-      onError('Please select an approver before assigning.')
+      onError(`Please select an ${approverLabel.toLowerCase()} before assigning.`)
       return
     }
     onAssign(req.id, selectedApproverId)
@@ -405,10 +403,10 @@ const ManagerRequestCard = memo(function ManagerRequestCard({
             <div className="min-w-0 flex-1">
               <p className="text-sm font-bold text-amber-900 flex items-center gap-2">
                 <FaUserCheck className="w-4 h-4 shrink-0" />
-                Assign to Approver
+                Assign to {approverLabel}
               </p>
               <p className="text-xs text-amber-700 mt-0.5">
-                Select an approver from your team to review this request.
+                Select an {approverLabel.toLowerCase()} from your team to review this request.
               </p>
             </div>
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 sm:min-w-[320px]">
@@ -417,7 +415,7 @@ const ManagerRequestCard = memo(function ManagerRequestCard({
                 onChange={e => onSelectApprover(req.id, e.target.value)}
                 className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]/20 focus:border-[#0B1B3D] bg-white"
               >
-                <option value="">Choose approver…</option>
+                <option value="">Choose {approverLabel.toLowerCase()}…</option>
                 {approvers.map(a => (
                   <option key={a.id} value={a.id}>
                     {a.name} ({a.email}){a.firm?.name ? ` — ${a.firm.name}` : ''}
@@ -446,7 +444,7 @@ const ManagerRequestCard = memo(function ManagerRequestCard({
           </div>
           {approvers.length === 0 && (
             <p className="text-xs text-amber-800 mt-3 bg-amber-100/60 rounded-lg px-3 py-2">
-              No approvers found. Create an approver account in the <strong>Create User</strong> tab first.
+              No {approverLabel.toLowerCase()}s found. Create an {approverLabel.toLowerCase()} account in the <strong>Create User</strong> tab first.
             </p>
           )}
         </div>
@@ -612,6 +610,7 @@ const ManagerRequestCard = memo(function ManagerRequestCard({
 
 export default function ManagerDashboard() {
   const { user } = useAuth()
+  const { getRoleLabel, getRoleDescription, getDashboardTitle } = useRoleLabels()
   const [requests, setRequests] = useState([])
   const [users, setUsers] = useState([])
   const [logs, setLogs] = useState([])
@@ -639,6 +638,24 @@ export default function ManagerDashboard() {
   })
 
   const approvers = useMemo(() => users.filter(u => u.role === 'approver'), [users])
+
+  const creatableRoles = useMemo(() => ([
+    {
+      value: 'advisor',
+      label: `${getRoleLabel('advisor')} (Editor)`,
+      description: getRoleDescription('advisor'),
+    },
+    {
+      value: 'approver',
+      label: getRoleLabel('approver'),
+      description: getRoleDescription('approver'),
+    },
+    {
+      value: 'client_admin',
+      label: getRoleLabel('client_admin'),
+      description: getRoleDescription('client_admin'),
+    },
+  ]), [getRoleLabel, getRoleDescription])
 
   const cachePreview = useCallback((requestId, preview) => {
     if (!preview) return
@@ -760,7 +777,7 @@ export default function ManagerDashboard() {
       await api.post(`/change-requests/${requestId}/assign-to-approver`, {
         approver_id: Number(approverId),
       })
-      setMessage('Request assigned to approver successfully.')
+      setMessage(`Request assigned to ${getRoleLabel('approver').toLowerCase()} successfully.`)
       await fetchRequests()
       setSelectedApprover(prev => {
         const next = { ...prev }
@@ -833,7 +850,7 @@ export default function ManagerDashboard() {
     { id: 'logs', label: 'Activity', icon: FaListAlt },
   ]
 
-  const selectedRoleInfo = CREATABLE_ROLES.find(r => r.value === userForm.role)
+  const selectedRoleInfo = creatableRoles.find(r => r.value === userForm.role)
 
   const renderRequestList = (list, emptyTitle, emptyHint) => {
     if (loading) {
@@ -900,9 +917,9 @@ export default function ManagerDashboard() {
         {/* Page header */}
         <div className="flex flex-wrap items-start justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1B3D]">Manager Dashboard</h1>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0B1B3D]">{getDashboardTitle('manager')}</h1>
             <p className="text-gray-500 text-sm mt-1 max-w-xl">
-              Manage your team, assign incoming change requests to approvers, and track activity.
+              Manage your team, assign incoming change requests to {getRoleLabel('approver').toLowerCase()}s, and track activity.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -1016,7 +1033,7 @@ export default function ManagerDashboard() {
                 <div>
                   <h2 className="text-xl font-bold text-[#0B1B3D]">Create New User</h2>
                   <p className="text-sm text-gray-500">
-                    Add advisors, approvers, or client admins to your team.
+                    Add {getRoleLabel('advisor').toLowerCase()}s, {getRoleLabel('approver').toLowerCase()}s, or {getRoleLabel('client_admin').toLowerCase()}s to your team.
                   </p>
                 </div>
               </div>
@@ -1062,7 +1079,7 @@ export default function ManagerDashboard() {
                     className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]/20 focus:border-[#0B1B3D] bg-white transition"
                     required
                   >
-                    {CREATABLE_ROLES.map(r => (
+                    {creatableRoles.map(r => (
                       <option key={r.value} value={r.value}>{r.label}</option>
                     ))}
                   </select>
@@ -1130,7 +1147,7 @@ export default function ManagerDashboard() {
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-5">
                 <h3 className="text-sm font-bold text-[#0B1B3D] mb-3">Role Guide</h3>
                 <div className="space-y-3">
-                  {CREATABLE_ROLES.map(r => (
+                  {creatableRoles.map(r => (
                     <div
                       key={r.value}
                       className={`p-3 rounded-xl border transition ${

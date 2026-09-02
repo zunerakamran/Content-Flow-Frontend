@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { RoleLabelsProvider } from './context/RoleLabelsContext'
 
 import Login from './Login'
 
@@ -80,8 +81,10 @@ const AppRoutes = () => {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppRoutes />
-    </AuthProvider>
+    <RoleLabelsProvider>
+      <AuthProvider>
+        <AppRoutes />
+      </AuthProvider>
+    </RoleLabelsProvider>
   )
 }
