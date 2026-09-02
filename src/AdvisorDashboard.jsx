@@ -14,26 +14,15 @@ import {
   isUploadedAsset,
 } from './utils/imageAssets'
 import {
-  FaBalanceScale,
   FaBriefcase,
   FaBuilding,
   FaChartLine,
   FaChartPie,
-  FaCoins,
   FaComments,
-  FaFileInvoiceDollar,
-  FaGlobe,
   FaHandHoldingUsd,
-  FaHandshake,
   FaLandmark,
   FaLightbulb,
-  FaPercentage,
-  FaSeedling,
-  FaShieldAlt,
-  FaStar,
-  FaTasks,
   FaUserTie,
-  FaUsers,
   FaAward,
   FaRocket,
   FaLock,
@@ -567,35 +556,6 @@ function ItemPanel({ index, title, children }) {
     </div>
   )
 }
-
-const SERVICE_ICON_OPTIONS = [
-  { value: 'chart-pie', label: 'Chart pie', Icon: FaChartPie },
-  { value: 'tasks', label: 'Tasks', Icon: FaTasks },
-  { value: 'landmark', label: 'Landmark', Icon: FaLandmark },
-  { value: 'coins', label: 'Coins', Icon: FaCoins },
-  { value: 'holding', label: 'Holding', Icon: FaHandHoldingUsd },
-  { value: 'seedling', label: 'Seedling', Icon: FaSeedling },
-  { value: 'briefcase', label: 'Briefcase', Icon: FaBriefcase },
-  { value: 'chart-line', label: 'Chart line', Icon: FaChartLine },
-  { value: 'handshake', label: 'Handshake', Icon: FaHandshake },
-  { value: 'building', label: 'Building', Icon: FaBuilding },
-  { value: 'users', label: 'Users', Icon: FaUsers },
-  { value: 'shield-alt', label: 'Shield', Icon: FaShieldAlt },
-  { value: 'lightbulb', label: 'Lightbulb', Icon: FaLightbulb },
-  { value: 'file-invoice-dollar', label: 'Invoice', Icon: FaFileInvoiceDollar },
-  { value: 'percentage', label: 'Percentage', Icon: FaPercentage },
-  { value: 'globe', label: 'Globe', Icon: FaGlobe },
-  { value: 'comments', label: 'Comments', Icon: FaComments },
-  { value: 'balance-scale', label: 'Balance', Icon: FaBalanceScale },
-]
-
-const STAT_ICON_OPTIONS = [
-  { value: 'users', label: 'Users', Icon: FaUsers },
-  { value: 'star', label: 'Star', Icon: FaStar },
-  { value: 'user-tie', label: 'User tie', Icon: FaUserTie },
-  { value: 'award', label: 'Award', Icon: FaAward },
-  ...SERVICE_ICON_OPTIONS.filter((opt) => opt.value !== 'users'),
-]
 
 function defaultFeaturedServiceBoxes() {
   return [
@@ -3060,16 +3020,6 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                               className={inputClass}
                                             />
                                           </div>
-                                          <div className="md:col-span-2">
-                                            <label className={labelClass}>YouTube URL</label>
-                                            <input
-                                              type="text"
-                                              value={slide.youtube_url || ''}
-                                              onChange={(e) => updateSlide({ youtube_url: e.target.value })}
-                                              placeholder="https://www.youtube.com/watch?v=..."
-                                              className={inputClass}
-                                            />
-                                          </div>
                                         </div>
                                       </div>
                                     </div>
@@ -3471,30 +3421,6 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                         <ItemPanel index={boxIndex} title={`Box ${boxIndex + 1}`}>
                                           <div className="grid md:grid-cols-2 gap-4">
                                             <div className="md:col-span-2">
-                                              <label className={labelClass}>Icon</label>
-                                              <div className="grid grid-cols-6 sm:grid-cols-9 gap-2">
-                                                {SERVICE_ICON_OPTIONS.map((opt) => {
-                                                  const selected = (box.icon || '') === opt.value
-                                                  const Icon = opt.Icon
-                                                  return (
-                                                    <button
-                                                      key={opt.value}
-                                                      type="button"
-                                                      title={opt.label}
-                                                      onClick={() => patchServiceBox(secId, boxIndex, { icon: opt.value })}
-                                                      className={`h-10 rounded-lg border flex items-center justify-center transition ${
-                                                        selected
-                                                          ? 'border-[#0B1B3D] bg-[#0B1B3D] text-white'
-                                                          : 'border-gray-200 bg-white text-[#0B1B3D] hover:border-gray-400'
-                                                      }`}
-                                                    >
-                                                      <Icon size={16} />
-                                                    </button>
-                                                  )
-                                                })}
-                                              </div>
-                                            </div>
-                                            <div className="md:col-span-2">
                                               <label className={labelClass}>Heading</label>
                                               <input
                                                 type="text"
@@ -3629,30 +3555,6 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                         />
                                         <ItemPanel index={highlightIndex} title={`Highlight ${highlightIndex + 1}`}>
                                           <div className="grid md:grid-cols-2 gap-4">
-                                            <div className="md:col-span-2">
-                                              <label className={labelClass}>Icon</label>
-                                              <div className="grid grid-cols-6 sm:grid-cols-9 gap-2">
-                                                {SERVICE_ICON_OPTIONS.map((opt) => {
-                                                  const selected = (item.icon || '') === opt.value
-                                                  const Icon = opt.Icon
-                                                  return (
-                                                    <button
-                                                      key={opt.value}
-                                                      type="button"
-                                                      title={opt.label}
-                                                      onClick={() => patchProgressHighlight(secId, highlightIndex, { icon: opt.value })}
-                                                      className={`h-10 rounded-lg border flex items-center justify-center transition ${
-                                                        selected
-                                                          ? 'border-[#0B1B3D] bg-[#0B1B3D] text-white'
-                                                          : 'border-gray-200 bg-white text-[#0B1B3D] hover:border-gray-400'
-                                                      }`}
-                                                    >
-                                                      <Icon size={16} />
-                                                    </button>
-                                                  )
-                                                })}
-                                              </div>
-                                            </div>
                                             <div className="md:col-span-2">
                                               <label className={labelClass}>Heading</label>
                                               <input
@@ -3928,30 +3830,6 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                       />
                                       <ItemPanel index={statIndex} title={`Stat ${statIndex + 1}`}>
                                         <div className="grid md:grid-cols-2 gap-4">
-                                          <div className="md:col-span-2">
-                                            <label className={labelClass}>Icon</label>
-                                            <div className="grid grid-cols-6 sm:grid-cols-9 gap-2">
-                                              {STAT_ICON_OPTIONS.map((opt) => {
-                                                const selected = (stat.icon || '') === opt.value
-                                                const Icon = opt.Icon
-                                                return (
-                                                  <button
-                                                    key={opt.value}
-                                                    type="button"
-                                                    title={opt.label}
-                                                    onClick={() => patchCounterStat(secId, statIndex, { icon: opt.value })}
-                                                    className={`h-10 rounded-lg border flex items-center justify-center transition ${
-                                                      selected
-                                                        ? 'border-[#0B1B3D] bg-[#0B1B3D] text-white'
-                                                        : 'border-gray-200 bg-white text-[#0B1B3D] hover:border-gray-400'
-                                                    }`}
-                                                  >
-                                                    <Icon size={16} />
-                                                  </button>
-                                                )
-                                              })}
-                                            </div>
-                                          </div>
                                           <div>
                                             <label className={labelClass}>Value</label>
                                             <input
