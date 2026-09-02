@@ -3053,26 +3053,6 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                               className={inputClass}
                                             />
                                           </div>
-                                          <div>
-                                            <label className={labelClass}>Button Text</label>
-                                            <input
-                                              type="text"
-                                              value={slide.button_text || ''}
-                                              onChange={(e) => updateSlide({ button_text: e.target.value })}
-                                              placeholder="GET IN TOUCH"
-                                              className={inputClass}
-                                            />
-                                          </div>
-                                          <div>
-                                            <label className={labelClass}>Button Link</label>
-                                            <input
-                                              type="text"
-                                              value={slide.button_url || ''}
-                                              onChange={(e) => updateSlide({ button_url: e.target.value })}
-                                              placeholder="#appointment"
-                                              className={inputClass}
-                                            />
-                                          </div>
                                           <div className="md:col-span-2">
                                             <label className={labelClass}>YouTube URL</label>
                                             <input
@@ -3174,26 +3154,6 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                                 value={box.text || ''}
                                                 onChange={(e) => patchBox(secId, activeBoxIndex, { text: e.target.value })}
                                                 placeholder="Box description..."
-                                                className={inputClass}
-                                              />
-                                            </div>
-                                            <div>
-                                              <label className={labelClass}>Read more button</label>
-                                              <input
-                                                type="text"
-                                                value={box.button_text || 'Read more'}
-                                                onChange={(e) => patchBox(secId, activeBoxIndex, { button_text: e.target.value })}
-                                                placeholder="Read more"
-                                                className={inputClass}
-                                              />
-                                            </div>
-                                            <div>
-                                              <label className={labelClass}>URL</label>
-                                              <input
-                                                type="text"
-                                                value={box.button_url || box.url || ''}
-                                                onChange={(e) => patchBox(secId, activeBoxIndex, { button_url: e.target.value })}
-                                                placeholder="#services"
                                                 className={inputClass}
                                               />
                                             </div>
@@ -3547,26 +3507,6 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                                 className={inputClass}
                                               />
                                             </div>
-                                            <div>
-                                              <label className={labelClass}>Button text</label>
-                                              <input
-                                                type="text"
-                                                value={box.button_text || ''}
-                                                onChange={(e) => patchServiceBox(secId, boxIndex, { button_text: e.target.value })}
-                                                placeholder="Read more"
-                                                className={inputClass}
-                                              />
-                                            </div>
-                                            <div>
-                                              <label className={labelClass}>Button URL</label>
-                                              <input
-                                                type="text"
-                                                value={box.button_url || box.url || ''}
-                                                onChange={(e) => patchServiceBox(secId, boxIndex, { button_url: e.target.value })}
-                                                placeholder="#services"
-                                                className={inputClass}
-                                              />
-                                            </div>
                                           </div>
                                         </ItemPanel>
                                       </div>
@@ -3806,26 +3746,6 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                                 className={inputClass}
                                               />
                                             </div>
-                                            <div>
-                                              <label className={labelClass}>Button text</label>
-                                              <input
-                                                type="text"
-                                                value={item.button_text || ''}
-                                                onChange={(e) => patchPortfolioItem(secId, itemIndex, { button_text: e.target.value })}
-                                                placeholder="Read more"
-                                                className={inputClass}
-                                              />
-                                            </div>
-                                            <div>
-                                              <label className={labelClass}>Button URL</label>
-                                              <input
-                                                type="text"
-                                                value={item.button_url || item.url || ''}
-                                                onChange={(e) => patchPortfolioItem(secId, itemIndex, { button_url: e.target.value })}
-                                                placeholder="#portfolio"
-                                                className={inputClass}
-                                              />
-                                            </div>
                                           </div>
                                         </ItemPanel>
                                       </div>
@@ -3872,16 +3792,6 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                         value={values.form_heading || ''}
                                         onChange={(e) => handleFieldValueChange(secId, 'form_heading', e.target.value)}
                                         placeholder="Book an appionment"
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Button text</label>
-                                      <input
-                                        type="text"
-                                        value={values.button_text || ''}
-                                        onChange={(e) => handleFieldValueChange(secId, 'button_text', e.target.value)}
-                                        placeholder="SEND YOUR MESSAGE"
                                         className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                       />
                                     </div>
@@ -4283,26 +4193,6 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                                 className={inputClass}
                                               />
                                             </div>
-                                            <div>
-                                              <label className={labelClass}>Button text</label>
-                                              <input
-                                                type="text"
-                                                value={item.button_text || ''}
-                                                onChange={(e) => patchNewsItem(secId, itemIndex, { button_text: e.target.value })}
-                                                placeholder="Read more"
-                                                className={inputClass}
-                                              />
-                                            </div>
-                                            <div>
-                                              <label className={labelClass}>Button URL</label>
-                                              <input
-                                                type="text"
-                                                value={item.button_url || item.url || ''}
-                                                onChange={(e) => patchNewsItem(secId, itemIndex, { button_url: e.target.value })}
-                                                placeholder="#news"
-                                                className={inputClass}
-                                              />
-                                            </div>
                                             <div className="md:col-span-2">
                                               <ImageFieldPicker
                                                 label="Featured Image"
@@ -4387,26 +4277,6 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                         className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                       />
                                     </div>
-                                    <div>
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Button text</label>
-                                      <input
-                                        type="text"
-                                        value={values.button_text || ''}
-                                        onChange={(e) => handleFieldValueChange(secId, 'button_text', e.target.value)}
-                                        placeholder="GET A QUOTE"
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
-                                      />
-                                    </div>
-                                    <div>
-                                      <label className="block text-xs font-bold text-gray-700 mb-1">Button URL</label>
-                                      <input
-                                        type="text"
-                                        value={values.button_url || ''}
-                                        onChange={(e) => handleFieldValueChange(secId, 'button_url', e.target.value)}
-                                        placeholder="#appointment"
-                                        className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
-                                      />
-                                    </div>
                                   </div>
                                 </div>
                               ) : (
@@ -4460,26 +4330,6 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                       onUpload={(file) => handleSectionImageUpload(secId, file)}
                                       uploading={uploadingState[`section-${secId}`]}
                                       localImages={localImages}
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">Button Text</label>
-                                    <input
-                                      type="text"
-                                      value={values.button_text || ''}
-                                      onChange={(e) => handleFieldValueChange(secId, 'button_text', e.target.value)}
-                                      placeholder="GET IN TOUCH"
-                                      className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-bold text-gray-700 mb-1">Button Link</label>
-                                    <input
-                                      type="text"
-                                      value={values.button_url || ''}
-                                      onChange={(e) => handleFieldValueChange(secId, 'button_url', e.target.value)}
-                                      placeholder="#appointment"
-                                      className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                     />
                                   </div>
                                 </div>
