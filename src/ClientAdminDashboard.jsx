@@ -179,8 +179,9 @@ export default function ClientAdminDashboard() {
   const { getDashboardTitle } = useRoleLabels()
   const { can } = usePermissions()
   const canManageUsers = can('manage_users')
-  const canViewUsers = can('view_users') || canManageUsers
+  const canViewUsers = can('view_users')
   const canViewLogs = can('view_activity_logs')
+  const canViewPlatformReport = can('view_platform_report')
   const canAssignRequests = can('assign_change_requests') || can('view_all_change_requests')
   const canReview = can('review_change_requests')
   const canContentEditor = can('submit_change_requests') || can('edit_sections') || can('request_deployments')
@@ -302,7 +303,7 @@ export default function ClientAdminDashboard() {
 
   const tabs = useMemo(() => [
     canViewLogs && { id: 'overview', label: 'Overview', icon: FaChartBar },
-    canViewLogs && { id: 'platform', label: 'Platform Summary', icon: FaBuilding },
+    canViewPlatformReport && { id: 'platform', label: 'Platform Summary', icon: FaBuilding },
     canViewLogs && { id: 'reports', label: 'Activity Reports', count: logs.length, icon: FaListAlt },
     canAssignRequests && { id: 'change-requests', label: 'Change Requests', icon: FaInbox },
     canReview && { id: 'review-queue', label: 'Review Queue', icon: FaClipboardCheck },
@@ -312,6 +313,7 @@ export default function ClientAdminDashboard() {
     canDeploymentHub && { id: 'deployment-hub', label: 'Deployment Hub', icon: FaRocket },
   ].filter(Boolean), [
     canViewLogs,
+    canViewPlatformReport,
     canManageUsers,
     canViewUsers,
     canAssignRequests,
@@ -441,7 +443,7 @@ export default function ClientAdminDashboard() {
           </div>
         ) : (
           <>
-            {activeTab === 'platform' && canViewLogs && (
+            {activeTab === 'platform' && canViewPlatformReport && (
               <PlatformSummaryReport onError={setError} />
             )}
 
@@ -744,7 +746,7 @@ export default function ClientAdminDashboard() {
 
             {activeTab === 'create-user' && canManageUsers && (
               <CreateUserPanel
-                onCreated={() => setActiveTab('users')}
+                onCreated={() => setActiveTab(canViewUsers ? 'users' : 'create-user')}
                 onError={setError}
                 onMessage={setMessage}
               />

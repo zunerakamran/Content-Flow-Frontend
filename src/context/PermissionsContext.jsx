@@ -3,7 +3,7 @@ import api from '../api/axios'
 import { useAuth } from './AuthContext'
 
 export const PERMISSION_CATALOG = [
-    { key: 'manage_users', name: 'Create & Manage Users', description: 'Create new users and manage team accounts.', category: 'Team' },
+    { key: 'manage_users', name: 'Create Users', description: 'Create new user accounts.', category: 'Team' },
     { key: 'view_users', name: 'View Team Users', description: 'View the list of users on the team.', category: 'Team' },
     { key: 'assign_change_requests', name: 'Assign Change Requests', description: 'Assign pending change requests to an approver.', category: 'Change Requests' },
     { key: 'view_all_change_requests', name: 'View All Change Requests', description: 'See change requests across firms.', category: 'Change Requests' },
@@ -17,6 +17,7 @@ export const PERMISSION_CATALOG = [
     { key: 'manage_deployment_sections', name: 'Manage Deployment Sections', description: 'Show or hide sections on a deployed site.', category: 'Deployments' },
     { key: 'publish_live_content', name: 'Publish Live Content', description: 'Publish live site content without approver review.', category: 'Content' },
     { key: 'view_activity_logs', name: 'View Activity Logs', description: 'View audit and activity logs.', category: 'Compliance' },
+    { key: 'view_platform_report', name: 'View Platform Report', description: 'View and refresh the platform summary report.', category: 'Compliance' },
     { key: 'manage_role_labels', name: 'Manage Role Labels', description: 'Rename role display names shown in the dashboard.', category: 'Settings' },
     { key: 'manage_role_permissions', name: 'Manage Role Permissions', description: 'Grant or revoke what each role can do.', category: 'Settings' },
 ]
@@ -30,9 +31,11 @@ const DEFAULT_MATRIX = {
         view_all_change_requests: true,
         view_all_deployments: true,
         view_activity_logs: true,
+        view_platform_report: true,
     },
     client_admin: {
         view_activity_logs: true,
+        view_platform_report: true,
     },
     approver: {
         review_change_requests: true,

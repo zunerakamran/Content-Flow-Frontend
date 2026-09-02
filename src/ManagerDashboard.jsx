@@ -623,10 +623,11 @@ export default function ManagerDashboard() {
   const { getRoleLabel, getRoleDescription, getDashboardTitle } = useRoleLabels()
   const { can } = usePermissions()
   const canManageUsers = can('manage_users')
-  const canViewUsers = can('view_users') || canManageUsers
+  const canViewUsers = can('view_users')
   const canAssignRequests = can('assign_change_requests') || can('view_all_change_requests')
   const canReview = can('review_change_requests')
   const canViewLogs = can('view_activity_logs')
+  const canViewPlatformReport = can('view_platform_report')
   const canContentEditor = can('submit_change_requests') || can('edit_sections') || can('request_deployments')
   const canDeploymentHub = can('deploy_websites') || can('manage_templates') || can('manage_deployment_sections') || can('publish_live_content') || can('view_all_deployments')
   const [requests, setRequests] = useState([])
@@ -713,14 +714,18 @@ export default function ManagerDashboard() {
     else setLoading(true)
     setError('')
     try {
-      await Promise.all([fetchRequests(), fetchUsers(), fetchLogs()])
+      const tasks = []
+      if (canAssignRequests || canReview) tasks.push(fetchRequests())
+      if (canViewUsers || canManageUsers || canAssignRequests) tasks.push(fetchUsers())
+      if (canViewLogs) tasks.push(fetchLogs())
+      if (tasks.length) await Promise.all(tasks)
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load dashboard data.')
     } finally {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [fetchRequests, fetchUsers, fetchLogs])
+  }, [fetchRequests, fetchUsers, fetchLogs, canAssignRequests, canReview, canViewUsers, canManageUsers, canViewLogs])
 
   useEffect(() => {
     loadAll()
@@ -846,7 +851,9 @@ export default function ManagerDashboard() {
         role: 'advisor',
       })
       await fetchUsers()
-      setActiveTab('users')
+      if (canViewUsers) {
+        setActiveTab('users')
+      }
     } catch (err) {
       const validationErrors = err.response?.data?.errors
       if (validationErrors) {
@@ -867,7 +874,7 @@ export default function ManagerDashboard() {
     canViewUsers && { id: 'users', label: 'Team', count: users.length, icon: FaUsers },
     canContentEditor && { id: 'content-editor', label: 'Content Editor', icon: FaEdit },
     canDeploymentHub && { id: 'deployment-hub', label: 'Deployment Hub', icon: FaRocket },
-    canViewLogs && { id: 'platform', label: 'Platform Summary', icon: FaBuilding },
+    canViewPlatformReport && { id: 'platform', label: 'Platform Summary', icon: FaBuilding },
     canViewLogs && { id: 'logs', label: 'Activity', icon: FaListAlt },
   ].filter(Boolean), [
     canAssignRequests,
@@ -876,6 +883,7 @@ export default function ManagerDashboard() {
     canViewUsers,
     canContentEditor,
     canDeploymentHub,
+    canViewPlatformReport,
     canViewLogs,
     newRequests.length,
     users.length,
@@ -1341,7 +1349,7 @@ export default function ManagerDashboard() {
           </div>
         )}
 
-        {activeTab === 'platform' && canViewLogs && (
+        {activeTab === 'platform' && canViewPlatformReport && (
           <PlatformSummaryReport onError={setError} />
         )}
 
