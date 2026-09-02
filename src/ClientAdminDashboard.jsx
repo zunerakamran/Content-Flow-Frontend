@@ -31,6 +31,7 @@ import { useAuth } from './context/AuthContext'
 import { useRoleLabels } from './context/RoleLabelsContext'
 import { usePermissions } from './context/PermissionsContext'
 import { CreateUserPanel, TeamUsersPanel } from './components/TeamUserManagement'
+import PlatformSummaryReport from './components/PlatformSummaryReport'
 
 const AdvisorDashboard = lazy(() => import('./AdvisorDashboard'))
 const PowerAdminDashboard = lazy(() => import('./PowerAdminDashboard'))
@@ -301,6 +302,7 @@ export default function ClientAdminDashboard() {
 
   const tabs = useMemo(() => [
     canViewLogs && { id: 'overview', label: 'Overview', icon: FaChartBar },
+    canViewLogs && { id: 'platform', label: 'Platform Summary', icon: FaBuilding },
     canViewLogs && { id: 'reports', label: 'Activity Reports', count: logs.length, icon: FaListAlt },
     canAssignRequests && { id: 'change-requests', label: 'Change Requests', icon: FaInbox },
     canReview && { id: 'review-queue', label: 'Review Queue', icon: FaClipboardCheck },
@@ -439,6 +441,10 @@ export default function ClientAdminDashboard() {
           </div>
         ) : (
           <>
+            {activeTab === 'platform' && canViewLogs && (
+              <PlatformSummaryReport onError={setError} />
+            )}
+
             {activeTab === 'overview' && canViewLogs && (
               <div className="grid lg:grid-cols-2 gap-6">
                 {/* Action breakdown */}

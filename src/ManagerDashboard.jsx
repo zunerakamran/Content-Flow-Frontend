@@ -31,6 +31,7 @@ import Pagination from './components/Pagination'
 import ChangeRequestAssignmentPanel from './components/ChangeRequestAssignmentPanel'
 import ReviewQueuePanel from './components/ReviewQueuePanel'
 import { CreateUserPanel, TeamUsersPanel } from './components/TeamUserManagement'
+import PlatformSummaryReport from './components/PlatformSummaryReport'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import { useRoleLabels } from './context/RoleLabelsContext'
@@ -866,6 +867,7 @@ export default function ManagerDashboard() {
     canViewUsers && { id: 'users', label: 'Team', count: users.length, icon: FaUsers },
     canContentEditor && { id: 'content-editor', label: 'Content Editor', icon: FaEdit },
     canDeploymentHub && { id: 'deployment-hub', label: 'Deployment Hub', icon: FaRocket },
+    canViewLogs && { id: 'platform', label: 'Platform Summary', icon: FaBuilding },
     canViewLogs && { id: 'logs', label: 'Activity', icon: FaListAlt },
   ].filter(Boolean), [
     canAssignRequests,
@@ -1337,6 +1339,10 @@ export default function ManagerDashboard() {
               )}
             </div>
           </div>
+        )}
+
+        {activeTab === 'platform' && canViewLogs && (
+          <PlatformSummaryReport onError={setError} />
         )}
 
         {activeTab === 'logs' && (
