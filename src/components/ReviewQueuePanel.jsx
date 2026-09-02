@@ -213,20 +213,6 @@ function AlertBanner({ type, message, onDismiss }) {
   )
 }
 
-function StatCard({ label, value, icon: Icon, accent }) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${accent}`}>
-        <Icon className="w-5 h-5" />
-      </div>
-      <div>
-        <p className="text-2xl font-extrabold text-[#0B1B3D] leading-none">{value}</p>
-        <p className="text-xs text-gray-500 font-semibold mt-1">{label}</p>
-      </div>
-    </div>
-  )
-}
-
 const RequestCard = memo(function RequestCard({
   req,
   user,
@@ -798,63 +784,11 @@ export default function ReviewQueuePanel() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-        <div>
-          <h2 className="text-xl font-bold text-[#0B1B3D]">Review Queue</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            Pick up change requests, preview edits side-by-side, then approve or reject.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => fetchRequests(true)}
-          disabled={refreshing || loading}
-          className="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition shadow-sm disabled:opacity-60"
-        >
-          <FaSync className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </button>
-      </div>
-
       {message && <AlertBanner type="success" message={message} onDismiss={() => setMessage('')} />}
       {error && <AlertBanner type="error" message={error} onDismiss={() => setError('')} />}
 
-      {!loading && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-          <StatCard label="Awaiting Pickup" value={stats.pending} icon={FaInbox} accent="bg-amber-100 text-amber-600" />
-          <StatCard label="Under Review" value={stats.underReview} icon={FaClipboardCheck} accent="bg-blue-100 text-blue-600" />
-          <StatCard label="Scheduled" value={stats.scheduled} icon={FaCalendarCheck} accent="bg-purple-100 text-purple-600" />
-          <StatCard label="Total Active" value={stats.active} icon={FaClock} accent="bg-teal-100 text-teal-600" />
-        </div>
-      )}
-
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setView('active')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition ${
-              view === 'active'
-                ? 'bg-[#0B1B3D] text-white shadow-sm'
-                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            Needs Review ({stats.active})
-          </button>
-          <button
-            type="button"
-            onClick={() => setView('all')}
-            className={`px-4 py-2 rounded-xl text-sm font-bold transition ${
-              view === 'all'
-                ? 'bg-[#0B1B3D] text-white shadow-sm'
-                : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-            }`}
-          >
-            All Requests ({requests.length})
-          </button>
-        </div>
-
-        <div className="relative flex-1 sm:max-w-xs sm:ml-auto">
+        <div className="relative flex-1 sm:max-w-md">
           <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
           <input
             type="search"
@@ -864,6 +798,25 @@ export default function ReviewQueuePanel() {
             className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E] transition"
           />
         </div>
+
+        <select
+          value={view}
+          onChange={e => setView(e.target.value)}
+          className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]/20 focus:border-[#0B1B3D] bg-white transition sm:min-w-[160px]"
+        >
+          <option value="active">Needs review ({stats.active})</option>
+          <option value="all">All requests ({requests.length})</option>
+        </select>
+
+        <button
+          type="button"
+          onClick={() => fetchRequests(true)}
+          disabled={refreshing || loading}
+          className="inline-flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition shadow-sm disabled:opacity-60 shrink-0"
+        >
+          <FaSync className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </button>
       </div>
 
       {loading ? (

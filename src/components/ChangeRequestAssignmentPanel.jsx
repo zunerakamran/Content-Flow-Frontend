@@ -13,7 +13,6 @@ import {
   FaLayerGroup,
   FaInbox,
   FaClipboardCheck,
-  FaClipboardList,
   FaSearch,
   FaSync,
   FaUserCheck,
@@ -216,20 +215,6 @@ function AlertBanner({ type, message, onDismiss }) {
       >
         <FaTimes className="w-4 h-4" />
       </button>
-    </div>
-  )
-}
-
-function StatCard({ label, value, icon: Icon, accent }) {
-  return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex items-center gap-4">
-      <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${accent}`}>
-        <Icon className="w-5 h-5" />
-      </div>
-      <div>
-        <p className="text-2xl font-extrabold text-[#0B1B3D] leading-none">{value}</p>
-        <p className="text-xs text-gray-500 font-semibold mt-1">{label}</p>
-      </div>
     </div>
   )
 }
@@ -592,7 +577,7 @@ export default function ChangeRequestAssignmentPanel({ onMessage: externalOnMess
   const [localError, setLocalError] = useState('')
   const [requests, setRequests] = useState([])
   const [users, setUsers] = useState([])
-  const [activeTab, setActiveTab] = useState('new')
+  const [statusFilter, setStatusFilter] = useState('pending')
   const [selectedApprover, setSelectedApprover] = useState({})
   const [assigningId, setAssigningId] = useState(null)
   const [previewSnapshots, setPreviewSnapshots] = useState(() => loadPreviewSnapshots())
@@ -656,18 +641,14 @@ export default function ChangeRequestAssignmentPanel({ onMessage: externalOnMess
     [requests]
   )
 
-  const previousRequests = useMemo(
-    () => requests.filter(r => PREVIOUS_STATUSES.has(r.status)),
-    [requests]
-  )
+  const filteredRequests = useMemo(() => {
+    let list = requests
+    if (statusFilter === 'pending') {
+      list = requests.filter(r => r.status === PENDING_STATUS)
+    } else if (statusFilter === 'history') {
+      list = requests.filter(r => PREVIOUS_STATUSES.has(r.status))
+    }
 
-  const stats = useMemo(() => ({
-    new: newRequests.length,
-    underReview: requests.filter(r => r.status === 'under_review').length,
-    completed: requests.filter(r => r.status === 'approved' || r.status === 'scheduled').length,
-  }), [requests, newRequests])
-
-  const filterRequests = useCallback((list) => {
     if (!requestSearch.trim()) return list
     const q = requestSearch.trim().toLowerCase()
     return list.filter(r => {
@@ -676,10 +657,7 @@ export default function ChangeRequestAssignmentPanel({ onMessage: externalOnMess
       const approver = (r.approver?.name || '').toLowerCase()
       return searchText.includes(q) || editor.includes(q) || approver.includes(q) || String(r.id).includes(q)
     })
-  }, [requestSearch])
-
-  const filteredNewRequests = useMemo(() => filterRequests(newRequests), [newRequests, filterRequests])
-  const filteredPreviousRequests = useMemo(() => filterRequests(previousRequests), [previousRequests, filterRequests])
+  }, [requests, statusFilter, requestSearch])
 
   const handleAssign = async (requestId, approverId) => {
     setAssigningId(requestId)
@@ -770,94 +748,45 @@ export default function ChangeRequestAssignmentPanel({ onMessage: externalOnMess
         <AlertBanner type="error" message={localError} onDismiss={() => setLocalError('')} />
       )}
 
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-        <div>
-          <h2 className="text-xl font-bold text-[#0B1B3D]">Change Requests</h2>
-          <p className="text-sm text-gray-500 mt-1">
-            {canAssign
-              ? `Assign incoming requests to ${getRoleLabel('approver').toLowerCase()}s and track history.`
-              : 'View change requests across your organization.'}
-          </p>
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
+        <div className="relative flex-1 sm:max-w-md">
+          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+          <input
+            type="search"
+            placeholder="Search by section, editor, approver, or ID…"
+            value={requestSearch}
+            onChange={e => setRequestSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E] transition"
+          />
         </div>
+
+        <select
+          value={statusFilter}
+          onChange={e => setStatusFilter(e.target.value)}
+          className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]/20 focus:border-[#0B1B3D] bg-white transition sm:min-w-[160px]"
+        >
+          <option value="pending">Pending ({newRequests.length})</option>
+          <option value="history">History</option>
+          <option value="all">All requests</option>
+        </select>
+
         <button
           type="button"
           onClick={() => loadAll(true)}
           disabled={refreshing || loading}
-          className="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition shadow-sm disabled:opacity-60"
+          className="inline-flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-gray-50 transition shadow-sm disabled:opacity-60 shrink-0"
         >
           <FaSync className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
           Refresh
         </button>
       </div>
 
-      {!loading && (
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6">
-          <StatCard label="New Requests" value={stats.new} icon={FaInbox} accent="bg-amber-100 text-amber-600" />
-          <StatCard label="Under Review" value={stats.underReview} icon={FaClipboardCheck} accent="bg-blue-100 text-blue-600" />
-          <StatCard label="Completed" value={stats.completed} icon={FaCheckCircle} accent="bg-emerald-100 text-emerald-600" />
-        </div>
-      )}
-
-      <div className="flex flex-wrap items-center gap-2 mb-6">
-        <button
-          type="button"
-          onClick={() => setActiveTab('new')}
-          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition ${
-            activeTab === 'new'
-              ? 'bg-[#0B1B3D] text-white shadow-sm'
-              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-          }`}
-        >
-          <FaInbox className="w-3.5 h-3.5" />
-          New Requests
-          <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-extrabold ${
-            activeTab === 'new' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
-          }`}>
-            {newRequests.length}
-          </span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('previous')}
-          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition ${
-            activeTab === 'previous'
-              ? 'bg-[#0B1B3D] text-white shadow-sm'
-              : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
-          }`}
-        >
-          <FaClipboardList className="w-3.5 h-3.5" />
-          History
-          <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-extrabold ${
-            activeTab === 'previous' ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-600'
-          }`}>
-            {previousRequests.length}
-          </span>
-        </button>
-      </div>
-
-      <div className="relative mb-6 max-w-md">
-        <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
-        <input
-          type="search"
-          placeholder="Search by section, editor, approver, or ID…"
-          value={requestSearch}
-          onChange={e => setRequestSearch(e.target.value)}
-          className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E] transition"
-        />
-      </div>
-
-      {activeTab === 'new' && renderRequestList(
-        filteredNewRequests,
-        'No New Requests',
+      {renderRequestList(
+        filteredRequests,
+        statusFilter === 'pending' ? 'No pending requests' : statusFilter === 'history' ? 'No history yet' : 'No change requests',
         canAssign
-          ? 'All incoming change requests have been assigned to approvers.'
-          : 'There are no pending change requests right now.'
-      )}
-
-      {activeTab === 'previous' && renderRequestList(
-        filteredPreviousRequests,
-        'No Previous Requests',
-        'Completed, rejected, and in-review requests will appear here.'
+          ? 'Incoming requests you can assign will appear here.'
+          : 'Change requests will appear here when available.'
       )}
     </div>
   )

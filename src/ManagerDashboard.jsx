@@ -983,33 +983,17 @@ export default function ManagerDashboard() {
         {message && <AlertBanner type="success" message={message} onDismiss={() => setMessage('')} />}
         {error && <AlertBanner type="error" message={error} onDismiss={() => setError('')} />}
 
-        {/* Stats */}
-        {!loading && (
+        {/* Stats — only show when relevant permissions exist; skip request cards (handled in Change Requests list) */}
+        {!loading && (canViewUsers || canViewLogs || canViewPlatformReport) && (
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-            <StatCard
-              label="New Requests"
-              value={stats.new}
-              icon={FaInbox}
-              accent="bg-amber-100 text-amber-600"
-            />
-            <StatCard
-              label="Under Review"
-              value={stats.underReview}
-              icon={FaClipboardCheck}
-              accent="bg-blue-100 text-blue-600"
-            />
-            <StatCard
-              label="Completed"
-              value={stats.completed}
-              icon={FaCheckCircle}
-              accent="bg-emerald-100 text-emerald-600"
-            />
-            <StatCard
-              label="Team Members"
-              value={stats.team}
-              icon={FaUsers}
-              accent="bg-violet-100 text-violet-600"
-            />
+            {canViewUsers && (
+              <StatCard
+                label="Team Members"
+                value={stats.team}
+                icon={FaUsers}
+                accent="bg-violet-100 text-violet-600"
+              />
+            )}
           </div>
         )}
 
