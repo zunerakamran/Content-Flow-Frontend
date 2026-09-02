@@ -3,6 +3,16 @@ import api from '../api/axios'
 
 const AuthContext = createContext()
 
+function withPermissions(user, permissions) {
+    if (!user) return null
+    return {
+        ...user,
+        permissions: Array.isArray(permissions)
+            ? permissions
+            : (Array.isArray(user.permissions) ? user.permissions : undefined),
+    }
+}
+
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null)
     const [loading, setLoading] = useState(true)
@@ -11,7 +21,7 @@ export const AuthProvider = ({ children }) => {
         const token = localStorage.getItem('token')
         if (token) {
             api.get('/me')
-                .then(res => setUser(res.data))
+                .then(res => setUser(withPermissions(res.data, res.data?.permissions)))
                 .catch(() => localStorage.removeItem('token'))
                 .finally(() => setLoading(false))
         } else {
@@ -22,8 +32,9 @@ export const AuthProvider = ({ children }) => {
     const login = async (email, password) => {
         const res = await api.post('/login', { email, password })
         localStorage.setItem('token', res.data.token)
-        setUser(res.data.user)
-        return res.data.user
+        const nextUser = withPermissions(res.data.user, res.data.permissions)
+        setUser(nextUser)
+        return nextUser
     }
 
     const logout = async () => {
@@ -32,8 +43,15 @@ export const AuthProvider = ({ children }) => {
         setUser(null)
     }
 
+    const refreshUser = async () => {
+        const res = await api.get('/me')
+        const nextUser = withPermissions(res.data, res.data?.permissions)
+        setUser(nextUser)
+        return nextUser
+    }
+
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading }}>
+        <AuthContext.Provider value={{ user, login, logout, loading, refreshUser, setUser }}>
             {children}
         </AuthContext.Provider>
     )

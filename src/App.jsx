@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { RoleLabelsProvider } from './context/RoleLabelsContext'
+import { PermissionsProvider } from './context/PermissionsContext'
 
 import Login from './Login'
 
@@ -83,7 +84,9 @@ export default function App() {
   return (
     <RoleLabelsProvider>
       <AuthProvider>
-        <AppRoutes />
+        <PermissionsProvider>
+          <AppRoutes />
+        </PermissionsProvider>
       </AuthProvider>
     </RoleLabelsProvider>
   )

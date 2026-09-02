@@ -16,12 +16,15 @@ import {
   FaCalendarWeek,
   FaHistory,
   FaFilter,
+  FaUserPlus,
 } from 'react-icons/fa'
 import Navbar from './Navbar'
 import Pagination from './components/Pagination'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import { useRoleLabels } from './context/RoleLabelsContext'
+import { usePermissions } from './context/PermissionsContext'
+import { CreateUserPanel, TeamUsersPanel } from './components/TeamUserManagement'
 
 const LOGS_PER_PAGE = 15
 
@@ -164,11 +167,16 @@ function ActivityRow({ log, showIndex, index }) {
 export default function ClientAdminDashboard() {
   const { user } = useAuth()
   const { getDashboardTitle } = useRoleLabels()
+  const { can } = usePermissions()
+  const canManageUsers = can('manage_users')
+  const canViewUsers = can('view_users') || canManageUsers
+  const canViewLogs = can('view_activity_logs')
   const [logs, setLogs] = useState([])
   const [activeTab, setActiveTab] = useState('overview')
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
 
   const [search, setSearch] = useState('')
   const [actionFilter, setActionFilter] = useState('all')
@@ -176,6 +184,10 @@ export default function ClientAdminDashboard() {
   const [logPage, setLogPage] = useState(1)
 
   const fetchLogs = useCallback(async (silent = false) => {
+    if (!canViewLogs) {
+      setLoading(false)
+      return
+    }
     if (!silent) setLoading(true)
     else setRefreshing(true)
     setError('')
@@ -188,7 +200,7 @@ export default function ClientAdminDashboard() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [])
+  }, [canViewLogs])
 
   useEffect(() => {
     fetchLogs()
@@ -274,10 +286,18 @@ export default function ClientAdminDashboard() {
     setDateFilter('all')
   }
 
-  const tabs = [
-    { id: 'overview', label: 'Overview', icon: FaChartBar },
-    { id: 'reports', label: 'Activity Reports', count: logs.length, icon: FaListAlt },
-  ]
+  const tabs = useMemo(() => [
+    canViewLogs && { id: 'overview', label: 'Overview', icon: FaChartBar },
+    canViewLogs && { id: 'reports', label: 'Activity Reports', count: logs.length, icon: FaListAlt },
+    canManageUsers && { id: 'create-user', label: 'Create User', icon: FaUserPlus },
+    canViewUsers && { id: 'users', label: 'Team', icon: FaUsers },
+  ].filter(Boolean), [canViewLogs, canManageUsers, canViewUsers, logs.length])
+
+  useEffect(() => {
+    if (tabs.length && !tabs.some(t => t.id === activeTab)) {
+      setActiveTab(tabs[0].id)
+    }
+  }, [tabs, activeTab])
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans text-gray-800">
@@ -306,9 +326,17 @@ export default function ClientAdminDashboard() {
         </div>
 
         {error && <AlertBanner message={error} onDismiss={() => setError('')} />}
+        {message && (
+          <div className="bg-emerald-50 border-l-4 border-emerald-500 text-emerald-800 p-4 mb-6 rounded-lg shadow-sm flex items-start justify-between gap-3 text-sm font-medium">
+            <span className="flex-1">{message}</span>
+            <button type="button" onClick={() => setMessage('')} className="shrink-0 p-1 rounded hover:bg-black/5" aria-label="Dismiss">
+              <FaTimes className="w-4 h-4" />
+            </button>
+          </div>
+        )}
 
         {/* Stats */}
-        {!loading && (
+        {!loading && canViewLogs && (
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4 mb-6">
             <StatCard
               label="Total Events"
@@ -650,6 +678,18 @@ export default function ClientAdminDashboard() {
                   )}
                 </div>
               </div>
+            )}
+
+            {activeTab === 'create-user' && canManageUsers && (
+              <CreateUserPanel
+                onCreated={() => setActiveTab('users')}
+                onError={setError}
+                onMessage={setMessage}
+              />
+            )}
+
+            {activeTab === 'users' && canViewUsers && (
+              <TeamUsersPanel onCreateClick={canManageUsers ? () => setActiveTab('create-user') : undefined} />
             )}
           </>
         )}

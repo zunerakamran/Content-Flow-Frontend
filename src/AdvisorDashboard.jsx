@@ -3,6 +3,7 @@ import Navbar from './Navbar'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import { useRoleLabels } from './context/RoleLabelsContext'
+import { usePermissions } from './context/PermissionsContext'
 import SectionIframePreview from './SectionIframePreview'
 import TemplateScrollPreview from './components/TemplateScrollPreview'
 import ImageFieldPicker from './components/ImageFieldPicker'
@@ -1146,6 +1147,8 @@ function aboutPreviewPayload(values) {
 export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExitPowerAdmin = null } = {}) {
   const { user } = useAuth()
   const { getRoleLabel, getConsoleTitle } = useRoleLabels()
+  const { can } = usePermissions()
+  const canRequestDeployments = can('request_deployments')
   const powerAdminLabel = getRoleLabel('power_admin')
   const advisorLabel = getRoleLabel('advisor')
   const isPowerAdminPublishMode = Boolean(powerAdminDeploymentId)
@@ -2391,7 +2394,7 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                 <FaArrowLeft className="w-4 h-4" />
                 Back to Deployments
               </button>
-            ) : (
+            ) : canRequestDeployments ? (
               <button
                 type="button"
                 onClick={() => openDeploymentModal(null, true)}
@@ -2400,7 +2403,7 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                 <FaPlus className="w-4 h-4" />
                 New Deployment
               </button>
-            )}
+            ) : null}
           </div>
 
           {/* Quick stats */}

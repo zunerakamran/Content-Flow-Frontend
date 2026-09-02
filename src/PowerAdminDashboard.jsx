@@ -23,10 +23,13 @@ import {
     FaList,
     FaPen,
     FaTags,
+    FaUserShield,
 } from 'react-icons/fa'
 import Navbar from './Navbar'
 import api from './api/axios'
 import { useRoleLabels } from './context/RoleLabelsContext'
+import { usePermissions } from './context/PermissionsContext'
+import { useAuth } from './context/AuthContext'
 import { sectionDisplayName } from './utils/sectionDisplay'
 import TemplateScrollPreview from './components/TemplateScrollPreview'
 import { defaultTemplatePreviewUrl } from './utils/assetUrl'
@@ -133,8 +136,22 @@ const inputClass =
 const labelClass = 'block text-xs font-bold text-gray-600 uppercase tracking-wide mb-1.5'
 
 export default function PowerAdminDashboard() {
+    const { refreshUser } = useAuth()
     const { records: roleLabelRecords, getRoleLabel, updateRoleLabel } = useRoleLabels()
+    const {
+        permissions: permissionDefs,
+        roles: permissionRoles,
+        matrix,
+        can,
+        isLocked,
+        updatePermission,
+        fetchPermissions,
+    } = usePermissions()
     const advisorLabel = getRoleLabel('advisor')
+    const canManageTemplates = can('manage_templates')
+    const canDeploy = can('deploy_websites') || can('view_all_deployments')
+    const canManageLabels = can('manage_role_labels')
+    const canManagePermissions = can('manage_role_permissions')
     const [requests, setRequests] = useState([])
     const [templates, setTemplates] = useState([])
     const [message, setMessage] = useState('')
@@ -175,6 +192,7 @@ export default function PowerAdminDashboard() {
 
     const [roleLabelDrafts, setRoleLabelDrafts] = useState({})
     const [savingRoleKey, setSavingRoleKey] = useState(null)
+    const [togglingPermission, setTogglingPermission] = useState(null)
 
     useEffect(() => {
         const next = {}
@@ -186,6 +204,28 @@ export default function PowerAdminDashboard() {
         }
         setRoleLabelDrafts(next)
     }, [roleLabelRecords])
+
+    const handleTogglePermission = async (roleKey, permissionKey, granted) => {
+        if (isLocked(roleKey, permissionKey) && !granted) {
+            setError('This permission cannot be removed from Power Admin.')
+            return
+        }
+
+        const toggleId = `${roleKey}:${permissionKey}`
+        setTogglingPermission(toggleId)
+        setError('')
+        setMessage('')
+        try {
+            await updatePermission(roleKey, permissionKey, granted)
+            setMessage(`Updated ${getRoleLabel(roleKey)} permission.`)
+            await refreshUser?.()
+            await fetchPermissions()
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to update permission.')
+        } finally {
+            setTogglingPermission(null)
+        }
+    }
 
     const handleRoleLabelDraftChange = (roleKey, field, value) => {
         setRoleLabelDrafts(prev => ({
@@ -453,11 +493,27 @@ export default function PowerAdminDashboard() {
         }
     }
 
-    const tabs = [
-        { id: 'templates', label: 'Template Catalog', icon: FaThLarge, count: templates.length },
-        { id: 'deployments', label: 'Deployment Requests', icon: FaRocket, count: requests.length },
-        { id: 'role-labels', label: 'Role Labels', icon: FaTags, count: roleLabelRecords.length },
-    ]
+    const tabs = useMemo(() => [
+        canManageTemplates && { id: 'templates', label: 'Template Catalog', icon: FaThLarge, count: templates.length },
+        canDeploy && { id: 'deployments', label: 'Deployment Requests', icon: FaRocket, count: requests.length },
+        canManageLabels && { id: 'role-labels', label: 'Role Labels', icon: FaTags, count: roleLabelRecords.length },
+        canManagePermissions && { id: 'permissions', label: 'Permissions', icon: FaUserShield, count: permissionDefs.length },
+    ].filter(Boolean), [
+        canManageTemplates,
+        canDeploy,
+        canManageLabels,
+        canManagePermissions,
+        templates.length,
+        requests.length,
+        roleLabelRecords.length,
+        permissionDefs.length,
+    ])
+
+    useEffect(() => {
+        if (tabs.length && !tabs.some(t => t.id === activeTab)) {
+            setActiveTab(tabs[0].id)
+        }
+    }, [tabs, activeTab])
 
     const renderRequestActions = req => (
         <div className="flex items-center gap-2 flex-wrap">
@@ -599,7 +655,7 @@ export default function PowerAdminDashboard() {
                 ) : (
                     <>
                         {/* Template Catalog */}
-                        {activeTab === 'templates' && (
+                        {activeTab === 'templates' && canManageTemplates && (
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                                 <div className="p-6 border-b border-gray-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                     <div>
@@ -714,7 +770,7 @@ export default function PowerAdminDashboard() {
                         )}
 
                         {/* Deployment Requests */}
-                        {activeTab === 'deployments' && (
+                        {activeTab === 'deployments' && canDeploy && (
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                                 <div className="p-6 border-b border-gray-100 space-y-4">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -905,7 +961,7 @@ export default function PowerAdminDashboard() {
                             </div>
                         )}
 
-                        {activeTab === 'role-labels' && (
+                        {activeTab === 'role-labels' && canManageLabels && (
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                                 <div className="p-6 border-b border-gray-100">
                                     <h2 className="text-lg font-bold text-[#0B1B3D]">Dashboard Role Labels</h2>
@@ -969,6 +1025,61 @@ export default function PowerAdminDashboard() {
                                             </div>
                                         )
                                     })}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'permissions' && canManagePermissions && (
+                            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                                <div className="p-6 border-b border-gray-100">
+                                    <h2 className="text-lg font-bold text-[#0B1B3D]">Role Permissions</h2>
+                                    <p className="text-xs text-gray-500 mt-0.5 max-w-3xl">
+                                        Control what each role can do. Example: turn off Create Users for {getRoleLabel('manager')} and turn it on for {getRoleLabel('client_admin')}.
+                                    </p>
+                                </div>
+
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-sm min-w-[900px]">
+                                        <thead className="bg-slate-50 text-[10px] font-extrabold uppercase tracking-wider text-gray-500">
+                                            <tr>
+                                                <th className="px-5 py-4 sticky left-0 bg-slate-50 z-10 min-w-[240px]">Permission</th>
+                                                {permissionRoles.map(role => (
+                                                    <th key={role} className="px-4 py-4 text-center whitespace-nowrap">
+                                                        {getRoleLabel(role)}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {permissionDefs.map(perm => (
+                                                <tr key={perm.key} className="hover:bg-gray-50/70">
+                                                    <td className="px-5 py-4 sticky left-0 bg-white z-10">
+                                                        <p className="font-bold text-[#0B1B3D]">{perm.name}</p>
+                                                        <p className="text-xs text-gray-500 mt-0.5">{perm.description}</p>
+                                                        <p className="text-[10px] font-mono text-gray-400 mt-1">{perm.key}</p>
+                                                    </td>
+                                                    {permissionRoles.map(role => {
+                                                        const checked = Boolean(matrix[role]?.[perm.key])
+                                                        const lockedCell = isLocked(role, perm.key)
+                                                        const busy = togglingPermission === `${role}:${perm.key}`
+                                                        return (
+                                                            <td key={`${role}-${perm.key}`} className="px-4 py-4 text-center">
+                                                                <label className={`inline-flex items-center justify-center ${lockedCell ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={checked}
+                                                                        disabled={busy || (lockedCell && checked)}
+                                                                        onChange={e => handleTogglePermission(role, perm.key, e.target.checked)}
+                                                                        className="w-4 h-4 rounded border-gray-300 text-[#C8102E] focus:ring-[#C8102E]"
+                                                                    />
+                                                                </label>
+                                                            </td>
+                                                        )
+                                                    })}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         )}

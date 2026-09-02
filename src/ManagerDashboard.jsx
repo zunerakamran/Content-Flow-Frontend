@@ -29,6 +29,7 @@ import Pagination from './components/Pagination'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import { useRoleLabels } from './context/RoleLabelsContext'
+import { usePermissions } from './context/PermissionsContext'
 import { parseJson } from './utils/parseJson'
 import {
   buildPreviewFromRequest,
@@ -611,6 +612,11 @@ const ManagerRequestCard = memo(function ManagerRequestCard({
 export default function ManagerDashboard() {
   const { user } = useAuth()
   const { getRoleLabel, getRoleDescription, getDashboardTitle } = useRoleLabels()
+  const { can } = usePermissions()
+  const canManageUsers = can('manage_users')
+  const canViewUsers = can('view_users') || canManageUsers
+  const canAssignRequests = can('assign_change_requests') || can('view_all_change_requests')
+  const canViewLogs = can('view_activity_logs')
   const [requests, setRequests] = useState([])
   const [users, setUsers] = useState([])
   const [logs, setLogs] = useState([])
@@ -842,13 +848,27 @@ export default function ManagerDashboard() {
     }
   }
 
-  const tabs = [
-    { id: 'new', label: 'New Requests', count: newRequests.length, icon: FaInbox },
-    { id: 'previous', label: 'History', count: previousRequests.length, icon: FaClipboardList },
-    { id: 'create-user', label: 'Create User', icon: FaUserPlus },
-    { id: 'users', label: 'Team', count: users.length, icon: FaUsers },
-    { id: 'logs', label: 'Activity', icon: FaListAlt },
-  ]
+  const tabs = useMemo(() => [
+    canAssignRequests && { id: 'new', label: 'New Requests', count: newRequests.length, icon: FaInbox },
+    canAssignRequests && { id: 'previous', label: 'History', count: previousRequests.length, icon: FaClipboardList },
+    canManageUsers && { id: 'create-user', label: 'Create User', icon: FaUserPlus },
+    canViewUsers && { id: 'users', label: 'Team', count: users.length, icon: FaUsers },
+    canViewLogs && { id: 'logs', label: 'Activity', icon: FaListAlt },
+  ].filter(Boolean), [
+    canAssignRequests,
+    canManageUsers,
+    canViewUsers,
+    canViewLogs,
+    newRequests.length,
+    previousRequests.length,
+    users.length,
+  ])
+
+  useEffect(() => {
+    if (tabs.length && !tabs.some(t => t.id === activeTab)) {
+      setActiveTab(tabs[0].id)
+    }
+  }, [tabs, activeTab])
 
   const selectedRoleInfo = creatableRoles.find(r => r.value === userForm.role)
 
