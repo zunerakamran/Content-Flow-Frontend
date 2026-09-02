@@ -568,16 +568,19 @@ const AssignmentRequestCard = memo(function AssignmentRequestCard({
   )
 })
 
-export default function ChangeRequestAssignmentPanel({ onMessage: externalOnMessage, onError: externalOnError }) {
+export default function ChangeRequestAssignmentPanel({
+  variant = 'pending',
+  onMessage: externalOnMessage,
+  onError: externalOnError,
+}) {
   const { getRoleLabel } = useRoleLabels()
   const { can } = usePermissions()
-  const canAssign = can('assign_change_requests')
+  const canAssign = can('assign_change_requests') && variant === 'pending'
 
   const [localMessage, setLocalMessage] = useState('')
   const [localError, setLocalError] = useState('')
   const [requests, setRequests] = useState([])
   const [users, setUsers] = useState([])
-  const [statusFilter, setStatusFilter] = useState('pending')
   const [selectedApprover, setSelectedApprover] = useState({})
   const [assigningId, setAssigningId] = useState(null)
   const [previewSnapshots, setPreviewSnapshots] = useState(() => loadPreviewSnapshots())
@@ -636,18 +639,10 @@ export default function ChangeRequestAssignmentPanel({ onMessage: externalOnMess
     loadAll()
   }, [loadAll])
 
-  const newRequests = useMemo(
-    () => requests.filter(r => r.status === PENDING_STATUS),
-    [requests]
-  )
-
   const filteredRequests = useMemo(() => {
-    let list = requests
-    if (statusFilter === 'pending') {
-      list = requests.filter(r => r.status === PENDING_STATUS)
-    } else if (statusFilter === 'history') {
-      list = requests.filter(r => PREVIOUS_STATUSES.has(r.status))
-    }
+    const list = variant === 'history'
+      ? requests.filter(r => PREVIOUS_STATUSES.has(r.status))
+      : requests.filter(r => r.status === PENDING_STATUS)
 
     if (!requestSearch.trim()) return list
     const q = requestSearch.trim().toLowerCase()
@@ -657,7 +652,7 @@ export default function ChangeRequestAssignmentPanel({ onMessage: externalOnMess
       const approver = (r.approver?.name || '').toLowerCase()
       return searchText.includes(q) || editor.includes(q) || approver.includes(q) || String(r.id).includes(q)
     })
-  }, [requests, statusFilter, requestSearch])
+  }, [requests, variant, requestSearch])
 
   const handleAssign = async (requestId, approverId) => {
     setAssigningId(requestId)
@@ -760,16 +755,6 @@ export default function ChangeRequestAssignmentPanel({ onMessage: externalOnMess
           />
         </div>
 
-        <select
-          value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value)}
-          className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]/20 focus:border-[#0B1B3D] bg-white transition sm:min-w-[160px]"
-        >
-          <option value="pending">Pending ({newRequests.length})</option>
-          <option value="history">History</option>
-          <option value="all">All requests</option>
-        </select>
-
         <button
           type="button"
           onClick={() => loadAll(true)}
@@ -783,10 +768,12 @@ export default function ChangeRequestAssignmentPanel({ onMessage: externalOnMess
 
       {renderRequestList(
         filteredRequests,
-        statusFilter === 'pending' ? 'No pending requests' : statusFilter === 'history' ? 'No history yet' : 'No change requests',
-        canAssign
-          ? 'Incoming requests you can assign will appear here.'
-          : 'Change requests will appear here when available.'
+        variant === 'history' ? 'No history yet' : 'No pending requests',
+        variant === 'history'
+          ? 'Completed, rejected, and in-review requests will appear here.'
+          : canAssign
+            ? 'Incoming requests you can assign will appear here.'
+            : 'Pending change requests will appear here when available.'
       )}
     </div>
   )

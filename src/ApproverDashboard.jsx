@@ -7,6 +7,7 @@ import {
   FaTimes,
   FaBuilding,
   FaListAlt,
+  FaHistory,
 } from 'react-icons/fa'
 import Navbar from './Navbar'
 import ChangeRequestAssignmentPanel from './components/ChangeRequestAssignmentPanel'
@@ -49,6 +50,7 @@ export default function ApproverDashboard({ embedded = false } = {}) {
   const canViewUsers = can('view_users')
   const canViewPlatformReport = can('view_platform_report')
   const canViewLogs = can('view_activity_logs')
+  const canViewRequestHistory = canAssignRequests || canReview
 
   const [activeTab, setActiveTab] = useState('review')
   const [message, setMessage] = useState('')
@@ -59,12 +61,13 @@ export default function ApproverDashboard({ embedded = false } = {}) {
 
   const tabs = useMemo(() => [
     canReview && { id: 'review', label: 'Review Queue', icon: FaClipboardCheck },
-    canAssignRequests && { id: 'change-requests', label: 'Change Requests', icon: FaInbox },
+    canAssignRequests && { id: 'change-requests', label: 'New Requests', icon: FaInbox },
+    canViewRequestHistory && { id: 'request-history', label: 'History', icon: FaHistory },
     canManageUsers && { id: 'create-user', label: 'Create User', icon: FaUserPlus },
     canViewUsers && { id: 'users', label: 'Team', icon: FaUsers },
     canViewPlatformReport && { id: 'platform', label: 'Platform Summary', icon: FaBuilding },
     canViewLogs && { id: 'logs', label: 'Activity', icon: FaListAlt },
-  ].filter(Boolean), [canReview, canAssignRequests, canManageUsers, canViewUsers, canViewPlatformReport, canViewLogs])
+  ].filter(Boolean), [canReview, canAssignRequests, canViewRequestHistory, canManageUsers, canViewUsers, canViewPlatformReport, canViewLogs])
 
   useEffect(() => {
     if (tabs.length && !tabs.some(t => t.id === activeTab)) {
@@ -133,10 +136,16 @@ export default function ApproverDashboard({ embedded = false } = {}) {
         </div>
       )}
 
-      {activeTab === 'review' && canReview && <ReviewQueuePanel />}
+      {activeTab === 'review' && canReview && <ReviewQueuePanel variant="active" />}
 
       {activeTab === 'change-requests' && canAssignRequests && (
-        <ChangeRequestAssignmentPanel onMessage={setMessage} onError={setError} />
+        <ChangeRequestAssignmentPanel variant="pending" onMessage={setMessage} onError={setError} />
+      )}
+
+      {activeTab === 'request-history' && canViewRequestHistory && (
+        canAssignRequests
+          ? <ChangeRequestAssignmentPanel variant="history" onMessage={setMessage} onError={setError} />
+          : <ReviewQueuePanel variant="history" />
       )}
 
       {activeTab === 'create-user' && canManageUsers && (

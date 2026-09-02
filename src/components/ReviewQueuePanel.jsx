@@ -715,13 +715,12 @@ const RequestCard = memo(function RequestCard({
   )
 })
 
-export default function ReviewQueuePanel() {
+export default function ReviewQueuePanel({ variant = 'active' } = {}) {
   const { user } = useAuth()
   const [requests, setRequests] = useState([])
   const [previewSnapshots, setPreviewSnapshots] = useState(() => loadPreviewSnapshots())
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [view, setView] = useState('active')
   const [search, setSearch] = useState('')
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
@@ -759,15 +758,10 @@ export default function ReviewQueuePanel() {
     setRequests(prev => prev.map(r => (r.id === id ? { ...r, ...updates } : r)))
   }, [])
 
-  const stats = useMemo(() => ({
-    pending: requests.filter(r => r.status === 'pending').length,
-    underReview: requests.filter(r => r.status === 'under_review').length,
-    scheduled: requests.filter(r => r.status === 'scheduled').length,
-    active: requests.filter(r => ACTIVE_STATUSES.has(r.status)).length,
-  }), [requests])
-
   const filteredRequests = useMemo(() => {
-    let list = view === 'all' ? requests : requests.filter(r => ACTIVE_STATUSES.has(r.status))
+    let list = variant === 'history'
+      ? requests.filter(r => !ACTIVE_STATUSES.has(r.status))
+      : requests.filter(r => ACTIVE_STATUSES.has(r.status))
 
     if (search.trim()) {
       const q = search.trim().toLowerCase()
@@ -780,7 +774,7 @@ export default function ReviewQueuePanel() {
     }
 
     return list
-  }, [requests, view, search])
+  }, [requests, variant, search])
 
   return (
     <div>
@@ -798,15 +792,6 @@ export default function ReviewQueuePanel() {
             className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E] transition"
           />
         </div>
-
-        <select
-          value={view}
-          onChange={e => setView(e.target.value)}
-          className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B1B3D]/20 focus:border-[#0B1B3D] bg-white transition sm:min-w-[160px]"
-        >
-          <option value="active">Needs review ({stats.active})</option>
-          <option value="all">All requests ({requests.length})</option>
-        </select>
 
         <button
           type="button"
@@ -830,14 +815,14 @@ export default function ReviewQueuePanel() {
             <FaInbox className="w-6 h-6 text-gray-400" />
           </div>
           <h3 className="text-lg font-bold text-[#0B1B3D]">
-            {search.trim() ? 'No matching requests' : 'No change requests found'}
+            {search.trim() ? 'No matching requests' : variant === 'history' ? 'No history yet' : 'No change requests found'}
           </h3>
           <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
             {search.trim()
               ? 'Try a different search term or clear the filter.'
-              : view === 'active'
-                ? 'You\'re all caught up — no requests need review right now.'
-                : 'There are currently no change requests in the system.'}
+              : variant === 'history'
+                ? 'Approved and rejected requests will appear here.'
+                : 'You\'re all caught up — no requests need review right now.'}
           </p>
           {search.trim() && (
             <button

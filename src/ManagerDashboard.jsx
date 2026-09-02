@@ -867,9 +867,12 @@ export default function ManagerDashboard() {
     }
   }
 
+  const canViewRequestHistory = canAssignRequests || canReview
+
   const tabs = useMemo(() => [
-    canAssignRequests && { id: 'change-requests', label: 'Change Requests', count: newRequests.length, icon: FaInbox },
+    canAssignRequests && { id: 'change-requests', label: 'New Requests', count: newRequests.length, icon: FaInbox },
     canReview && { id: 'review-queue', label: 'Review Queue', icon: FaClipboardCheck },
+    canViewRequestHistory && { id: 'request-history', label: 'History', icon: FaClipboardList },
     canManageUsers && { id: 'create-user', label: 'Create User', icon: FaUserPlus },
     canViewUsers && { id: 'users', label: 'Team', count: users.length, icon: FaUsers },
     canContentEditor && { id: 'content-editor', label: 'Content Editor', icon: FaEdit },
@@ -879,6 +882,7 @@ export default function ManagerDashboard() {
   ].filter(Boolean), [
     canAssignRequests,
     canReview,
+    canViewRequestHistory,
     canManageUsers,
     canViewUsers,
     canContentEditor,
@@ -1029,11 +1033,17 @@ export default function ManagerDashboard() {
         {/* Request tabs: search bar — handled inside ChangeRequestAssignmentPanel */}
 
         {activeTab === 'change-requests' && canAssignRequests && (
-          <ChangeRequestAssignmentPanel onMessage={setMessage} onError={setError} />
+          <ChangeRequestAssignmentPanel variant="pending" onMessage={setMessage} onError={setError} />
         )}
 
         {activeTab === 'review-queue' && canReview && (
-          <ReviewQueuePanel />
+          <ReviewQueuePanel variant="active" />
+        )}
+
+        {activeTab === 'request-history' && canViewRequestHistory && (
+          canAssignRequests
+            ? <ChangeRequestAssignmentPanel variant="history" onMessage={setMessage} onError={setError} />
+            : <ReviewQueuePanel variant="history" />
         )}
 
         {activeTab === 'content-editor' && canContentEditor && (

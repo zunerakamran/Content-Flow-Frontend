@@ -301,12 +301,15 @@ export default function ClientAdminDashboard() {
     setDateFilter('all')
   }
 
+  const canViewRequestHistory = canAssignRequests || canReview
+
   const tabs = useMemo(() => [
     canViewLogs && { id: 'overview', label: 'Overview', icon: FaChartBar },
     canViewPlatformReport && { id: 'platform', label: 'Platform Summary', icon: FaBuilding },
     canViewLogs && { id: 'reports', label: 'Activity Reports', count: logs.length, icon: FaListAlt },
-    canAssignRequests && { id: 'change-requests', label: 'Change Requests', icon: FaInbox },
+    canAssignRequests && { id: 'change-requests', label: 'New Requests', icon: FaInbox },
     canReview && { id: 'review-queue', label: 'Review Queue', icon: FaClipboardCheck },
+    canViewRequestHistory && { id: 'request-history', label: 'History', icon: FaHistory },
     canManageUsers && { id: 'create-user', label: 'Create User', icon: FaUserPlus },
     canViewUsers && { id: 'users', label: 'Team', icon: FaUsers },
     canContentEditor && { id: 'content-editor', label: 'Content Editor', icon: FaEdit },
@@ -318,6 +321,7 @@ export default function ClientAdminDashboard() {
     canViewUsers,
     canAssignRequests,
     canReview,
+    canViewRequestHistory,
     canContentEditor,
     canDeploymentHub,
     logs.length,
@@ -715,11 +719,17 @@ export default function ClientAdminDashboard() {
             )}
 
             {activeTab === 'change-requests' && canAssignRequests && (
-              <ChangeRequestAssignmentPanel onMessage={setMessage} onError={setError} />
+              <ChangeRequestAssignmentPanel variant="pending" onMessage={setMessage} onError={setError} />
             )}
 
             {activeTab === 'review-queue' && canReview && (
-              <ReviewQueuePanel />
+              <ReviewQueuePanel variant="active" />
+            )}
+
+            {activeTab === 'request-history' && canViewRequestHistory && (
+              canAssignRequests
+                ? <ChangeRequestAssignmentPanel variant="history" onMessage={setMessage} onError={setError} />
+                : <ReviewQueuePanel variant="history" />
             )}
 
             {activeTab === 'content-editor' && canContentEditor && (
