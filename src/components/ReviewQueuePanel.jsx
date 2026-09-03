@@ -227,6 +227,7 @@ const RequestCard = memo(function RequestCard({
   const [expandedPreviewSections, setExpandedPreviewSections] = useState(() => new Set())
   const [rejectionReason, setRejectionReason] = useState('')
   const [scheduleDate, setScheduleDate] = useState('')
+  const [decision, setDecision] = useState('approve') // 'approve' | 'reject'
   const [busy, setBusy] = useState(null)
 
   const isAssignedToMe = req.approver_id === user?.id
@@ -285,17 +286,22 @@ const RequestCard = memo(function RequestCard({
     setBusy('approve')
     onError('')
     onMessage('')
-    const scheduledTime = scheduleDate
+    // datetime-local is local wall time; send UTC ISO so backend (APP_TIMEZONE=UTC) compares correctly
+    const scheduledTime = isScheduled && scheduleDate
+      ? new Date(scheduleDate).toISOString()
+      : null
     try {
       const snapshot = await capturePreviewSnapshot(api, req.id, previewData)
       cachePreview(req.id, snapshot)
 
-      await api.post(`/change-requests/${req.id}/approve`, {
-        scheduled_at: isScheduled ? scheduledTime : null,
+      const res = await api.post(`/change-requests/${req.id}/approve`, {
+        scheduled_at: scheduledTime,
       })
-      if (isScheduled && scheduledTime) {
-        onMessage(`Request approved and scheduled for publication at ${new Date(scheduledTime).toLocaleString()}.`)
-        onStatusChange(req.id, { status: 'scheduled', scheduled_at: scheduledTime })
+      const status = res.data?.status
+      const savedScheduledAt = res.data?.scheduled_at || scheduledTime
+      if (status === 'scheduled' && savedScheduledAt) {
+        onMessage(`Request approved and scheduled for publication at ${new Date(savedScheduledAt).toLocaleString()}.`)
+        onStatusChange(req.id, { status: 'scheduled', scheduled_at: savedScheduledAt })
       } else {
         onMessage('Request approved. All sections in this request have been published live.')
         onStatusChange(req.id, { status: 'approved', scheduled_at: null })
@@ -448,103 +454,134 @@ const RequestCard = memo(function RequestCard({
       )}
 
       {showReviewPanel && (
-        <div className="bg-slate-50 border-b border-gray-100 px-5 sm:px-6 py-5 space-y-4">
-          <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Your decision</p>
-
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="bg-white rounded-xl border border-emerald-200 p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                  <FaCheckCircle className="w-4 h-4 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-sm font-bold text-[#0B1B3D]">Approve & Publish</p>
-                  <p className="text-[11px] text-gray-500">Publish changes immediately or schedule for later</p>
-                </div>
+        <div className="bg-slate-50 border-b border-gray-100 px-5 sm:px-6 py-5">
+          <div className="max-w-xl mx-auto space-y-4">
+            <div>
+              <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-3">Your decision</p>
+              <div className="flex rounded-xl border border-gray-200 bg-white p-1 shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => setDecision('approve')}
+                  disabled={!!busy}
+                  className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition ${
+                    decision === 'approve'
+                      ? 'bg-emerald-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <FaCheckCircle className="w-3.5 h-3.5" />
+                  Approve
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDecision('reject')}
+                  disabled={!!busy}
+                  className={`flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition ${
+                    decision === 'reject'
+                      ? 'bg-rose-600 text-white shadow-sm'
+                      : 'text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <FaTimesCircle className="w-3.5 h-3.5" />
+                  Reject
+                </button>
               </div>
-              <div className="space-y-2">
-                <label className="block text-[11px] font-semibold text-gray-500">
-                  <FaCalendarAlt className="inline w-3 h-3 mr-1 text-purple-500" />
-                  Optional: schedule publish date
-                </label>
-                <input
-                  type="datetime-local"
-                  value={scheduleDate}
-                  onChange={e => setScheduleDate(e.target.value)}
-                  className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 bg-white"
-                />
-              </div>
-              <button
-                type="button"
-                onClick={() => handleApprove(!!scheduleDate)}
-                disabled={!!busy}
-                className={`w-full inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-2.5 rounded-xl transition shadow-sm disabled:opacity-60 ${
-                  scheduleDate
-                    ? 'bg-purple-600 hover:bg-purple-700 text-white'
-                    : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                }`}
-              >
-                {busy === 'approve' ? (
-                  <>
-                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Processing…
-                  </>
-                ) : scheduleDate ? (
-                  <>
-                    <FaCalendarCheck className="w-3.5 h-3.5" />
-                    Schedule Publish
-                  </>
-                ) : (
-                  <>
-                    <FaCheckCircle className="w-3.5 h-3.5" />
-                    Approve & Publish Now
-                  </>
-                )}
-              </button>
             </div>
 
-            <div className="bg-white rounded-xl border border-rose-200 p-4 space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-rose-100 flex items-center justify-center">
-                  <FaTimesCircle className="w-4 h-4 text-rose-600" />
-                </div>
+            {decision === 'approve' ? (
+              <div className="bg-white rounded-xl border border-emerald-200 p-5 space-y-4">
                 <div>
-                  <p className="text-sm font-bold text-[#0B1B3D]">Reject Request</p>
-                  <p className="text-[11px] text-gray-500">Send back to the editor with feedback</p>
+                  <p className="text-sm font-bold text-[#0B1B3D]">Approve &amp; publish</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Publish now, or optionally schedule a later publish time.
+                  </p>
                 </div>
+                <div className="space-y-2">
+                  <label className="block text-xs font-semibold text-gray-600">
+                    <FaCalendarAlt className="inline w-3 h-3 mr-1.5 text-purple-500" />
+                    Schedule publish <span className="font-normal text-gray-400">(optional)</span>
+                  </label>
+                  <input
+                    type="datetime-local"
+                    value={scheduleDate}
+                    onChange={e => setScheduleDate(e.target.value)}
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-purple-400 focus:border-purple-400 bg-white"
+                  />
+                  {scheduleDate && (
+                    <p className="text-[11px] text-purple-700 bg-purple-50 border border-purple-100 rounded-lg px-3 py-2">
+                      Will publish at {new Date(scheduleDate).toLocaleString()}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleApprove(!!scheduleDate)}
+                  disabled={!!busy}
+                  className={`w-full inline-flex items-center justify-center gap-2 text-sm font-bold px-4 py-3 rounded-xl transition shadow-sm disabled:opacity-60 ${
+                    scheduleDate
+                      ? 'bg-purple-600 hover:bg-purple-700 text-white'
+                      : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                  }`}
+                >
+                  {busy === 'approve' ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Processing…
+                    </>
+                  ) : scheduleDate ? (
+                    <>
+                      <FaCalendarCheck className="w-3.5 h-3.5" />
+                      Schedule Publish
+                    </>
+                  ) : (
+                    <>
+                      <FaCheckCircle className="w-3.5 h-3.5" />
+                      Approve &amp; Publish Now
+                    </>
+                  )}
+                </button>
               </div>
-              <div className="space-y-2">
-                <label htmlFor={`reject-reason-${req.id}`} className="block text-[11px] font-semibold text-gray-500">
-                  Rejection reason (required)
-                </label>
-                <input
-                  id={`reject-reason-${req.id}`}
-                  type="text"
-                  placeholder="Explain what needs to be changed…"
-                  value={rejectionReason}
-                  onChange={e => setRejectionReason(e.target.value)}
-                  className="w-full text-xs border border-gray-200 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-rose-400 focus:border-rose-400 bg-white"
-                />
+            ) : (
+              <div className="bg-white rounded-xl border border-rose-200 p-5 space-y-4">
+                <div>
+                  <p className="text-sm font-bold text-[#0B1B3D]">Reject request</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Send it back to the editor with clear feedback on what to change.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <label htmlFor={`reject-reason-${req.id}`} className="block text-xs font-semibold text-gray-600">
+                    Rejection reason <span className="text-rose-500">*</span>
+                  </label>
+                  <textarea
+                    id={`reject-reason-${req.id}`}
+                    rows={3}
+                    placeholder="Explain what needs to be changed…"
+                    value={rejectionReason}
+                    onChange={e => setRejectionReason(e.target.value)}
+                    className="w-full text-sm border border-gray-200 rounded-lg px-3 py-2.5 outline-none focus:ring-2 focus:ring-rose-400 focus:border-rose-400 bg-white resize-y min-h-[5rem]"
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={handleReject}
+                  disabled={!!busy || !rejectionReason.trim()}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-rose-600 text-white text-sm font-bold px-4 py-3 rounded-xl hover:bg-rose-700 transition shadow-sm disabled:opacity-50"
+                >
+                  {busy === 'reject' ? (
+                    <>
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Rejecting…
+                    </>
+                  ) : (
+                    <>
+                      <FaTimesCircle className="w-3.5 h-3.5" />
+                      Reject Request
+                    </>
+                  )}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={handleReject}
-                disabled={!!busy || !rejectionReason.trim()}
-                className="w-full inline-flex items-center justify-center gap-2 bg-rose-600 text-white text-sm font-bold px-4 py-2.5 rounded-xl hover:bg-rose-700 transition shadow-sm disabled:opacity-50"
-              >
-                {busy === 'reject' ? (
-                  <>
-                    <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Rejecting…
-                  </>
-                ) : (
-                  <>
-                    <FaTimesCircle className="w-3.5 h-3.5" />
-                    Reject Request
-                  </>
-                )}
-              </button>
-            </div>
+            )}
           </div>
         </div>
       )}
