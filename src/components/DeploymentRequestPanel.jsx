@@ -271,6 +271,9 @@ function CreateDeploymentModal({ advisors, onClose, onCreated }) {
               </option>
             ))}
           </select>
+          {advisors.length === 0 && (
+            <p className="text-xs text-amber-700 mt-1">No advisor accounts were found. Create an advisor user first.</p>
+          )}
           <p className="text-[11px] text-gray-500 mt-1">
             The assigned advisor will be able to edit this site's content sections and submit change requests for approval.
           </p>
@@ -346,6 +349,9 @@ function AssignAdvisorModal({ request, advisors, onClose, onAssigned }) {
               </option>
             ))}
           </select>
+          {advisors.length === 0 && (
+            <p className="text-xs text-amber-700 mt-1">No advisor accounts were found. Create an advisor user first.</p>
+          )}
         </div>
 
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-xs text-amber-800">
@@ -588,11 +594,17 @@ export default function DeploymentRequestPanel() {
     }
 
     try {
-      const usersRes = await api.get('/users')
+      const usersRes = await api.get('/advisors')
       const users = Array.isArray(usersRes.data) ? usersRes.data : usersRes.data?.data || []
       setAdvisors(users.filter(u => u.role === 'advisor' || u.role === 'editor'))
     } catch {
-      setAdvisors([])
+      try {
+        const usersRes = await api.get('/users')
+        const users = Array.isArray(usersRes.data) ? usersRes.data : usersRes.data?.data || []
+        setAdvisors(users.filter(u => u.role === 'advisor' || u.role === 'editor'))
+      } catch {
+        setAdvisors([])
+      }
     } finally {
       setLoading(false)
       setRefreshing(false)

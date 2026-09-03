@@ -41,6 +41,19 @@ function normalizeSiteUrl(value) {
     return `https://${trimmed.replace(/^\/+/, '')}`
 }
 
+function requestRequesterName(req, fallback = 'Unknown') {
+    return req.requested_by?.name
+        || req.requestedBy?.name
+        || req.advisor?.name
+        || fallback
+}
+
+function requestRequesterRole(req) {
+    const role = req.requested_by?.role || req.requestedBy?.role || req.advisor?.role
+    if (!role) return null
+    return String(role).replace(/_/g, ' ')
+}
+
 function resolveAdvisorSiteUrl(req) {
     const raw = req.cpanel_domain || req.domain_name || req.domain || ''
     return normalizeSiteUrl(raw)
@@ -313,7 +326,10 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
             const matchesSearch =
                 !q ||
                 [
+                    requestRequesterName(req, ''),
                     req.advisor?.name,
+                    req.assigned_advisor?.name,
+                    req.assignedAdvisor?.name,
                     req.firm?.name,
                     req.template_name,
                     req.domain_name,
@@ -851,7 +867,7 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                                         <table className="w-full text-left border-collapse text-sm">
                                             <thead className="bg-slate-50 text-gray-500 text-[10px] font-extrabold uppercase tracking-wider">
                                                 <tr>
-                                                    <th className="px-6 py-4">{advisorLabel} & Firm</th>
+                                                    <th className="px-6 py-4">Requested by</th>
                                                     <th className="px-6 py-4">Template</th>
                                                     <th className="px-6 py-4">Domain</th>
                                                     <th className="px-6 py-4">Colors</th>
@@ -864,10 +880,11 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                                                     <tr key={req.id} className="hover:bg-slate-50/80 transition-colors">
                                                         <td className="px-6 py-4">
                                                             <div className="font-bold text-[#0B1B3D]">
-                                                                {req.advisor?.name || advisorLabel}
+                                                                {requestRequesterName(req, advisorLabel)}
                                                             </div>
-                                                            <div className="text-xs text-gray-500">
-                                                                {req.firm?.name || 'No Firm'}
+                                                            <div className="text-xs text-gray-500 capitalize">
+                                                                {requestRequesterRole(req) || req.firm?.name || 'No Firm'}
+                                                                {requestRequesterRole(req) && req.firm?.name ? ` · ${req.firm.name}` : ''}
                                                             </div>
                                                         </td>
                                                         <td className="px-6 py-4">
@@ -918,9 +935,12 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                                                 <div className="flex items-start justify-between gap-3 mb-4">
                                                     <div>
                                                         <h3 className="font-bold text-[#0B1B3D]">
-                                                            {req.advisor?.name || advisorLabel}
+                                                            {requestRequesterName(req, advisorLabel)}
                                                         </h3>
-                                                        <p className="text-xs text-gray-500">{req.firm?.name || 'No Firm'}</p>
+                                                        <p className="text-xs text-gray-500 capitalize">
+                                                            {requestRequesterRole(req) || req.firm?.name || 'No Firm'}
+                                                            {requestRequesterRole(req) && req.firm?.name ? ` · ${req.firm.name}` : ''}
+                                                        </p>
                                                     </div>
                                                     <StatusBadge status={req.status} />
                                                 </div>
@@ -1209,7 +1229,7 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                     title="Manage Deployment Sections"
                     subtitle={
                         <>
-                            {sectionManageRequest.advisor?.name || advisorLabel} —{' '}
+                            {requestRequesterName(sectionManageRequest, advisorLabel)} —{' '}
                             {sectionManageRequest.cpanel_domain && (
                                 <>
                                     {' '}
