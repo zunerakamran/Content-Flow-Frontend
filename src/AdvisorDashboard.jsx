@@ -1893,11 +1893,12 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
     }
   }
 
-  const fetchAdvisorSections = async (pageId, advisorIdOverride = null) => {
+  const fetchAdvisorSections = async (pageId, advisorIdOverride = null, templateRequestId = null) => {
     const advisorId = advisorIdOverride ?? (isPowerAdminPublishMode ? null : user?.id)
-    const res = await api.get(`/pages/${pageId}/sections`, {
-      params: advisorId ? { advisor_id: advisorId } : {},
-    })
+    const params = {}
+    if (advisorId) params.advisor_id = advisorId
+    if (templateRequestId) params.template_request_id = templateRequestId
+    const res = await api.get(`/pages/${pageId}/sections`, { params })
     const list = Array.isArray(res.data) ? res.data : []
     if (!advisorId) return list
     return list.filter(s => String(s.advisor_id) === String(advisorId))
@@ -1920,12 +1921,58 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
       return
     }
 
-    // Power Admin direct-publish must edit deployment-scoped sections
-    // (template_request_id set), not the advisor hub copy.
-    if (isPowerAdminPublishMode && powerAdminDeploymentId) {
+    // Advisors and Power Admin both edit deployment-scoped sections
+    // (template_request_id set) — never the NULL hub copies.
+    const deployment = templateRequests.find(
+      r => r.id === (powerAdminDeploymentId || selectedDeploymentId) && r.status === 'deployed'
+    ) || templateRequests.find(r => r.status === 'deployed')
+    const deploymentId = powerAdminDeploymentId || deployment?.id || null
+
+    if (deploymentId) {
       try {
-        const deploymentSections = await fetchDeploymentSections(powerAdminDeploymentId)
+        const deploymentSections = await fetchDeploymentSections(deploymentId)
         setSections(deploymentSections)
+
+        if (isPowerAdminPublishMode) {
+          return
+        }
+
+        const lockedByMeIds = deploymentSections
+          .filter(s => s.is_locked && s.locked_by === user?.id && isAdvisorVisibleSection(sectionTemplateKey(s)))
+          .map(s => s.id)
+
+        setCheckedSectionIds(lockedByMeIds)
+
+        const initialEdits = {}
+        deploymentSections.forEach(s => {
+          if (lockedByMeIds.includes(s.id)) {
+            const parsed = parseJson(s.content)
+            initialEdits[s.id] = isAboutSection(sectionTemplateKey(s))
+              ? normalizeAboutEditorContent(parsed)
+              : isCompanyHistorySection(sectionTemplateKey(s))
+                ? normalizeCompanyHistoryEditorContent(parsed)
+                : isFeaturedServicesSection(sectionTemplateKey(s))
+                  ? normalizeFeaturedServicesEditorContent(parsed)
+                  : isAnnualProgressionSection(sectionTemplateKey(s))
+                    ? normalizeAnnualProgressionEditorContent(parsed)
+                    : isPortfolioSection(sectionTemplateKey(s))
+                      ? normalizePortfolioEditorContent(parsed)
+                      : isBranchesSection(sectionTemplateKey(s))
+                        ? normalizeBranchesEditorContent(parsed)
+                        : isCounterStatsSection(sectionTemplateKey(s))
+                          ? normalizeCounterStatsEditorContent(parsed)
+                          : isTestimonialsSection(sectionTemplateKey(s))
+                            ? normalizeTestimonialsEditorContent(parsed)
+                            : isLatestNewsSection(sectionTemplateKey(s))
+                              ? normalizeLatestNewsEditorContent(parsed)
+                              : isClientLogosSection(sectionTemplateKey(s))
+                                ? normalizeClientLogosEditorContent(parsed)
+                                : isCtaBannerSection(sectionTemplateKey(s))
+                                  ? normalizeCtaBannerEditorContent(parsed)
+                                  : parsed
+          }
+        })
+        setSectionEdits(initialEdits)
       } catch (err) {
         setSections([])
         setError(err.response?.data?.message || 'Failed to load deployment sections.')
@@ -1933,12 +1980,8 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
       return
     }
 
-    const deployment = templateRequests.find(
-      r => r.id === (powerAdminDeploymentId || selectedDeploymentId) && r.status === 'deployed'
-    ) || templateRequests.find(r => r.status === 'deployed')
     const targetAdvisorId = deployment?.assigned_advisor_id ?? deployment?.advisor_id ?? null
-
-    const sectionsForAdvisor = await fetchAdvisorSections(pageId, targetAdvisorId)
+    const sectionsForAdvisor = await fetchAdvisorSections(pageId, targetAdvisorId, deployment?.id)
     setSections(sectionsForAdvisor)
 
     if (isPowerAdminPublishMode) {
@@ -2291,9 +2334,15 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
         const deployment = templateRequests.find(
           r => r.id === (powerAdminDeploymentId || selectedDeploymentId) && r.status === 'deployed'
         ) || templateRequests.find(r => r.status === 'deployed')
-        const targetAdvisorId = deployment?.advisor_id ?? deployment?.assigned_advisor_id ?? null
-        const refreshed = await fetchAdvisorSections(selectedPageId, targetAdvisorId)
-        setSections(refreshed)
+        const deploymentId = powerAdminDeploymentId || deployment?.id || null
+        if (deploymentId) {
+          const refreshed = await fetchDeploymentSections(deploymentId)
+          setSections(refreshed)
+        } else {
+          const targetAdvisorId = deployment?.assigned_advisor_id ?? deployment?.advisor_id ?? null
+          const refreshed = await fetchAdvisorSections(selectedPageId, targetAdvisorId, deployment?.id)
+          setSections(refreshed)
+        }
       }
       setCheckedSectionIds([])
       setSectionEdits({})
