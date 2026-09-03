@@ -26,6 +26,7 @@ import Navbar from './Navbar'
 import Pagination from './components/Pagination'
 import ChangeRequestAssignmentPanel from './components/ChangeRequestAssignmentPanel'
 import ReviewQueuePanel from './components/ReviewQueuePanel'
+import DeploymentRequestPanel from './components/DeploymentRequestPanel'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import { useRoleLabels } from './context/RoleLabelsContext'
@@ -184,8 +185,9 @@ export default function ClientAdminDashboard() {
   const canViewPlatformReport = can('view_platform_report')
   const canAssignRequests = can('assign_change_requests') || can('view_all_change_requests')
   const canReview = can('review_change_requests')
-  const canContentEditor = can('submit_change_requests') || can('edit_sections') || can('request_deployments')
+  const canContentEditor = can('submit_change_requests') || can('edit_sections')
   const canDeploymentHub = can('deploy_websites') || can('manage_templates') || can('manage_deployment_sections') || can('publish_live_content') || can('view_all_deployments')
+  const canRequestDeployments = can('request_deployments') || can('view_all_deployments')
   const [logs, setLogs] = useState([])
   const [activeTab, setActiveTab] = useState('overview')
   const [loading, setLoading] = useState(true)
@@ -313,6 +315,7 @@ export default function ClientAdminDashboard() {
     canManageUsers && { id: 'create-user', label: 'Create User', icon: FaUserPlus },
     canViewUsers && { id: 'users', label: 'Team', icon: FaUsers },
     canContentEditor && { id: 'content-editor', label: 'Content Editor', icon: FaEdit },
+    canRequestDeployments && { id: 'deployment-requests', label: 'Deployments', icon: FaRocket },
     canDeploymentHub && { id: 'deployment-hub', label: 'Deployment Hub', icon: FaRocket },
   ].filter(Boolean), [
     canViewLogs,
@@ -323,6 +326,7 @@ export default function ClientAdminDashboard() {
     canReview,
     canViewRequestHistory,
     canContentEditor,
+    canRequestDeployments,
     canDeploymentHub,
     logs.length,
   ])
@@ -730,6 +734,10 @@ export default function ClientAdminDashboard() {
               canAssignRequests
                 ? <ChangeRequestAssignmentPanel variant="history" onMessage={setMessage} onError={setError} />
                 : <ReviewQueuePanel variant="history" />
+            )}
+
+            {activeTab === 'deployment-requests' && canRequestDeployments && (
+              <DeploymentRequestPanel />
             )}
 
             {activeTab === 'content-editor' && canContentEditor && (

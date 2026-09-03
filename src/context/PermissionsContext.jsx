@@ -29,6 +29,7 @@ const DEFAULT_MATRIX = {
         view_users: true,
         assign_change_requests: true,
         view_all_change_requests: true,
+        request_deployments: true,
         view_all_deployments: true,
         view_activity_logs: true,
         view_platform_report: true,
