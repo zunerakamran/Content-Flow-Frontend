@@ -33,6 +33,8 @@ import {
     FaClipboardList,
     FaUserPlus,
     FaUsers,
+    FaEllipsisH,
+    FaChevronLeft,
 } from 'react-icons/fa'
 import Navbar from './Navbar'
 import api from './api/axios'
@@ -205,6 +207,7 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
     const [refreshing, setRefreshing] = useState(false)
 
     const [activeTab, setActiveTab] = useState('templates')
+    const [moreTool, setMoreTool] = useState(null)
     const [templateSearch, setTemplateSearch] = useState('')
     const [requestSearch, setRequestSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState('all')
@@ -579,6 +582,70 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
         }
     }
 
+    const moreTools = useMemo(() => {
+        if (embedded) return []
+        return [
+            canAssignRequests && {
+                id: 'change-requests',
+                label: 'New Requests',
+                description: 'Assign pending change requests to an approver.',
+                icon: FaInbox,
+                category: 'Change Requests',
+            },
+            canReview && {
+                id: 'review-queue',
+                label: 'Review Queue',
+                description: 'Approve, reject, or schedule submitted content changes.',
+                icon: FaClipboardCheck,
+                category: 'Change Requests',
+            },
+            canViewRequestHistory && {
+                id: 'request-history',
+                label: 'Request History',
+                description: 'Browse previously assigned or reviewed change requests.',
+                icon: FaClipboardList,
+                category: 'Change Requests',
+            },
+            canManageUsers && {
+                id: 'create-user',
+                label: 'Create User',
+                description: 'Create new team accounts.',
+                icon: FaUserPlus,
+                category: 'Team',
+            },
+            canViewUsers && {
+                id: 'users',
+                label: 'Team Users',
+                description: 'View and manage users on the platform.',
+                icon: FaUsers,
+                category: 'Team',
+            },
+            canContentEditor && {
+                id: 'content-editor',
+                label: 'Content Editor',
+                description: 'Edit sections and submit content change requests.',
+                icon: FaEdit,
+                category: 'Content',
+            },
+            canRequestDeployments && {
+                id: 'request-deployments',
+                label: 'Deployment Requests',
+                description: 'Request new advisor sites or browse deployment requests.',
+                icon: FaRocket,
+                category: 'Deployments',
+            },
+        ].filter(Boolean)
+    }, [
+        embedded,
+        canAssignRequests,
+        canReview,
+        canViewRequestHistory,
+        canManageUsers,
+        canViewUsers,
+        canContentEditor,
+        canRequestDeployments,
+    ])
+
     const tabs = useMemo(() => {
         const hubTabs = [
             canManageTemplates && { id: 'templates', label: 'Template Catalog', icon: FaThLarge, count: templates.length },
@@ -591,34 +658,27 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
         }
 
         return [
-            canAssignRequests && { id: 'change-requests', label: 'New Requests', icon: FaInbox },
-            canReview && { id: 'review-queue', label: 'Review Queue', icon: FaClipboardCheck },
-            canViewRequestHistory && { id: 'request-history', label: 'History', icon: FaClipboardList },
-            canManageUsers && { id: 'create-user', label: 'Create User', icon: FaUserPlus },
-            canViewUsers && { id: 'users', label: 'Team', icon: FaUsers },
-            canContentEditor && { id: 'content-editor', label: 'Content Editor', icon: FaEdit },
-            canRequestDeployments && { id: 'request-deployments', label: 'Deployments', icon: FaRocket },
             ...hubTabs,
             canViewPlatformReport && { id: 'platform', label: 'Platform Summary', icon: FaBuilding },
             canViewLogs && { id: 'logs', label: 'Activity', icon: FaListAlt, count: logs.length },
             canManageLabels && { id: 'role-labels', label: 'Role Labels', icon: FaTags, count: roleLabelRecords.length },
             canManagePermissions && { id: 'permissions', label: 'Permissions', icon: FaUserShield, count: permissionDefs.length },
+            moreTools.length > 0 && {
+                id: 'more-tools',
+                label: 'More Tools',
+                icon: FaEllipsisH,
+                count: moreTools.length,
+            },
         ].filter(Boolean)
     }, [
         embedded,
-        canAssignRequests,
-        canReview,
-        canViewRequestHistory,
-        canManageUsers,
-        canViewUsers,
-        canContentEditor,
-        canRequestDeployments,
         canManageTemplates,
         canViewDeployments,
         canViewPlatformReport,
         canViewLogs,
         canManageLabels,
         canManagePermissions,
+        moreTools,
         templates.length,
         requests.length,
         logs.length,
@@ -629,8 +689,18 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
     useEffect(() => {
         if (tabs.length && !tabs.some(t => t.id === activeTab)) {
             setActiveTab(tabs[0].id)
+            setMoreTool(null)
         }
     }, [tabs, activeTab])
+
+    useEffect(() => {
+        if (activeTab !== 'more-tools') setMoreTool(null)
+    }, [activeTab])
+
+    const activeMoreTool = useMemo(
+        () => moreTools.find(tool => tool.id === moreTool) || null,
+        [moreTools, moreTool]
+    )
 
     const renderRequestActions = req => {
         const actions = []
@@ -792,45 +862,103 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                     </div>
                 ) : (
                     <>
-                        {activeTab === 'change-requests' && !embedded && canAssignRequests && (
-                            <ChangeRequestAssignmentPanel variant="pending" onMessage={setMessage} onError={setError} />
-                        )}
+                        {activeTab === 'more-tools' && !embedded && (
+                            <div className="space-y-4">
+                                {activeMoreTool ? (
+                                    <div className="space-y-4">
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <button
+                                                type="button"
+                                                onClick={() => setMoreTool(null)}
+                                                className="inline-flex items-center gap-2 text-sm font-bold text-[#0B1B3D] bg-white border border-gray-200 px-3 py-2 rounded-xl hover:bg-gray-50 transition"
+                                            >
+                                                <FaChevronLeft className="w-3 h-3" />
+                                                All tools
+                                            </button>
+                                            <div>
+                                                <p className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">
+                                                    {activeMoreTool.category}
+                                                </p>
+                                                <h2 className="text-lg font-bold text-[#0B1B3D]">{activeMoreTool.label}</h2>
+                                            </div>
+                                        </div>
 
-                        {activeTab === 'review-queue' && !embedded && canReview && (
-                            <ReviewQueuePanel variant="active" />
-                        )}
-
-                        {activeTab === 'request-history' && !embedded && canViewRequestHistory && (
-                            canAssignRequests
-                                ? <ChangeRequestAssignmentPanel variant="history" onMessage={setMessage} onError={setError} />
-                                : <ReviewQueuePanel variant="history" />
-                        )}
-
-                        {activeTab === 'create-user' && !embedded && canManageUsers && (
-                            <CreateUserPanel
-                                onCreated={() => setActiveTab(canViewUsers ? 'users' : 'create-user')}
-                                onError={setError}
-                                onMessage={setMessage}
-                            />
-                        )}
-
-                        {activeTab === 'users' && !embedded && canViewUsers && (
-                            <TeamUsersPanel onCreateClick={canManageUsers ? () => setActiveTab('create-user') : undefined} />
-                        )}
-
-                        {activeTab === 'content-editor' && !embedded && canContentEditor && (
-                            <Suspense fallback={
-                                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center text-gray-500">
-                                    <div className="w-10 h-10 mx-auto mb-4 rounded-full border-4 border-[#C8102E] border-t-transparent animate-spin" />
-                                    <p className="text-sm font-semibold">Loading content editor…</p>
-                                </div>
-                            }>
-                                <AdvisorDashboard embedded />
-                            </Suspense>
-                        )}
-
-                        {activeTab === 'request-deployments' && !embedded && canRequestDeployments && (
-                            <DeploymentRequestPanel />
+                                        {moreTool === 'change-requests' && canAssignRequests && (
+                                            <ChangeRequestAssignmentPanel variant="pending" onMessage={setMessage} onError={setError} />
+                                        )}
+                                        {moreTool === 'review-queue' && canReview && (
+                                            <ReviewQueuePanel variant="active" />
+                                        )}
+                                        {moreTool === 'request-history' && canViewRequestHistory && (
+                                            canAssignRequests
+                                                ? <ChangeRequestAssignmentPanel variant="history" onMessage={setMessage} onError={setError} />
+                                                : <ReviewQueuePanel variant="history" />
+                                        )}
+                                        {moreTool === 'create-user' && canManageUsers && (
+                                            <CreateUserPanel
+                                                onCreated={() => {
+                                                    if (canViewUsers) setMoreTool('users')
+                                                }}
+                                                onError={setError}
+                                                onMessage={setMessage}
+                                            />
+                                        )}
+                                        {moreTool === 'users' && canViewUsers && (
+                                            <TeamUsersPanel onCreateClick={canManageUsers ? () => setMoreTool('create-user') : undefined} />
+                                        )}
+                                        {moreTool === 'content-editor' && canContentEditor && (
+                                            <Suspense fallback={
+                                                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center text-gray-500">
+                                                    <div className="w-10 h-10 mx-auto mb-4 rounded-full border-4 border-[#C8102E] border-t-transparent animate-spin" />
+                                                    <p className="text-sm font-semibold">Loading content editor…</p>
+                                                </div>
+                                            }>
+                                                <AdvisorDashboard embedded />
+                                            </Suspense>
+                                        )}
+                                        {moreTool === 'request-deployments' && canRequestDeployments && (
+                                            <DeploymentRequestPanel />
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                                        <div className="p-6 border-b border-gray-100">
+                                            <h2 className="text-lg font-bold text-[#0B1B3D]">More Tools</h2>
+                                            <p className="text-xs text-gray-500 mt-0.5 max-w-2xl">
+                                                Extra operations Power Admin can run. These stay out of the main hub tabs so Template & Deployment stays focused.
+                                            </p>
+                                        </div>
+                                        <div className="p-6 grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                                            {moreTools.map(tool => {
+                                                const Icon = tool.icon
+                                                return (
+                                                    <button
+                                                        key={tool.id}
+                                                        type="button"
+                                                        onClick={() => setMoreTool(tool.id)}
+                                                        className="text-left group rounded-2xl border border-gray-200 bg-slate-50/60 hover:bg-white hover:border-[#0B1B3D]/30 hover:shadow-md transition p-5"
+                                                    >
+                                                        <div className="flex items-start gap-3">
+                                                            <div className="w-10 h-10 rounded-xl bg-[#0B1B3D] text-white flex items-center justify-center shrink-0 group-hover:bg-[#C8102E] transition">
+                                                                <Icon className="w-4 h-4" />
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <p className="text-[10px] font-extrabold uppercase tracking-wider text-gray-400">
+                                                                    {tool.category}
+                                                                </p>
+                                                                <p className="font-bold text-[#0B1B3D] mt-0.5">{tool.label}</p>
+                                                                <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                                                                    {tool.description}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         )}
 
                         {/* Template Catalog */}
