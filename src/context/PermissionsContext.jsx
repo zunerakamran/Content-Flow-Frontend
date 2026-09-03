@@ -8,8 +8,8 @@ export const PERMISSION_CATALOG = [
     { key: 'assign_change_requests', name: 'Assign Change Requests', description: 'Assign pending change requests to an approver.', category: 'Change Requests' },
     { key: 'view_all_change_requests', name: 'View All Change Requests', description: 'See change requests across firms.', category: 'Change Requests' },
     { key: 'review_change_requests', name: 'Review Change Requests', description: 'Approve, reject, or schedule submitted content changes.', category: 'Change Requests' },
-    { key: 'submit_change_requests', name: 'Submit Change Requests', description: 'Edit sections and submit changes for approval.', category: 'Content' },
-    { key: 'edit_sections', name: 'Edit Sections', description: 'Lock and edit website section content.', category: 'Content' },
+    { key: 'submit_change_requests', name: 'Submit Change Requests', description: 'Edit sections and submit changes for approval. Not available for Manager, Client Admin, or Approver.', category: 'Content' },
+    { key: 'edit_sections', name: 'Edit Sections', description: 'Lock and edit website section content. Not available for Manager, Client Admin, or Approver.', category: 'Content' },
     { key: 'request_deployments', name: 'Request Deployments', description: 'Request a new showcase site deployment.', category: 'Deployments' },
     { key: 'view_all_deployments', name: 'View All Deployments', description: 'See all deployment requests (list only; does not allow requesting or deploying).', category: 'Deployments' },
     { key: 'deploy_websites', name: 'Deploy Websites', description: 'Deploy or update advisor sites on cPanel. Reserved for Power Admin only.', category: 'Deployments' },
@@ -30,6 +30,19 @@ const POWER_ADMIN_ONLY_PERMISSIONS = [
     'manage_role_labels',
     'manage_role_permissions',
 ]
+
+const ADVISOR_CONTENT_PERMISSIONS = ['submit_change_requests', 'edit_sections']
+const ROLES_BLOCKED_FROM_ADVISOR_CONTENT = ['manager', 'client_admin', 'approver']
+
+function buildDefaultLocked() {
+    return Object.fromEntries(ROLE_KEYS.map(role => {
+        const keys = [...POWER_ADMIN_ONLY_PERMISSIONS]
+        if (ROLES_BLOCKED_FROM_ADVISOR_CONTENT.includes(role)) {
+            keys.push(...ADVISOR_CONTENT_PERMISSIONS)
+        }
+        return [role, keys]
+    }))
+}
 
 const DEFAULT_MATRIX = {
     power_admin: Object.fromEntries(PERMISSION_CATALOG.map(p => [p.key, true])),
@@ -83,9 +96,7 @@ export function PermissionsProvider({ children }) {
     const [permissions, setPermissions] = useState(PERMISSION_CATALOG)
     const [roles, setRoles] = useState(ROLE_KEYS)
     const [matrix, setMatrix] = useState(() => buildDefaultMatrix())
-    const [locked, setLocked] = useState(() =>
-        Object.fromEntries(ROLE_KEYS.map(role => [role, [...POWER_ADMIN_ONLY_PERMISSIONS]]))
-    )
+    const [locked, setLocked] = useState(() => buildDefaultLocked())
     const [loading, setLoading] = useState(true)
 
     const applyPayload = useCallback((data) => {
@@ -100,11 +111,16 @@ export function PermissionsProvider({ children }) {
             for (const [role, grants] of Object.entries(data.matrix)) {
                 next[role] = { ...(next[role] || {}), ...grants }
             }
-            // Hard-enforce: Power-Admin-only permissions stay with power_admin.
+            // Hard-enforce reserved / blocked permission cells.
             for (const role of ROLE_KEYS) {
                 if (!next[role]) next[role] = {}
                 for (const key of POWER_ADMIN_ONLY_PERMISSIONS) {
                     next[role][key] = role === 'power_admin'
+                }
+                if (ROLES_BLOCKED_FROM_ADVISOR_CONTENT.includes(role)) {
+                    for (const key of ADVISOR_CONTENT_PERMISSIONS) {
+                        next[role][key] = false
+                    }
                 }
             }
             setMatrix(next)
@@ -116,9 +132,16 @@ export function PermissionsProvider({ children }) {
                 for (const key of POWER_ADMIN_ONLY_PERMISSIONS) {
                     list.add(key)
                 }
+                if (ROLES_BLOCKED_FROM_ADVISOR_CONTENT.includes(role)) {
+                    for (const key of ADVISOR_CONTENT_PERMISSIONS) {
+                        list.add(key)
+                    }
+                }
                 nextLocked[role] = [...list]
             }
             setLocked(nextLocked)
+        } else {
+            setLocked(buildDefaultLocked())
         }
     }, [])
 
@@ -159,6 +182,13 @@ export function PermissionsProvider({ children }) {
         // These settings permissions are reserved for Power Admin only.
         if (POWER_ADMIN_ONLY_PERMISSIONS.includes(permissionKey)) {
             return roleKey === 'power_admin'
+        }
+        // Manager / Client Admin / Approver cannot hold advisor content permissions.
+        if (
+            ROLES_BLOCKED_FROM_ADVISOR_CONTENT.includes(roleKey)
+            && ADVISOR_CONTENT_PERMISSIONS.includes(permissionKey)
+        ) {
+            return false
         }
         // Live matrix is the source of truth so Power Admin changes apply without re-login
         if (Object.prototype.hasOwnProperty.call(matrix[roleKey] || {}, permissionKey)) {

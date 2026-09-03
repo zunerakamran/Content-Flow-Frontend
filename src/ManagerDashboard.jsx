@@ -629,7 +629,7 @@ export default function ManagerDashboard() {
   const canReview = can('review_change_requests')
   const canViewLogs = can('view_activity_logs')
   const canViewPlatformReport = can('view_platform_report')
-  const canContentEditor = can('submit_change_requests') || can('edit_sections') || can('request_deployments')
+  const canContentEditor = can('submit_change_requests') || can('edit_sections')
   const canDeploymentHub = can('deploy_websites') || can('manage_templates') || can('manage_deployment_sections') || can('publish_live_content')
   const canViewDeployments = can('request_deployments') || can('view_all_deployments')
   const [requests, setRequests] = useState([])

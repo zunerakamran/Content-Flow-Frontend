@@ -243,6 +243,8 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                 publish_live_content: 'Publish Live Content is reserved for Power Admin and cannot be changed.',
                 manage_role_permissions: 'Manage Role Permissions is reserved for Power Admin and cannot be changed.',
                 manage_role_labels: 'Manage Role Labels is reserved for Power Admin and cannot be changed.',
+                submit_change_requests: 'Submit Change Requests cannot be granted to Manager, Client Admin, or Approver.',
+                edit_sections: 'Edit Sections cannot be granted to Manager, Client Admin, or Approver.',
             }
             setError(reservedMessages[permissionKey] || 'This permission cannot be changed for this role.')
             return
@@ -1206,7 +1208,8 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                                     <h2 className="text-lg font-bold text-[#0B1B3D]">Role Permissions</h2>
                                     <p className="text-xs text-gray-500 mt-0.5 max-w-3xl">
                                         Control what each role can do. Example: turn off Create Users for {getRoleLabel('manager')} and turn it on for {getRoleLabel('client_admin')}.
-                                        Deploy Websites, Manage Templates, Manage Deployment Sections, Publish Live Content, Manage Role Labels, and Manage Role Permissions stay with {getRoleLabel('power_admin')} only and cannot be reassigned.
+                                        Deploy Websites, Manage Templates, Manage Deployment Sections, Publish Live Content, Manage Role Labels, and Manage Role Permissions stay with {getRoleLabel('power_admin')} only.
+                                        Edit Sections and Submit Change Requests cannot be granted to {getRoleLabel('manager')}, {getRoleLabel('client_admin')}, or {getRoleLabel('approver')}.
                                     </p>
                                 </div>
 
@@ -1238,7 +1241,11 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                                                             <td key={`${role}-${perm.key}`} className="px-4 py-4 text-center">
                                                                 <label
                                                                     className={`inline-flex items-center justify-center ${lockedCell ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                                                                    title={lockedCell ? 'Reserved for Power Admin' : undefined}
+                                                                    title={lockedCell
+                                                                        ? (perm.key === 'edit_sections' || perm.key === 'submit_change_requests'
+                                                                            ? 'Not available for this role'
+                                                                            : 'Reserved for Power Admin')
+                                                                        : undefined}
                                                                 >
                                                                     <input
                                                                         type="checkbox"
