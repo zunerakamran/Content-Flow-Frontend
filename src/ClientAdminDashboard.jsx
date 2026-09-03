@@ -186,7 +186,7 @@ export default function ClientAdminDashboard() {
   const canAssignRequests = can('assign_change_requests') || can('view_all_change_requests')
   const canReview = can('review_change_requests')
   const canContentEditor = can('submit_change_requests') || can('edit_sections')
-  const canDeploymentHub = can('deploy_websites') || can('manage_templates') || can('manage_deployment_sections') || can('publish_live_content') || can('view_all_deployments')
+  const canDeploymentHub = can('deploy_websites') || can('manage_templates') || can('manage_deployment_sections') || can('publish_live_content')
   const canRequestDeployments = can('request_deployments') || can('view_all_deployments')
   const [logs, setLogs] = useState([])
   const [activeTab, setActiveTab] = useState('overview')

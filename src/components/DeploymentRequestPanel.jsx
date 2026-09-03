@@ -578,15 +578,21 @@ export default function DeploymentRequestPanel() {
     else setLoading(true)
     setError('')
     try {
-      const [reqRes, usersRes] = await Promise.all([
-        api.get('/template-requests'),
-        api.get('/users'),
-      ])
+      const reqRes = await api.get('/template-requests')
       setRequests(Array.isArray(reqRes.data) ? reqRes.data : [])
-      const users = Array.isArray(usersRes.data) ? usersRes.data : usersRes.data?.data || []
-      setAdvisors(users.filter(u => u.role === 'advisor'))
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load deployment requests.')
+      setLoading(false)
+      setRefreshing(false)
+      return
+    }
+
+    try {
+      const usersRes = await api.get('/users')
+      const users = Array.isArray(usersRes.data) ? usersRes.data : usersRes.data?.data || []
+      setAdvisors(users.filter(u => u.role === 'advisor' || u.role === 'editor'))
+    } catch {
+      setAdvisors([])
     } finally {
       setLoading(false)
       setRefreshing(false)
