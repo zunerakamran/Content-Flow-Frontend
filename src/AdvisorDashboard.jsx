@@ -1944,7 +1944,10 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
     }
 
     if (!isPowerAdminPublishMode && section.is_locked && section.locked_by !== user?.id) {
-      setError(`Section "${sectionDisplayName(section)}" is locked by ${section.locked_by_user?.name || 'another advisor'}.`)
+      const msg = section.locked_by
+        ? `Section "${sectionDisplayName(section)}" is locked by ${section.locked_by_user?.name || 'another user'}.`
+        : `Section "${sectionDisplayName(section)}" has a pending or scheduled change request and cannot be edited until it is reviewed.`
+      setError(msg)
       return
     }
 
@@ -2788,7 +2791,9 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                 {isLockedByOther && (
                                   <span className="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full inline-flex items-center gap-1">
                                     <FaLock className="w-2.5 h-2.5" />
-                                    {section.locked_by_user?.name || 'Other'}
+                                    {section.locked_by
+                                      ? (section.locked_by_user?.name || 'Another user')
+                                      : 'Under review'}
                                   </span>
                                 )}
                                 {(isChecked || isLockedByMe) && (
@@ -2800,7 +2805,9 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                               </div>
                               <p className="text-xs text-gray-500 mt-1">
                                 {isLockedByOther
-                                  ? 'Locked by another advisor'
+                                  ? (section.locked_by
+                                      ? `Locked by ${section.locked_by_user?.name || 'another user'}`
+                                      : 'Pending or scheduled change request — locked until reviewed')
                                   : isChecked || isLockedByMe
                                     ? 'Ready to edit below'
                                     : 'Click to lock & edit'}
