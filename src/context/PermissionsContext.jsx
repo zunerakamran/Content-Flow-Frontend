@@ -5,9 +5,9 @@ import { useAuth } from './AuthContext'
 export const PERMISSION_CATALOG = [
     { key: 'manage_users', name: 'Create Users', description: 'Create new user accounts.', category: 'Team' },
     { key: 'view_users', name: 'View Team Users', description: 'View the list of users on the team.', category: 'Team' },
-    { key: 'assign_change_requests', name: 'Assign Change Requests', description: 'Assign pending change requests to an approver.', category: 'Change Requests' },
-    { key: 'view_all_change_requests', name: 'View All Change Requests', description: 'See change requests across firms.', category: 'Change Requests' },
-    { key: 'review_change_requests', name: 'Review Change Requests', description: 'Approve, reject, or schedule submitted content changes.', category: 'Change Requests' },
+    { key: 'assign_change_requests', name: 'Assign Change Requests', description: 'Assign pending change requests to an approver. Not available for Advisor.', category: 'Change Requests' },
+    { key: 'view_all_change_requests', name: 'View All Change Requests', description: 'See change requests across firms. Not available for Advisor.', category: 'Change Requests' },
+    { key: 'review_change_requests', name: 'Review Change Requests', description: 'Approve, reject, or schedule submitted content changes. Not available for Advisor.', category: 'Change Requests' },
     { key: 'submit_change_requests', name: 'Submit Change Requests', description: 'Edit sections and submit changes for approval. Not available for Manager, Client Admin, or Approver.', category: 'Content' },
     { key: 'edit_sections', name: 'Edit Sections', description: 'Lock and edit website section content. Not available for Manager, Client Admin, or Approver.', category: 'Content' },
     { key: 'request_deployments', name: 'Request Deployments', description: 'Request a new showcase site deployment.', category: 'Deployments' },
@@ -34,11 +34,21 @@ const POWER_ADMIN_ONLY_PERMISSIONS = [
 const ADVISOR_CONTENT_PERMISSIONS = ['submit_change_requests', 'edit_sections']
 const ROLES_BLOCKED_FROM_ADVISOR_CONTENT = ['manager', 'client_admin', 'approver']
 
+const CHANGE_REQUEST_MANAGEMENT_PERMISSIONS = [
+    'assign_change_requests',
+    'view_all_change_requests',
+    'review_change_requests',
+]
+const ROLES_BLOCKED_FROM_CHANGE_REQUEST_MANAGEMENT = ['advisor']
+
 function buildDefaultLocked() {
     return Object.fromEntries(ROLE_KEYS.map(role => {
         const keys = [...POWER_ADMIN_ONLY_PERMISSIONS]
         if (ROLES_BLOCKED_FROM_ADVISOR_CONTENT.includes(role)) {
             keys.push(...ADVISOR_CONTENT_PERMISSIONS)
+        }
+        if (ROLES_BLOCKED_FROM_CHANGE_REQUEST_MANAGEMENT.includes(role)) {
+            keys.push(...CHANGE_REQUEST_MANAGEMENT_PERMISSIONS)
         }
         return [role, keys]
     }))
@@ -122,6 +132,11 @@ export function PermissionsProvider({ children }) {
                         next[role][key] = false
                     }
                 }
+                if (ROLES_BLOCKED_FROM_CHANGE_REQUEST_MANAGEMENT.includes(role)) {
+                    for (const key of CHANGE_REQUEST_MANAGEMENT_PERMISSIONS) {
+                        next[role][key] = false
+                    }
+                }
             }
             setMatrix(next)
         }
@@ -134,6 +149,11 @@ export function PermissionsProvider({ children }) {
                 }
                 if (ROLES_BLOCKED_FROM_ADVISOR_CONTENT.includes(role)) {
                     for (const key of ADVISOR_CONTENT_PERMISSIONS) {
+                        list.add(key)
+                    }
+                }
+                if (ROLES_BLOCKED_FROM_CHANGE_REQUEST_MANAGEMENT.includes(role)) {
+                    for (const key of CHANGE_REQUEST_MANAGEMENT_PERMISSIONS) {
                         list.add(key)
                     }
                 }
@@ -187,6 +207,13 @@ export function PermissionsProvider({ children }) {
         if (
             ROLES_BLOCKED_FROM_ADVISOR_CONTENT.includes(roleKey)
             && ADVISOR_CONTENT_PERMISSIONS.includes(permissionKey)
+        ) {
+            return false
+        }
+        // Advisor cannot hold change-request management permissions.
+        if (
+            ROLES_BLOCKED_FROM_CHANGE_REQUEST_MANAGEMENT.includes(roleKey)
+            && CHANGE_REQUEST_MANAGEMENT_PERMISSIONS.includes(permissionKey)
         ) {
             return false
         }

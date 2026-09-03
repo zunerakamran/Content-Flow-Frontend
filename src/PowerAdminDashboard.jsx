@@ -245,6 +245,9 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                 manage_role_labels: 'Manage Role Labels is reserved for Power Admin and cannot be changed.',
                 submit_change_requests: 'Submit Change Requests cannot be granted to Manager, Client Admin, or Approver.',
                 edit_sections: 'Edit Sections cannot be granted to Manager, Client Admin, or Approver.',
+                assign_change_requests: 'Assign Change Requests cannot be granted to Advisor.',
+                view_all_change_requests: 'View All Change Requests cannot be granted to Advisor.',
+                review_change_requests: 'Review Change Requests cannot be granted to Advisor.',
             }
             setError(reservedMessages[permissionKey] || 'This permission cannot be changed for this role.')
             return
@@ -1210,6 +1213,7 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                                         Control what each role can do. Example: turn off Create Users for {getRoleLabel('manager')} and turn it on for {getRoleLabel('client_admin')}.
                                         Deploy Websites, Manage Templates, Manage Deployment Sections, Publish Live Content, Manage Role Labels, and Manage Role Permissions stay with {getRoleLabel('power_admin')} only.
                                         Edit Sections and Submit Change Requests cannot be granted to {getRoleLabel('manager')}, {getRoleLabel('client_admin')}, or {getRoleLabel('approver')}.
+                                        Assign Change Requests, View All Change Requests, and Review Change Requests cannot be granted to {getRoleLabel('advisor')}.
                                     </p>
                                 </div>
 
@@ -1242,9 +1246,15 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                                                                 <label
                                                                     className={`inline-flex items-center justify-center ${lockedCell ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                                                                     title={lockedCell
-                                                                        ? (perm.key === 'edit_sections' || perm.key === 'submit_change_requests'
-                                                                            ? 'Not available for this role'
-                                                                            : 'Reserved for Power Admin')
+                                                                        ? (
+                                                                            perm.key === 'edit_sections'
+                                                                            || perm.key === 'submit_change_requests'
+                                                                            || perm.key === 'assign_change_requests'
+                                                                            || perm.key === 'view_all_change_requests'
+                                                                            || perm.key === 'review_change_requests'
+                                                                                ? 'Not available for this role'
+                                                                                : 'Reserved for Power Admin'
+                                                                        )
                                                                         : undefined}
                                                                 >
                                                                     <input
