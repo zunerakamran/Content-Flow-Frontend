@@ -220,11 +220,15 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
 
     const handleTogglePermission = async (roleKey, permissionKey, granted) => {
         if (isLocked(roleKey, permissionKey)) {
-            setError(
-                permissionKey === 'manage_role_permissions'
-                    ? 'Manage Role Permissions is reserved for Power Admin and cannot be changed.'
-                    : 'This permission cannot be changed for this role.'
-            )
+            const reservedMessages = {
+                deploy_websites: 'Deploy Websites is reserved for Power Admin and cannot be changed.',
+                manage_templates: 'Manage Templates is reserved for Power Admin and cannot be changed.',
+                manage_deployment_sections: 'Manage Deployment Sections is reserved for Power Admin and cannot be changed.',
+                publish_live_content: 'Publish Live Content is reserved for Power Admin and cannot be changed.',
+                manage_role_permissions: 'Manage Role Permissions is reserved for Power Admin and cannot be changed.',
+                manage_role_labels: 'Manage Role Labels is reserved for Power Admin and cannot be changed.',
+            }
+            setError(reservedMessages[permissionKey] || 'This permission cannot be changed for this role.')
             return
         }
 
@@ -1057,7 +1061,7 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                                     <h2 className="text-lg font-bold text-[#0B1B3D]">Role Permissions</h2>
                                     <p className="text-xs text-gray-500 mt-0.5 max-w-3xl">
                                         Control what each role can do. Example: turn off Create Users for {getRoleLabel('manager')} and turn it on for {getRoleLabel('client_admin')}.
-                                        Manage Role Permissions stays with {getRoleLabel('power_admin')} only and cannot be reassigned.
+                                        Deploy Websites, Manage Templates, Manage Deployment Sections, Publish Live Content, Manage Role Labels, and Manage Role Permissions stay with {getRoleLabel('power_admin')} only and cannot be reassigned.
                                     </p>
                                 </div>
 
@@ -1089,9 +1093,7 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                                                             <td key={`${role}-${perm.key}`} className="px-4 py-4 text-center">
                                                                 <label
                                                                     className={`inline-flex items-center justify-center ${lockedCell ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
-                                                                    title={lockedCell && perm.key === 'manage_role_permissions'
-                                                                        ? 'Reserved for Power Admin'
-                                                                        : undefined}
+                                                                    title={lockedCell ? 'Reserved for Power Admin' : undefined}
                                                                 >
                                                                     <input
                                                                         type="checkbox"

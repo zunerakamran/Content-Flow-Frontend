@@ -12,14 +12,23 @@ export const PERMISSION_CATALOG = [
     { key: 'edit_sections', name: 'Edit Sections', description: 'Lock and edit website section content.', category: 'Content' },
     { key: 'request_deployments', name: 'Request Deployments', description: 'Request a new showcase site deployment.', category: 'Deployments' },
     { key: 'view_all_deployments', name: 'View All Deployments', description: 'See all deployment requests.', category: 'Deployments' },
-    { key: 'deploy_websites', name: 'Deploy Websites', description: 'Deploy or update advisor sites on cPanel.', category: 'Deployments' },
-    { key: 'manage_templates', name: 'Manage Templates', description: 'Create, edit, and delete showcase templates.', category: 'Templates' },
-    { key: 'manage_deployment_sections', name: 'Manage Deployment Sections', description: 'Show or hide sections on a deployed site.', category: 'Deployments' },
-    { key: 'publish_live_content', name: 'Publish Live Content', description: 'Publish live site content without approver review.', category: 'Content' },
+    { key: 'deploy_websites', name: 'Deploy Websites', description: 'Deploy or update advisor sites on cPanel. Reserved for Power Admin only.', category: 'Deployments' },
+    { key: 'manage_templates', name: 'Manage Templates', description: 'Create, edit, and delete showcase templates. Reserved for Power Admin only.', category: 'Templates' },
+    { key: 'manage_deployment_sections', name: 'Manage Deployment Sections', description: 'Show or hide sections on a deployed site. Reserved for Power Admin only.', category: 'Deployments' },
+    { key: 'publish_live_content', name: 'Publish Live Content', description: 'Publish live site content without approver review. Reserved for Power Admin only.', category: 'Content' },
     { key: 'view_activity_logs', name: 'View Activity Logs', description: 'View audit and activity logs.', category: 'Compliance' },
     { key: 'view_platform_report', name: 'View Platform Report', description: 'View and refresh the platform summary report.', category: 'Compliance' },
-    { key: 'manage_role_labels', name: 'Manage Role Labels', description: 'Rename role display names shown in the dashboard.', category: 'Settings' },
+    { key: 'manage_role_labels', name: 'Manage Role Labels', description: 'Rename role display names shown in the dashboard. Reserved for Power Admin only.', category: 'Settings' },
     { key: 'manage_role_permissions', name: 'Manage Role Permissions', description: 'Grant or revoke what each role can do. Reserved for Power Admin only.', category: 'Settings' },
+]
+
+const POWER_ADMIN_ONLY_PERMISSIONS = [
+    'deploy_websites',
+    'manage_templates',
+    'manage_deployment_sections',
+    'publish_live_content',
+    'manage_role_labels',
+    'manage_role_permissions',
 ]
 
 const DEFAULT_MATRIX = {
@@ -75,7 +84,7 @@ export function PermissionsProvider({ children }) {
     const [roles, setRoles] = useState(ROLE_KEYS)
     const [matrix, setMatrix] = useState(() => buildDefaultMatrix())
     const [locked, setLocked] = useState(() =>
-        Object.fromEntries(ROLE_KEYS.map(role => [role, ['manage_role_permissions']]))
+        Object.fromEntries(ROLE_KEYS.map(role => [role, [...POWER_ADMIN_ONLY_PERMISSIONS]]))
     )
     const [loading, setLoading] = useState(true)
 
@@ -91,10 +100,12 @@ export function PermissionsProvider({ children }) {
             for (const [role, grants] of Object.entries(data.matrix)) {
                 next[role] = { ...(next[role] || {}), ...grants }
             }
-            // Hard-enforce: Manage Role Permissions is Power Admin only.
+            // Hard-enforce: Power-Admin-only permissions stay with power_admin.
             for (const role of ROLE_KEYS) {
                 if (!next[role]) next[role] = {}
-                next[role].manage_role_permissions = role === 'power_admin'
+                for (const key of POWER_ADMIN_ONLY_PERMISSIONS) {
+                    next[role][key] = role === 'power_admin'
+                }
             }
             setMatrix(next)
         }
@@ -102,7 +113,9 @@ export function PermissionsProvider({ children }) {
             const nextLocked = { ...data.locked }
             for (const role of ROLE_KEYS) {
                 const list = new Set(nextLocked[role] || [])
-                list.add('manage_role_permissions')
+                for (const key of POWER_ADMIN_ONLY_PERMISSIONS) {
+                    list.add(key)
+                }
                 nextLocked[role] = [...list]
             }
             setLocked(nextLocked)
@@ -143,8 +156,8 @@ export function PermissionsProvider({ children }) {
 
     const can = useCallback((permissionKey) => {
         if (!permissionKey || !roleKey) return false
-        // Manage Role Permissions is reserved for Power Admin only.
-        if (permissionKey === 'manage_role_permissions') {
+        // These settings permissions are reserved for Power Admin only.
+        if (POWER_ADMIN_ONLY_PERMISSIONS.includes(permissionKey)) {
             return roleKey === 'power_admin'
         }
         // Live matrix is the source of truth so Power Admin changes apply without re-login
