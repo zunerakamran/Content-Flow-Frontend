@@ -46,7 +46,47 @@ import {
   FaSearch,
   FaThLarge,
   FaArrowLeft,
+  FaTasks,
+  FaCoins,
+  FaSeedling,
+  FaHandshake,
+  FaUsers,
+  FaShieldAlt,
+  FaFileInvoiceDollar,
+  FaPercentage,
+  FaGlobe,
+  FaBalanceScale,
+  FaStar,
 } from 'react-icons/fa'
+
+const SERVICE_ICON_OPTIONS = [
+  { value: 'chart-pie', label: 'Chart pie', Icon: FaChartPie },
+  { value: 'tasks', label: 'Tasks', Icon: FaTasks },
+  { value: 'landmark', label: 'Landmark', Icon: FaLandmark },
+  { value: 'coins', label: 'Coins', Icon: FaCoins },
+  { value: 'holding', label: 'Holding', Icon: FaHandHoldingUsd },
+  { value: 'seedling', label: 'Seedling', Icon: FaSeedling },
+  { value: 'briefcase', label: 'Briefcase', Icon: FaBriefcase },
+  { value: 'chart-line', label: 'Chart line', Icon: FaChartLine },
+  { value: 'handshake', label: 'Handshake', Icon: FaHandshake },
+  { value: 'building', label: 'Building', Icon: FaBuilding },
+  { value: 'users', label: 'Users', Icon: FaUsers },
+  { value: 'shield-alt', label: 'Shield', Icon: FaShieldAlt },
+  { value: 'lightbulb', label: 'Lightbulb', Icon: FaLightbulb },
+  { value: 'file-invoice-dollar', label: 'Invoice', Icon: FaFileInvoiceDollar },
+  { value: 'percentage', label: 'Percentage', Icon: FaPercentage },
+  { value: 'globe', label: 'Globe', Icon: FaGlobe },
+  { value: 'comments', label: 'Comments', Icon: FaComments },
+  { value: 'balance-scale', label: 'Balance', Icon: FaBalanceScale },
+]
+
+const STAT_ICON_OPTIONS = [
+  { value: 'users', label: 'Users', Icon: FaUsers },
+  { value: 'star', label: 'Star', Icon: FaStar },
+  { value: 'user-tie', label: 'User tie', Icon: FaUserTie },
+  { value: 'award', label: 'Award', Icon: FaAward },
+  ...SERVICE_ICON_OPTIONS.filter((opt) => opt.value !== 'users'),
+]
 
 const LOCAL_TEMPLATE_IMAGES = [
   { label: 'banner1', value: 'banner1' },
@@ -1863,6 +1903,11 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
     return list.filter(s => String(s.advisor_id) === String(advisorId))
   }
 
+  const fetchDeploymentSections = async (deploymentId) => {
+    const res = await api.get(`/template-requests/${deploymentId}/sections`)
+    return Array.isArray(res.data?.sections) ? res.data.sections : []
+  }
+
   const handlePageSelect = async (pageId) => {
     setSelectedPageId(pageId)
     setCheckedSectionIds([])
@@ -1875,10 +1920,23 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
       return
     }
 
+    // Power Admin direct-publish must edit deployment-scoped sections
+    // (template_request_id set), not the advisor hub copy.
+    if (isPowerAdminPublishMode && powerAdminDeploymentId) {
+      try {
+        const deploymentSections = await fetchDeploymentSections(powerAdminDeploymentId)
+        setSections(deploymentSections)
+      } catch (err) {
+        setSections([])
+        setError(err.response?.data?.message || 'Failed to load deployment sections.')
+      }
+      return
+    }
+
     const deployment = templateRequests.find(
       r => r.id === (powerAdminDeploymentId || selectedDeploymentId) && r.status === 'deployed'
     ) || templateRequests.find(r => r.status === 'deployed')
-    const targetAdvisorId = deployment?.advisor_id ?? deployment?.assigned_advisor_id ?? null
+    const targetAdvisorId = deployment?.assigned_advisor_id ?? deployment?.advisor_id ?? null
 
     const sectionsForAdvisor = await fetchAdvisorSections(pageId, targetAdvisorId)
     setSections(sectionsForAdvisor)
@@ -3027,6 +3085,40 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                               className={inputClass}
                                             />
                                           </div>
+                                          {isPowerAdminPublishMode && (
+                                            <>
+                                              <div>
+                                                <label className={labelClass}>Button Text</label>
+                                                <input
+                                                  type="text"
+                                                  value={slide.button_text || ''}
+                                                  onChange={(e) => updateSlide({ button_text: e.target.value })}
+                                                  placeholder="GET IN TOUCH"
+                                                  className={inputClass}
+                                                />
+                                              </div>
+                                              <div>
+                                                <label className={labelClass}>Button URL</label>
+                                                <input
+                                                  type="text"
+                                                  value={slide.button_url || slide.url || slide.link || ''}
+                                                  onChange={(e) => updateSlide({ button_url: e.target.value })}
+                                                  placeholder="#contact or https://..."
+                                                  className={inputClass}
+                                                />
+                                              </div>
+                                              <div className="md:col-span-2">
+                                                <label className={labelClass}>YouTube URL</label>
+                                                <input
+                                                  type="text"
+                                                  value={slide.youtube_url || ''}
+                                                  onChange={(e) => updateSlide({ youtube_url: e.target.value })}
+                                                  placeholder="https://www.youtube.com/watch?v=..."
+                                                  className={inputClass}
+                                                />
+                                              </div>
+                                            </>
+                                          )}
                                         </div>
                                       </div>
                                     </div>
@@ -3427,6 +3519,32 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                         />
                                         <ItemPanel index={boxIndex} title={`Box ${boxIndex + 1}`}>
                                           <div className="grid md:grid-cols-2 gap-4">
+                                            {isPowerAdminPublishMode && (
+                                              <div className="md:col-span-2">
+                                                <label className={labelClass}>Icon</label>
+                                                <div className="grid grid-cols-6 sm:grid-cols-9 gap-2">
+                                                  {SERVICE_ICON_OPTIONS.map((opt) => {
+                                                    const selected = (box.icon || '') === opt.value
+                                                    const Icon = opt.Icon
+                                                    return (
+                                                      <button
+                                                        key={opt.value}
+                                                        type="button"
+                                                        title={opt.label}
+                                                        onClick={() => patchServiceBox(secId, boxIndex, { icon: opt.value })}
+                                                        className={`h-10 rounded-lg border flex items-center justify-center transition ${
+                                                          selected
+                                                            ? 'border-[#0B1B3D] bg-[#0B1B3D] text-white'
+                                                            : 'border-gray-200 bg-white text-[#0B1B3D] hover:border-gray-400'
+                                                        }`}
+                                                      >
+                                                        <Icon size={16} />
+                                                      </button>
+                                                    )
+                                                  })}
+                                                </div>
+                                              </div>
+                                            )}
                                             <div className="md:col-span-2">
                                               <label className={labelClass}>Heading</label>
                                               <input
@@ -3447,6 +3565,30 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                                 className={inputClass}
                                               />
                                             </div>
+                                            {isPowerAdminPublishMode && (
+                                              <>
+                                                <div>
+                                                  <label className={labelClass}>Button Text</label>
+                                                  <input
+                                                    type="text"
+                                                    value={box.button_text || ''}
+                                                    onChange={(e) => patchServiceBox(secId, boxIndex, { button_text: e.target.value })}
+                                                    placeholder="Read more"
+                                                    className={inputClass}
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className={labelClass}>Button URL</label>
+                                                  <input
+                                                    type="text"
+                                                    value={box.button_url || box.url || box.link || ''}
+                                                    onChange={(e) => patchServiceBox(secId, boxIndex, { button_url: e.target.value })}
+                                                    placeholder="#service or https://..."
+                                                    className={inputClass}
+                                                  />
+                                                </div>
+                                              </>
+                                            )}
                                           </div>
                                         </ItemPanel>
                                       </div>
@@ -3562,6 +3704,32 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                         />
                                         <ItemPanel index={highlightIndex} title={`Highlight ${highlightIndex + 1}`}>
                                           <div className="grid md:grid-cols-2 gap-4">
+                                            {isPowerAdminPublishMode && (
+                                              <div className="md:col-span-2">
+                                                <label className={labelClass}>Icon</label>
+                                                <div className="grid grid-cols-6 sm:grid-cols-9 gap-2">
+                                                  {SERVICE_ICON_OPTIONS.map((opt) => {
+                                                    const selected = (item.icon || '') === opt.value
+                                                    const Icon = opt.Icon
+                                                    return (
+                                                      <button
+                                                        key={opt.value}
+                                                        type="button"
+                                                        title={opt.label}
+                                                        onClick={() => patchProgressHighlight(secId, highlightIndex, { icon: opt.value })}
+                                                        className={`h-10 rounded-lg border flex items-center justify-center transition ${
+                                                          selected
+                                                            ? 'border-[#0B1B3D] bg-[#0B1B3D] text-white'
+                                                            : 'border-gray-200 bg-white text-[#0B1B3D] hover:border-gray-400'
+                                                        }`}
+                                                      >
+                                                        <Icon size={16} />
+                                                      </button>
+                                                    )
+                                                  })}
+                                                </div>
+                                              </div>
+                                            )}
                                             <div className="md:col-span-2">
                                               <label className={labelClass}>Heading</label>
                                               <input
@@ -3662,6 +3830,30 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                                 className={inputClass}
                                               />
                                             </div>
+                                            {isPowerAdminPublishMode && (
+                                              <>
+                                                <div>
+                                                  <label className={labelClass}>Button Text</label>
+                                                  <input
+                                                    type="text"
+                                                    value={item.button_text || ''}
+                                                    onChange={(e) => patchPortfolioItem(secId, itemIndex, { button_text: e.target.value })}
+                                                    placeholder="Read more"
+                                                    className={inputClass}
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className={labelClass}>Button URL</label>
+                                                  <input
+                                                    type="text"
+                                                    value={item.button_url || item.url || item.link || ''}
+                                                    onChange={(e) => patchPortfolioItem(secId, itemIndex, { button_url: e.target.value })}
+                                                    placeholder="#portfolio or https://..."
+                                                    className={inputClass}
+                                                  />
+                                                </div>
+                                              </>
+                                            )}
                                           </div>
                                         </ItemPanel>
                                       </div>
@@ -3711,6 +3903,18 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                         className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                       />
                                     </div>
+                                    {isPowerAdminPublishMode && (
+                                      <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Button Text</label>
+                                        <input
+                                          type="text"
+                                          value={values.button_text || ''}
+                                          onChange={(e) => handleFieldValueChange(secId, 'button_text', e.target.value)}
+                                          placeholder="SEND YOUR MESSAGE"
+                                          className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                        />
+                                      </div>
+                                    )}
                                     <div>
                                       <label className="block text-xs font-bold text-gray-700 mb-1">Branches label</label>
                                       <input
@@ -3837,6 +4041,32 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                       />
                                       <ItemPanel index={statIndex} title={`Stat ${statIndex + 1}`}>
                                         <div className="grid md:grid-cols-2 gap-4">
+                                          {isPowerAdminPublishMode && (
+                                            <div className="md:col-span-2">
+                                              <label className={labelClass}>Icon</label>
+                                              <div className="grid grid-cols-6 sm:grid-cols-9 gap-2">
+                                                {STAT_ICON_OPTIONS.map((opt) => {
+                                                  const selected = (stat.icon || '') === opt.value
+                                                  const Icon = opt.Icon
+                                                  return (
+                                                    <button
+                                                      key={opt.value}
+                                                      type="button"
+                                                      title={opt.label}
+                                                      onClick={() => patchCounterStat(secId, statIndex, { icon: opt.value })}
+                                                      className={`h-10 rounded-lg border flex items-center justify-center transition ${
+                                                        selected
+                                                          ? 'border-[#0B1B3D] bg-[#0B1B3D] text-white'
+                                                          : 'border-gray-200 bg-white text-[#0B1B3D] hover:border-gray-400'
+                                                      }`}
+                                                    >
+                                                      <Icon size={16} />
+                                                    </button>
+                                                  )
+                                                })}
+                                              </div>
+                                            </div>
+                                          )}
                                           <div>
                                             <label className={labelClass}>Value</label>
                                             <input
@@ -4095,6 +4325,30 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                                 localImages={localImages}
                                               />
                                             </div>
+                                            {isPowerAdminPublishMode && (
+                                              <>
+                                                <div>
+                                                  <label className={labelClass}>Button Text</label>
+                                                  <input
+                                                    type="text"
+                                                    value={item.button_text || ''}
+                                                    onChange={(e) => patchNewsItem(secId, itemIndex, { button_text: e.target.value })}
+                                                    placeholder="Read more"
+                                                    className={inputClass}
+                                                  />
+                                                </div>
+                                                <div>
+                                                  <label className={labelClass}>Button URL</label>
+                                                  <input
+                                                    type="text"
+                                                    value={item.button_url || item.url || item.link || ''}
+                                                    onChange={(e) => patchNewsItem(secId, itemIndex, { button_url: e.target.value })}
+                                                    placeholder="#news or https://..."
+                                                    className={inputClass}
+                                                  />
+                                                </div>
+                                              </>
+                                            )}
                                           </div>
                                         </ItemPanel>
                                       </div>
@@ -4169,6 +4423,30 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                         className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                       />
                                     </div>
+                                    {isPowerAdminPublishMode && (
+                                      <>
+                                        <div>
+                                          <label className="block text-xs font-bold text-gray-700 mb-1">Button Text</label>
+                                          <input
+                                            type="text"
+                                            value={values.button_text || ''}
+                                            onChange={(e) => handleFieldValueChange(secId, 'button_text', e.target.value)}
+                                            placeholder="GET A QUOTE"
+                                            className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                          />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-bold text-gray-700 mb-1">Button URL</label>
+                                          <input
+                                            type="text"
+                                            value={values.button_url || values.url || values.link || ''}
+                                            onChange={(e) => handleFieldValueChange(secId, 'button_url', e.target.value)}
+                                            placeholder="#appointment or https://..."
+                                            className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                          />
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               ) : (
@@ -4214,6 +4492,30 @@ export default function AdvisorDashboard({ powerAdminDeploymentId = null, onExit
                                       className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
                                     />
                                   </div>
+                                  {isPowerAdminPublishMode && (
+                                    <>
+                                      <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Button Text</label>
+                                        <input
+                                          type="text"
+                                          value={values.button_text || ''}
+                                          onChange={(e) => handleFieldValueChange(secId, 'button_text', e.target.value)}
+                                          placeholder="Learn more"
+                                          className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                        />
+                                      </div>
+                                      <div>
+                                        <label className="block text-xs font-bold text-gray-700 mb-1">Button URL</label>
+                                        <input
+                                          type="text"
+                                          value={values.button_url || values.url || values.link || ''}
+                                          onChange={(e) => handleFieldValueChange(secId, 'button_url', e.target.value)}
+                                          placeholder="#section or https://..."
+                                          className="w-full text-sm p-2.5 border rounded-lg focus:ring-2 focus:ring-[#C8102E] outline-none"
+                                        />
+                                      </div>
+                                    </>
+                                  )}
                                   <div className="md:col-span-2">
                                     <ImageFieldPicker
                                       label="Section Image"
