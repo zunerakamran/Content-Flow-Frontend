@@ -24,6 +24,10 @@ import {
     FaPen,
     FaTags,
     FaUserShield,
+    FaBuilding,
+    FaListAlt,
+    FaHistory,
+    FaUser,
 } from 'react-icons/fa'
 import Navbar from './Navbar'
 import api from './api/axios'
@@ -33,6 +37,10 @@ import { useAuth } from './context/AuthContext'
 import { sectionDisplayName } from './utils/sectionDisplay'
 import TemplateScrollPreview from './components/TemplateScrollPreview'
 import { defaultTemplatePreviewUrl } from './utils/assetUrl'
+import PlatformSummaryReport from './components/PlatformSummaryReport'
+import Pagination from './components/Pagination'
+
+const LOGS_PER_PAGE = 15
 
 function normalizeSiteUrl(value) {
     const trimmed = String(value ?? '').trim()
@@ -165,8 +173,11 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
     const canDeploy = can('deploy_websites') || can('view_all_deployments')
     const canManageLabels = can('manage_role_labels')
     const canManagePermissions = can('manage_role_permissions')
+    const canViewLogs = can('view_activity_logs')
+    const canViewPlatformReport = can('view_platform_report')
     const [requests, setRequests] = useState([])
     const [templates, setTemplates] = useState([])
+    const [logs, setLogs] = useState([])
     const [message, setMessage] = useState('')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(true)
@@ -177,6 +188,8 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
     const [requestSearch, setRequestSearch] = useState('')
     const [statusFilter, setStatusFilter] = useState('all')
     const [requestView, setRequestView] = useState('table')
+    const [logSearch, setLogSearch] = useState('')
+    const [logPage, setLogPage] = useState(1)
 
     const [selectedRequest, setSelectedRequest] = useState(null)
     const [cpanelDomain, setCpanelDomain] = useState('')
@@ -285,23 +298,48 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
         if (!silent) setLoading(true)
         else setRefreshing(true)
         try {
-            const [reqRes, tplRes] = await Promise.all([
+            const tasks = [
                 api.get('/template-requests'),
                 api.get('/templates?all=1'),
-            ])
+            ]
+            if (canViewLogs) tasks.push(api.get('/logs'))
+
+            const [reqRes, tplRes, logsRes] = await Promise.all(tasks)
             setRequests(reqRes.data)
             setTemplates(tplRes.data)
+            if (canViewLogs && logsRes) {
+                setLogs(logsRes.data?.data || logsRes.data || [])
+            }
         } catch {
             setError('Failed to load dashboard data. Please try again.')
         } finally {
             setLoading(false)
             setRefreshing(false)
         }
-    }, [])
+    }, [canViewLogs])
 
     useEffect(() => {
         fetchData()
     }, [fetchData])
+
+    const filteredLogs = useMemo(() => {
+        if (!logSearch.trim()) return logs
+        const q = logSearch.trim().toLowerCase()
+        return logs.filter(log =>
+            (log.user?.name || '').toLowerCase().includes(q) ||
+            (log.action || '').toLowerCase().includes(q) ||
+            (log.details || log.description || '').toLowerCase().includes(q)
+        )
+    }, [logs, logSearch])
+
+    useEffect(() => {
+        setLogPage(1)
+    }, [logSearch])
+
+    const paginatedLogs = useMemo(() => {
+        const start = (logPage - 1) * LOGS_PER_PAGE
+        return filteredLogs.slice(start, start + LOGS_PER_PAGE)
+    }, [filteredLogs, logPage])
 
     const stats = useMemo(() => {
         const activeTemplates = templates.filter(t => t.is_active).length
@@ -520,15 +558,20 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
     const tabs = useMemo(() => [
         canManageTemplates && { id: 'templates', label: 'Template Catalog', icon: FaThLarge, count: templates.length },
         canDeploy && { id: 'deployments', label: 'Deployment Requests', icon: FaRocket, count: requests.length },
+        canViewPlatformReport && { id: 'platform', label: 'Platform Summary', icon: FaBuilding },
+        canViewLogs && { id: 'logs', label: 'Activity', icon: FaListAlt, count: logs.length },
         canManageLabels && { id: 'role-labels', label: 'Role Labels', icon: FaTags, count: roleLabelRecords.length },
         canManagePermissions && { id: 'permissions', label: 'Permissions', icon: FaUserShield, count: permissionDefs.length },
     ].filter(Boolean), [
         canManageTemplates,
         canDeploy,
+        canViewPlatformReport,
+        canViewLogs,
         canManageLabels,
         canManagePermissions,
         templates.length,
         requests.length,
+        logs.length,
         roleLabelRecords.length,
         permissionDefs.length,
     ])
@@ -657,13 +700,15 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                             >
                                 <Icon className="w-3.5 h-3.5" />
                                 {tab.label}
-                                <span
-                                    className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-                                        activeTab === tab.id ? 'bg-white/20' : 'bg-gray-100 text-gray-500'
-                                    }`}
-                                >
-                                    {tab.count}
-                                </span>
+                                {tab.count != null && (
+                                    <span
+                                        className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                                            activeTab === tab.id ? 'bg-white/20' : 'bg-gray-100 text-gray-500'
+                                        }`}
+                                    >
+                                        {tab.count}
+                                    </span>
+                                )}
                             </button>
                         )
                     })}
@@ -1051,6 +1096,82 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                                             </div>
                                         )
                                     })}
+                                </div>
+                            </div>
+                        )}
+
+                        {activeTab === 'platform' && canViewPlatformReport && (
+                            <PlatformSummaryReport onError={setError} />
+                        )}
+
+                        {activeTab === 'logs' && canViewLogs && (
+                            <div className="space-y-4">
+                                <div className="relative max-w-md">
+                                    <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
+                                    <input
+                                        type="search"
+                                        placeholder="Search activity logs…"
+                                        value={logSearch}
+                                        onChange={e => setLogSearch(e.target.value)}
+                                        className="w-full pl-9 pr-4 py-2.5 text-sm border border-gray-200 rounded-xl bg-white outline-none focus:ring-2 focus:ring-[#C8102E]/30 focus:border-[#C8102E] transition"
+                                    />
+                                </div>
+
+                                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                                    {filteredLogs.length === 0 ? (
+                                        <div className="p-16 text-center">
+                                            <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-gray-100 flex items-center justify-center">
+                                                <FaHistory className="w-6 h-6 text-gray-400" />
+                                            </div>
+                                            <h3 className="text-lg font-bold text-[#0B1B3D]">
+                                                {logSearch.trim() ? 'No matching activity' : 'No activity logs yet'}
+                                            </h3>
+                                            <p className="text-sm text-gray-500 mt-1">
+                                                {logSearch.trim() ? 'Try a different search term.' : 'Team actions will be recorded here.'}
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <div className="divide-y divide-gray-100">
+                                            {paginatedLogs.map(log => (
+                                                <div
+                                                    key={log.id}
+                                                    className="px-5 py-4 hover:bg-gray-50/80 transition flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-6"
+                                                >
+                                                    <div className="flex items-center gap-3 min-w-0 sm:w-48 shrink-0">
+                                                        <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                                                            <FaUser className="w-3.5 h-3.5 text-slate-500" />
+                                                        </div>
+                                                        <span className="font-semibold text-gray-800 text-sm truncate">
+                                                            {log.user?.name || 'System'}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <span className="inline-flex items-center text-xs font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 capitalize">
+                                                            {log.action?.replace(/_/g, ' ')}
+                                                        </span>
+                                                        {(log.details || log.description) && (
+                                                            <p className="text-sm text-gray-500 mt-1 truncate">
+                                                                {log.details || log.description}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-xs text-gray-400 shrink-0 flex items-center gap-1.5">
+                                                        <FaClock className="w-3 h-3" />
+                                                        {new Date(log.created_at).toLocaleString()}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+
+                                    {filteredLogs.length > 0 && (
+                                        <Pagination
+                                            currentPage={logPage}
+                                            totalItems={filteredLogs.length}
+                                            pageSize={LOGS_PER_PAGE}
+                                            onPageChange={setLogPage}
+                                        />
+                                    )}
                                 </div>
                             </div>
                         )}
