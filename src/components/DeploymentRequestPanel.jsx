@@ -567,7 +567,8 @@ export default function DeploymentRequestPanel() {
   const { getRoleLabel } = useRoleLabels()
   const canRequest = can('request_deployments')
   const canViewAll = can('view_all_deployments')
-  const canAssignAdvisor = can('assign_change_requests') || can('view_all_deployments') || canRequest
+  const canAssignAdvisor = can('assign_change_requests') || can('request_deployments')
+  const canAccess = canRequest || canViewAll
 
   const [requests, setRequests] = useState([])
   const [advisors, setAdvisors] = useState([])
@@ -580,6 +581,10 @@ export default function DeploymentRequestPanel() {
   const [assignTarget, setAssignTarget] = useState(null)
 
   const fetchData = useCallback(async (isRefresh = false) => {
+    if (!canAccess) {
+      setLoading(false)
+      return
+    }
     if (isRefresh) setRefreshing(true)
     else setLoading(true)
     setError('')
@@ -588,6 +593,13 @@ export default function DeploymentRequestPanel() {
       setRequests(Array.isArray(reqRes.data) ? reqRes.data : [])
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to load deployment requests.')
+      setLoading(false)
+      setRefreshing(false)
+      return
+    }
+
+    if (!canAssignAdvisor) {
+      setAdvisors([])
       setLoading(false)
       setRefreshing(false)
       return
@@ -609,7 +621,7 @@ export default function DeploymentRequestPanel() {
       setLoading(false)
       setRefreshing(false)
     }
-  }, [])
+  }, [canAccess, canAssignAdvisor])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -650,7 +662,9 @@ export default function DeploymentRequestPanel() {
         <div className="flex-1">
           <h2 className="text-lg font-bold text-[#0B1B3D]">Deployment Requests</h2>
           <p className="text-xs text-gray-500 mt-0.5">
-            Request new advisor showcase sites and assign {advisorLabel.toLowerCase()}s to edit their content.
+            {canRequest
+              ? `Request new advisor showcase sites and assign ${advisorLabel.toLowerCase()}s to edit their content.`
+              : 'Browse all deployment requests across the platform.'}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -747,7 +761,7 @@ export default function DeploymentRequestPanel() {
       )}
 
       {/* Create modal */}
-      {showCreateModal && (
+      {showCreateModal && canRequest && (
         <CreateDeploymentModal
           advisors={advisors}
           onClose={() => setShowCreateModal(false)}
@@ -756,7 +770,7 @@ export default function DeploymentRequestPanel() {
       )}
 
       {/* Assign advisor modal */}
-      {assignTarget && (
+      {assignTarget && canAssignAdvisor && (
         <AssignAdvisorModal
           request={assignTarget}
           advisors={advisors}

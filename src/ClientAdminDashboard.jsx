@@ -187,7 +187,7 @@ export default function ClientAdminDashboard() {
   const canReview = can('review_change_requests')
   const canContentEditor = can('submit_change_requests') || can('edit_sections')
   const canDeploymentHub = can('deploy_websites') || can('manage_templates') || can('manage_deployment_sections') || can('publish_live_content')
-  const canRequestDeployments = can('request_deployments') || can('view_all_deployments')
+  const canViewDeployments = can('request_deployments') || can('view_all_deployments')
   const [logs, setLogs] = useState([])
   const [activeTab, setActiveTab] = useState('overview')
   const [loading, setLoading] = useState(true)
@@ -315,7 +315,7 @@ export default function ClientAdminDashboard() {
     canManageUsers && { id: 'create-user', label: 'Create User', icon: FaUserPlus },
     canViewUsers && { id: 'users', label: 'Team', icon: FaUsers },
     canContentEditor && { id: 'content-editor', label: 'Content Editor', icon: FaEdit },
-    canRequestDeployments && { id: 'deployment-requests', label: 'Deployments', icon: FaRocket },
+    canViewDeployments && { id: 'deployment-requests', label: 'Deployments', icon: FaRocket },
     canDeploymentHub && { id: 'deployment-hub', label: 'Deployment Hub', icon: FaRocket },
   ].filter(Boolean), [
     canViewLogs,
@@ -326,7 +326,7 @@ export default function ClientAdminDashboard() {
     canReview,
     canViewRequestHistory,
     canContentEditor,
-    canRequestDeployments,
+    canViewDeployments,
     canDeploymentHub,
     logs.length,
   ])
@@ -736,7 +736,7 @@ export default function ClientAdminDashboard() {
                 : <ReviewQueuePanel variant="history" />
             )}
 
-            {activeTab === 'deployment-requests' && canRequestDeployments && (
+            {activeTab === 'deployment-requests' && canViewDeployments && (
               <DeploymentRequestPanel />
             )}
 

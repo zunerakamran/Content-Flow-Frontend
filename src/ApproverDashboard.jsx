@@ -53,7 +53,7 @@ export default function ApproverDashboard({ embedded = false } = {}) {
   const canViewPlatformReport = can('view_platform_report')
   const canViewLogs = can('view_activity_logs')
   const canViewRequestHistory = canAssignRequests || canReview
-  const canRequestDeployments = can('request_deployments') || can('view_all_deployments')
+  const canViewDeployments = can('request_deployments') || can('view_all_deployments')
 
   const [activeTab, setActiveTab] = useState('review')
   const [message, setMessage] = useState('')
@@ -66,12 +66,12 @@ export default function ApproverDashboard({ embedded = false } = {}) {
     canReview && { id: 'review', label: 'Review Queue', icon: FaClipboardCheck },
     canAssignRequests && { id: 'change-requests', label: 'New Requests', icon: FaInbox },
     canViewRequestHistory && { id: 'request-history', label: 'History', icon: FaHistory },
-    canRequestDeployments && { id: 'deployments', label: 'Deployments', icon: FaRocket },
+    canViewDeployments && { id: 'deployments', label: 'Deployments', icon: FaRocket },
     canManageUsers && { id: 'create-user', label: 'Create User', icon: FaUserPlus },
     canViewUsers && { id: 'users', label: 'Team', icon: FaUsers },
     canViewPlatformReport && { id: 'platform', label: 'Platform Summary', icon: FaBuilding },
     canViewLogs && { id: 'logs', label: 'Activity', icon: FaListAlt },
-  ].filter(Boolean), [canReview, canAssignRequests, canViewRequestHistory, canRequestDeployments, canManageUsers, canViewUsers, canViewPlatformReport, canViewLogs])
+  ].filter(Boolean), [canReview, canAssignRequests, canViewRequestHistory, canViewDeployments, canManageUsers, canViewUsers, canViewPlatformReport, canViewLogs])
 
   useEffect(() => {
     if (tabs.length && !tabs.some(t => t.id === activeTab)) {
@@ -142,7 +142,7 @@ export default function ApproverDashboard({ embedded = false } = {}) {
 
       {activeTab === 'review' && canReview && <ReviewQueuePanel variant="active" />}
 
-      {activeTab === 'deployments' && canRequestDeployments && <DeploymentRequestPanel />}
+      {activeTab === 'deployments' && canViewDeployments && <DeploymentRequestPanel />}
 
       {activeTab === 'change-requests' && canAssignRequests && (
         <ChangeRequestAssignmentPanel variant="pending" onMessage={setMessage} onError={setError} />

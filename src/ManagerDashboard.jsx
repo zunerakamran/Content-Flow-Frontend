@@ -32,6 +32,7 @@ import ChangeRequestAssignmentPanel from './components/ChangeRequestAssignmentPa
 import ReviewQueuePanel from './components/ReviewQueuePanel'
 import { CreateUserPanel, TeamUsersPanel } from './components/TeamUserManagement'
 import PlatformSummaryReport from './components/PlatformSummaryReport'
+import DeploymentRequestPanel from './components/DeploymentRequestPanel'
 import api from './api/axios'
 import { useAuth } from './context/AuthContext'
 import { useRoleLabels } from './context/RoleLabelsContext'
@@ -629,7 +630,8 @@ export default function ManagerDashboard() {
   const canViewLogs = can('view_activity_logs')
   const canViewPlatformReport = can('view_platform_report')
   const canContentEditor = can('submit_change_requests') || can('edit_sections') || can('request_deployments')
-  const canDeploymentHub = can('deploy_websites') || can('manage_templates') || can('manage_deployment_sections') || can('publish_live_content') || can('view_all_deployments')
+  const canDeploymentHub = can('deploy_websites') || can('manage_templates') || can('manage_deployment_sections') || can('publish_live_content')
+  const canViewDeployments = can('request_deployments') || can('view_all_deployments')
   const [requests, setRequests] = useState([])
   const [users, setUsers] = useState([])
   const [logs, setLogs] = useState([])
@@ -876,6 +878,7 @@ export default function ManagerDashboard() {
     canManageUsers && { id: 'create-user', label: 'Create User', icon: FaUserPlus },
     canViewUsers && { id: 'users', label: 'Team', count: users.length, icon: FaUsers },
     canContentEditor && { id: 'content-editor', label: 'Content Editor', icon: FaEdit },
+    canViewDeployments && { id: 'deployments', label: 'Deployments', icon: FaRocket },
     canDeploymentHub && { id: 'deployment-hub', label: 'Deployment Hub', icon: FaRocket },
     canViewPlatformReport && { id: 'platform', label: 'Platform Summary', icon: FaBuilding },
     canViewLogs && { id: 'logs', label: 'Activity', icon: FaListAlt },
@@ -886,6 +889,7 @@ export default function ManagerDashboard() {
     canManageUsers,
     canViewUsers,
     canContentEditor,
+    canViewDeployments,
     canDeploymentHub,
     canViewPlatformReport,
     canViewLogs,
@@ -1055,6 +1059,10 @@ export default function ManagerDashboard() {
           }>
             <AdvisorDashboard embedded />
           </Suspense>
+        )}
+
+        {activeTab === 'deployments' && canViewDeployments && (
+          <DeploymentRequestPanel />
         )}
 
         {activeTab === 'deployment-hub' && canDeploymentHub && (

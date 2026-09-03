@@ -170,7 +170,10 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
     } = usePermissions()
     const advisorLabel = getRoleLabel('advisor')
     const canManageTemplates = can('manage_templates')
-    const canDeploy = can('deploy_websites') || can('view_all_deployments')
+    const canDeployWebsites = can('deploy_websites')
+    const canPublishLive = can('publish_live_content')
+    const canManageSections = can('manage_deployment_sections')
+    const canViewDeployments = canDeployWebsites || can('view_all_deployments')
     const canManageLabels = can('manage_role_labels')
     const canManagePermissions = can('manage_role_permissions')
     const canViewLogs = can('view_activity_logs')
@@ -298,15 +301,13 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
         if (!silent) setLoading(true)
         else setRefreshing(true)
         try {
-            const tasks = [
-                api.get('/template-requests'),
-                api.get('/templates?all=1'),
-            ]
-            if (canViewLogs) tasks.push(api.get('/logs'))
-
-            const [reqRes, tplRes, logsRes] = await Promise.all(tasks)
-            setRequests(reqRes.data)
-            setTemplates(tplRes.data)
+            const [reqRes, tplRes, logsRes] = await Promise.all([
+                canViewDeployments ? api.get('/template-requests') : Promise.resolve({ data: [] }),
+                canManageTemplates ? api.get('/templates?all=1') : Promise.resolve({ data: [] }),
+                canViewLogs ? api.get('/logs') : Promise.resolve(null),
+            ])
+            setRequests(Array.isArray(reqRes.data) ? reqRes.data : [])
+            setTemplates(Array.isArray(tplRes.data) ? tplRes.data : [])
             if (canViewLogs && logsRes) {
                 setLogs(logsRes.data?.data || logsRes.data || [])
             }
@@ -316,7 +317,7 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
             setLoading(false)
             setRefreshing(false)
         }
-    }, [canViewLogs])
+    }, [canViewDeployments, canManageTemplates, canViewLogs])
 
     useEffect(() => {
         fetchData()
@@ -557,14 +558,14 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
 
     const tabs = useMemo(() => [
         canManageTemplates && { id: 'templates', label: 'Template Catalog', icon: FaThLarge, count: templates.length },
-        canDeploy && { id: 'deployments', label: 'Deployment Requests', icon: FaRocket, count: requests.length },
+        canViewDeployments && { id: 'deployments', label: 'Deployment Requests', icon: FaRocket, count: requests.length },
         canViewPlatformReport && { id: 'platform', label: 'Platform Summary', icon: FaBuilding },
         canViewLogs && { id: 'logs', label: 'Activity', icon: FaListAlt, count: logs.length },
         canManageLabels && { id: 'role-labels', label: 'Role Labels', icon: FaTags, count: roleLabelRecords.length },
         canManagePermissions && { id: 'permissions', label: 'Permissions', icon: FaUserShield, count: permissionDefs.length },
     ].filter(Boolean), [
         canManageTemplates,
-        canDeploy,
+        canViewDeployments,
         canViewPlatformReport,
         canViewLogs,
         canManageLabels,
@@ -582,46 +583,65 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
         }
     }, [tabs, activeTab])
 
-    const renderRequestActions = req => (
-        <div className="flex items-center gap-2 flex-wrap">
-            {req.status === 'deployed' && (
-                <>
-                    <Link
-                        to={`/power_admin/deployments/${req.id}/edit`}
-                        className="inline-flex items-center gap-1.5 bg-[#C8102E] text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-[#A00C23] transition shadow-sm"
-                    >
-                        <FaPen className="w-3 h-3" />
-                        Edit Content
-                    </Link>
-                    <button
-                        type="button"
-                        onClick={() => openSectionManageModal(req)}
-                        className="inline-flex items-center gap-1.5 bg-white border border-[#0B1B3D] text-[#0B1B3D] text-xs font-bold px-3 py-2 rounded-lg hover:bg-slate-50 transition"
-                    >
-                        <FaLayerGroup className="w-3 h-3" />
-                        Sections
-                    </button>
-                </>
-            )}
-            <button
-                type="button"
-                onClick={() => openDeployModal(req)}
-                className="inline-flex items-center gap-1.5 bg-[#0B1B3D] text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-slate-800 transition shadow-sm"
-            >
-                {req.status === 'deployed' ? (
-                    <>
-                        <FaCog className="w-3 h-3" />
-                        Update
-                    </>
-                ) : (
-                    <>
-                        <FaRocket className="w-3 h-3" />
-                        Deploy
-                    </>
-                )}
-            </button>
-        </div>
-    )
+    const renderRequestActions = req => {
+        const actions = []
+
+        if (req.status === 'deployed' && canPublishLive) {
+            actions.push(
+                <Link
+                    key="edit"
+                    to={`/power_admin/deployments/${req.id}/edit`}
+                    className="inline-flex items-center gap-1.5 bg-[#C8102E] text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-[#A00C23] transition shadow-sm"
+                >
+                    <FaPen className="w-3 h-3" />
+                    Edit Content
+                </Link>
+            )
+        }
+
+        if (req.status === 'deployed' && canManageSections) {
+            actions.push(
+                <button
+                    key="sections"
+                    type="button"
+                    onClick={() => openSectionManageModal(req)}
+                    className="inline-flex items-center gap-1.5 bg-white border border-[#0B1B3D] text-[#0B1B3D] text-xs font-bold px-3 py-2 rounded-lg hover:bg-slate-50 transition"
+                >
+                    <FaLayerGroup className="w-3 h-3" />
+                    Sections
+                </button>
+            )
+        }
+
+        if (canDeployWebsites) {
+            actions.push(
+                <button
+                    key="deploy"
+                    type="button"
+                    onClick={() => openDeployModal(req)}
+                    className="inline-flex items-center gap-1.5 bg-[#0B1B3D] text-white text-xs font-bold px-3 py-2 rounded-lg hover:bg-slate-800 transition shadow-sm"
+                >
+                    {req.status === 'deployed' ? (
+                        <>
+                            <FaCog className="w-3 h-3" />
+                            Update
+                        </>
+                    ) : (
+                        <>
+                            <FaRocket className="w-3 h-3" />
+                            Deploy
+                        </>
+                    )}
+                </button>
+            )
+        }
+
+        if (actions.length === 0) {
+            return <span className="text-xs text-gray-400">—</span>
+        }
+
+        return <div className="flex items-center gap-2 flex-wrap">{actions}</div>
+    }
 
     const pageContent = (
         <>
@@ -645,14 +665,16 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                             <FaSync className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} />
                             Refresh
                         </button>
-                        <button
-                            type="button"
-                            onClick={openCreateTemplateModal}
-                            className="inline-flex items-center gap-2 bg-[#C8102E] text-white text-xs font-extrabold px-5 py-3 rounded-xl hover:bg-[#A00C23] transition shadow-md"
-                        >
-                            <FaPlus className="w-3.5 h-3.5" />
-                            New Template
-                        </button>
+                        {canManageTemplates && (
+                            <button
+                                type="button"
+                                onClick={openCreateTemplateModal}
+                                className="inline-flex items-center gap-2 bg-[#C8102E] text-white text-xs font-extrabold px-5 py-3 rounded-xl hover:bg-[#A00C23] transition shadow-md"
+                            >
+                                <FaPlus className="w-3.5 h-3.5" />
+                                New Template
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -837,14 +859,16 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                         )}
 
                         {/* Deployment Requests */}
-                        {activeTab === 'deployments' && canDeploy && (
+                        {activeTab === 'deployments' && canViewDeployments && (
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                                 <div className="p-6 border-b border-gray-100 space-y-4">
                                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                         <div>
                                             <h2 className="text-lg font-bold text-[#0B1B3D]">Deployment Requests</h2>
                                             <p className="text-xs text-gray-500 mt-0.5">
-                                                Deploy templates to advisor cPanel hosting and configure database sync.
+                                                {canDeployWebsites
+                                                    ? 'Deploy templates to advisor cPanel hosting and configure database sync.'
+                                                    : 'View all deployment requests across the platform.'}
                                             </p>
                                         </div>
                                         <div className="flex items-center gap-2">

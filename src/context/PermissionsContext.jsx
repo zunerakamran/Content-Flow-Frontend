@@ -11,7 +11,7 @@ export const PERMISSION_CATALOG = [
     { key: 'submit_change_requests', name: 'Submit Change Requests', description: 'Edit sections and submit changes for approval.', category: 'Content' },
     { key: 'edit_sections', name: 'Edit Sections', description: 'Lock and edit website section content.', category: 'Content' },
     { key: 'request_deployments', name: 'Request Deployments', description: 'Request a new showcase site deployment.', category: 'Deployments' },
-    { key: 'view_all_deployments', name: 'View All Deployments', description: 'See all deployment requests.', category: 'Deployments' },
+    { key: 'view_all_deployments', name: 'View All Deployments', description: 'See all deployment requests (list only; does not allow requesting or deploying).', category: 'Deployments' },
     { key: 'deploy_websites', name: 'Deploy Websites', description: 'Deploy or update advisor sites on cPanel. Reserved for Power Admin only.', category: 'Deployments' },
     { key: 'manage_templates', name: 'Manage Templates', description: 'Create, edit, and delete showcase templates. Reserved for Power Admin only.', category: 'Templates' },
     { key: 'manage_deployment_sections', name: 'Manage Deployment Sections', description: 'Show or hide sections on a deployed site. Reserved for Power Admin only.', category: 'Deployments' },
