@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react'
 import { Link } from 'react-router-dom'
 import {
     FaPlus,
@@ -28,6 +28,11 @@ import {
     FaListAlt,
     FaHistory,
     FaUser,
+    FaInbox,
+    FaClipboardCheck,
+    FaClipboardList,
+    FaUserPlus,
+    FaUsers,
 } from 'react-icons/fa'
 import Navbar from './Navbar'
 import api from './api/axios'
@@ -39,6 +44,12 @@ import TemplateScrollPreview from './components/TemplateScrollPreview'
 import { defaultTemplatePreviewUrl } from './utils/assetUrl'
 import PlatformSummaryReport from './components/PlatformSummaryReport'
 import Pagination from './components/Pagination'
+import ChangeRequestAssignmentPanel from './components/ChangeRequestAssignmentPanel'
+import ReviewQueuePanel from './components/ReviewQueuePanel'
+import { CreateUserPanel, TeamUsersPanel } from './components/TeamUserManagement'
+import DeploymentRequestPanel from './components/DeploymentRequestPanel'
+
+const AdvisorDashboard = lazy(() => import('./AdvisorDashboard'))
 
 const LOGS_PER_PAGE = 15
 
@@ -174,10 +185,17 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
     const canPublishLive = can('publish_live_content')
     const canManageSections = can('manage_deployment_sections')
     const canViewDeployments = canDeployWebsites || can('view_all_deployments')
+    const canRequestDeployments = can('request_deployments') || can('view_all_deployments')
     const canManageLabels = can('manage_role_labels')
     const canManagePermissions = can('manage_role_permissions')
     const canViewLogs = can('view_activity_logs')
     const canViewPlatformReport = can('view_platform_report')
+    const canManageUsers = can('manage_users')
+    const canViewUsers = can('view_users')
+    const canAssignRequests = can('assign_change_requests') || can('view_all_change_requests')
+    const canReview = can('review_change_requests')
+    const canViewRequestHistory = canAssignRequests || canReview
+    const canContentEditor = can('submit_change_requests') || can('edit_sections')
     const [requests, setRequests] = useState([])
     const [templates, setTemplates] = useState([])
     const [logs, setLogs] = useState([])
@@ -561,14 +579,40 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
         }
     }
 
-    const tabs = useMemo(() => [
-        canManageTemplates && { id: 'templates', label: 'Template Catalog', icon: FaThLarge, count: templates.length },
-        canViewDeployments && { id: 'deployments', label: 'Deployment Requests', icon: FaRocket, count: requests.length },
-        canViewPlatformReport && { id: 'platform', label: 'Platform Summary', icon: FaBuilding },
-        canViewLogs && { id: 'logs', label: 'Activity', icon: FaListAlt, count: logs.length },
-        canManageLabels && { id: 'role-labels', label: 'Role Labels', icon: FaTags, count: roleLabelRecords.length },
-        canManagePermissions && { id: 'permissions', label: 'Permissions', icon: FaUserShield, count: permissionDefs.length },
-    ].filter(Boolean), [
+    const tabs = useMemo(() => {
+        const hubTabs = [
+            canManageTemplates && { id: 'templates', label: 'Template Catalog', icon: FaThLarge, count: templates.length },
+            canViewDeployments && { id: 'deployments', label: 'Deployment Hub', icon: FaServer, count: requests.length },
+        ].filter(Boolean)
+
+        // When embedded inside Manager/Client Admin, only show the deployment hub surface.
+        if (embedded) {
+            return hubTabs
+        }
+
+        return [
+            canAssignRequests && { id: 'change-requests', label: 'New Requests', icon: FaInbox },
+            canReview && { id: 'review-queue', label: 'Review Queue', icon: FaClipboardCheck },
+            canViewRequestHistory && { id: 'request-history', label: 'History', icon: FaClipboardList },
+            canManageUsers && { id: 'create-user', label: 'Create User', icon: FaUserPlus },
+            canViewUsers && { id: 'users', label: 'Team', icon: FaUsers },
+            canContentEditor && { id: 'content-editor', label: 'Content Editor', icon: FaEdit },
+            canRequestDeployments && { id: 'request-deployments', label: 'Deployments', icon: FaRocket },
+            ...hubTabs,
+            canViewPlatformReport && { id: 'platform', label: 'Platform Summary', icon: FaBuilding },
+            canViewLogs && { id: 'logs', label: 'Activity', icon: FaListAlt, count: logs.length },
+            canManageLabels && { id: 'role-labels', label: 'Role Labels', icon: FaTags, count: roleLabelRecords.length },
+            canManagePermissions && { id: 'permissions', label: 'Permissions', icon: FaUserShield, count: permissionDefs.length },
+        ].filter(Boolean)
+    }, [
+        embedded,
+        canAssignRequests,
+        canReview,
+        canViewRequestHistory,
+        canManageUsers,
+        canViewUsers,
+        canContentEditor,
+        canRequestDeployments,
         canManageTemplates,
         canViewDeployments,
         canViewPlatformReport,
@@ -748,6 +792,47 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                     </div>
                 ) : (
                     <>
+                        {activeTab === 'change-requests' && !embedded && canAssignRequests && (
+                            <ChangeRequestAssignmentPanel variant="pending" onMessage={setMessage} onError={setError} />
+                        )}
+
+                        {activeTab === 'review-queue' && !embedded && canReview && (
+                            <ReviewQueuePanel variant="active" />
+                        )}
+
+                        {activeTab === 'request-history' && !embedded && canViewRequestHistory && (
+                            canAssignRequests
+                                ? <ChangeRequestAssignmentPanel variant="history" onMessage={setMessage} onError={setError} />
+                                : <ReviewQueuePanel variant="history" />
+                        )}
+
+                        {activeTab === 'create-user' && !embedded && canManageUsers && (
+                            <CreateUserPanel
+                                onCreated={() => setActiveTab(canViewUsers ? 'users' : 'create-user')}
+                                onError={setError}
+                                onMessage={setMessage}
+                            />
+                        )}
+
+                        {activeTab === 'users' && !embedded && canViewUsers && (
+                            <TeamUsersPanel onCreateClick={canManageUsers ? () => setActiveTab('create-user') : undefined} />
+                        )}
+
+                        {activeTab === 'content-editor' && !embedded && canContentEditor && (
+                            <Suspense fallback={
+                                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-16 text-center text-gray-500">
+                                    <div className="w-10 h-10 mx-auto mb-4 rounded-full border-4 border-[#C8102E] border-t-transparent animate-spin" />
+                                    <p className="text-sm font-semibold">Loading content editor…</p>
+                                </div>
+                            }>
+                                <AdvisorDashboard embedded />
+                            </Suspense>
+                        )}
+
+                        {activeTab === 'request-deployments' && !embedded && canRequestDeployments && (
+                            <DeploymentRequestPanel />
+                        )}
+
                         {/* Template Catalog */}
                         {activeTab === 'templates' && canManageTemplates && (
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
@@ -1061,7 +1146,7 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                             </div>
                         )}
 
-                        {activeTab === 'role-labels' && canManageLabels && (
+                        {activeTab === 'role-labels' && !embedded && canManageLabels && (
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                                 <div className="p-6 border-b border-gray-100">
                                     <h2 className="text-lg font-bold text-[#0B1B3D]">Dashboard Role Labels</h2>
@@ -1129,11 +1214,11 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                             </div>
                         )}
 
-                        {activeTab === 'platform' && canViewPlatformReport && (
+                        {activeTab === 'platform' && !embedded && canViewPlatformReport && (
                             <PlatformSummaryReport onError={setError} />
                         )}
 
-                        {activeTab === 'logs' && canViewLogs && (
+                        {activeTab === 'logs' && !embedded && canViewLogs && (
                             <div className="space-y-4">
                                 <div className="relative max-w-md">
                                     <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" />
@@ -1205,7 +1290,7 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                             </div>
                         )}
 
-                        {activeTab === 'permissions' && canManagePermissions && (
+                        {activeTab === 'permissions' && !embedded && canManagePermissions && (
                             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
                                 <div className="p-6 border-b border-gray-100">
                                     <h2 className="text-lg font-bold text-[#0B1B3D]">Role Permissions</h2>
