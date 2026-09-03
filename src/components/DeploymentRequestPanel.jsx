@@ -384,10 +384,23 @@ function AssignAdvisorModal({ request, advisors, onClose, onAssigned }) {
 
 // ─── Single deployment request card ──────────────────────────────────────────
 
+function isRequestedByAdvisor(req) {
+  const requester = req.requested_by || req.requestedBy
+  if (requester?.role) {
+    return requester.role === 'advisor' || requester.role === 'editor'
+  }
+  // Legacy rows: advisor-created requests set advisor_id to the submitting advisor
+  return Boolean(req.advisor_id)
+}
+
 function DeploymentCard({ req, advisors, canAssignAdvisor, onAssignAdvisor }) {
   const [expanded, setExpanded] = useState(false)
   const assignedAdvisor = req.assigned_advisor || req.assignedAdvisor
   const requestingAdvisor = req.advisor
+  const requester = req.requested_by || req.requestedBy || requestingAdvisor
+  const advisorOwned = isRequestedByAdvisor(req)
+  const contentAdvisor = assignedAdvisor || (advisorOwned ? requestingAdvisor : null)
+  const showAssignAdvisor = canAssignAdvisor && !advisorOwned
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow">
@@ -408,19 +421,20 @@ function DeploymentCard({ req, advisors, canAssignAdvisor, onAssignAdvisor }) {
                 <FaServer className="w-3 h-3 text-gray-400" />
                 Template: <strong className="text-gray-700">{req.template_name || '—'}</strong>
               </span>
-              {requestingAdvisor && (
+              {requester && (
                 <span className="inline-flex items-center gap-1.5">
                   <FaUser className="w-3 h-3 text-gray-400" />
-                  Requested by <strong className="text-gray-700">{requestingAdvisor.name}</strong>
+                  Requested by <strong className="text-gray-700">{requester.name}</strong>
                 </span>
               )}
-              {assignedAdvisor && (
+              {contentAdvisor && (
                 <span className="inline-flex items-center gap-1.5">
                   <FaUserCheck className="w-3 h-3 text-[#C8102E]" />
-                  Advisor: <strong className="text-[#C8102E]">{assignedAdvisor.name}</strong>
+                  {advisorOwned && !assignedAdvisor ? 'Advisor' : 'Assigned'}:{' '}
+                  <strong className="text-[#C8102E]">{contentAdvisor.name}</strong>
                 </span>
               )}
-              {!assignedAdvisor && (
+              {!contentAdvisor && (
                 <span className="inline-flex items-center gap-1.5 text-amber-600">
                   <FaExclamationTriangle className="w-3 h-3" />
                   No advisor assigned
@@ -434,8 +448,8 @@ function DeploymentCard({ req, advisors, canAssignAdvisor, onAssignAdvisor }) {
           </div>
 
           <div className="flex items-center gap-2 shrink-0 flex-wrap">
-            {/* Assign / Reassign advisor */}
-            {canAssignAdvisor && (
+            {/* Assign / Reassign advisor — only for non-advisor-submitted requests */}
+            {showAssignAdvisor && (
               <button
                 type="button"
                 onClick={() => onAssignAdvisor(req)}
@@ -514,9 +528,9 @@ function DeploymentCard({ req, advisors, canAssignAdvisor, onAssignAdvisor }) {
                 <FaCheckCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-emerald-600" />
                 <div>
                   <p className="font-bold">Site is deployed and live.</p>
-                  {assignedAdvisor
+                  {contentAdvisor
                     ? <p className="mt-0.5">
-                        <strong>{assignedAdvisor.name}</strong> can now edit sections in their Advisor Dashboard.
+                        <strong>{contentAdvisor.name}</strong> can now edit sections in their Advisor Dashboard.
                         Content changes go through the standard approver review workflow.
                       </p>
                     : <p className="mt-0.5 text-amber-700">No advisor assigned — assign one so they can edit content.</p>
@@ -532,9 +546,12 @@ function DeploymentCard({ req, advisors, canAssignAdvisor, onAssignAdvisor }) {
                 <FaClock className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-600" />
                 <div>
                   <p className="font-bold">Awaiting deployment by the platform administrator.</p>
-                  {assignedAdvisor
+                  {contentAdvisor
                     ? <p className="mt-0.5">
-                        <strong>{assignedAdvisor.name}</strong> is assigned and will be able to edit content once the site is deployed.
+                        <strong>{contentAdvisor.name}</strong>
+                        {advisorOwned
+                          ? ' submitted this request and will edit content once the site is deployed.'
+                          : ' is assigned and will be able to edit content once the site goes live.'}
                       </p>
                     : <p className="mt-0.5">You can assign an advisor now so they are ready once the site goes live.</p>
                   }
@@ -770,7 +787,7 @@ export default function DeploymentRequestPanel() {
       )}
 
       {/* Assign advisor modal */}
-      {assignTarget && canAssignAdvisor && (
+      {assignTarget && canAssignAdvisor && !isRequestedByAdvisor(assignTarget) && (
         <AssignAdvisorModal
           request={assignTarget}
           advisors={advisors}
