@@ -219,8 +219,12 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
     }, [roleLabelRecords])
 
     const handleTogglePermission = async (roleKey, permissionKey, granted) => {
-        if (isLocked(roleKey, permissionKey) && !granted) {
-            setError('This permission cannot be removed from Power Admin.')
+        if (isLocked(roleKey, permissionKey)) {
+            setError(
+                permissionKey === 'manage_role_permissions'
+                    ? 'Manage Role Permissions is reserved for Power Admin and cannot be changed.'
+                    : 'This permission cannot be changed for this role.'
+            )
             return
         }
 
@@ -1053,6 +1057,7 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                                     <h2 className="text-lg font-bold text-[#0B1B3D]">Role Permissions</h2>
                                     <p className="text-xs text-gray-500 mt-0.5 max-w-3xl">
                                         Control what each role can do. Example: turn off Create Users for {getRoleLabel('manager')} and turn it on for {getRoleLabel('client_admin')}.
+                                        Manage Role Permissions stays with {getRoleLabel('power_admin')} only and cannot be reassigned.
                                     </p>
                                 </div>
 
@@ -1082,13 +1087,18 @@ export default function PowerAdminDashboard({ embedded = false } = {}) {
                                                         const busy = togglingPermission === `${role}:${perm.key}`
                                                         return (
                                                             <td key={`${role}-${perm.key}`} className="px-4 py-4 text-center">
-                                                                <label className={`inline-flex items-center justify-center ${lockedCell ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}>
+                                                                <label
+                                                                    className={`inline-flex items-center justify-center ${lockedCell ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
+                                                                    title={lockedCell && perm.key === 'manage_role_permissions'
+                                                                        ? 'Reserved for Power Admin'
+                                                                        : undefined}
+                                                                >
                                                                     <input
                                                                         type="checkbox"
                                                                         checked={checked}
-                                                                        disabled={busy || (lockedCell && checked)}
+                                                                        disabled={busy || lockedCell}
                                                                         onChange={e => handleTogglePermission(role, perm.key, e.target.checked)}
-                                                                        className="w-4 h-4 rounded border-gray-300 text-[#C8102E] focus:ring-[#C8102E]"
+                                                                        className="w-4 h-4 rounded border-gray-300 text-[#C8102E] focus:ring-[#C8102E] disabled:opacity-60"
                                                                     />
                                                                 </label>
                                                             </td>

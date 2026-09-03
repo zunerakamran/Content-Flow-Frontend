@@ -19,7 +19,7 @@ export const PERMISSION_CATALOG = [
     { key: 'view_activity_logs', name: 'View Activity Logs', description: 'View audit and activity logs.', category: 'Compliance' },
     { key: 'view_platform_report', name: 'View Platform Report', description: 'View and refresh the platform summary report.', category: 'Compliance' },
     { key: 'manage_role_labels', name: 'Manage Role Labels', description: 'Rename role display names shown in the dashboard.', category: 'Settings' },
-    { key: 'manage_role_permissions', name: 'Manage Role Permissions', description: 'Grant or revoke what each role can do.', category: 'Settings' },
+    { key: 'manage_role_permissions', name: 'Manage Role Permissions', description: 'Grant or revoke what each role can do. Reserved for Power Admin only.', category: 'Settings' },
 ]
 
 const DEFAULT_MATRIX = {
@@ -74,7 +74,9 @@ export function PermissionsProvider({ children }) {
     const [permissions, setPermissions] = useState(PERMISSION_CATALOG)
     const [roles, setRoles] = useState(ROLE_KEYS)
     const [matrix, setMatrix] = useState(() => buildDefaultMatrix())
-    const [locked, setLocked] = useState({ power_admin: ['manage_role_permissions'] })
+    const [locked, setLocked] = useState(() =>
+        Object.fromEntries(ROLE_KEYS.map(role => [role, ['manage_role_permissions']]))
+    )
     const [loading, setLoading] = useState(true)
 
     const applyPayload = useCallback((data) => {
@@ -89,10 +91,21 @@ export function PermissionsProvider({ children }) {
             for (const [role, grants] of Object.entries(data.matrix)) {
                 next[role] = { ...(next[role] || {}), ...grants }
             }
+            // Hard-enforce: Manage Role Permissions is Power Admin only.
+            for (const role of ROLE_KEYS) {
+                if (!next[role]) next[role] = {}
+                next[role].manage_role_permissions = role === 'power_admin'
+            }
             setMatrix(next)
         }
         if (data?.locked) {
-            setLocked(data.locked)
+            const nextLocked = { ...data.locked }
+            for (const role of ROLE_KEYS) {
+                const list = new Set(nextLocked[role] || [])
+                list.add('manage_role_permissions')
+                nextLocked[role] = [...list]
+            }
+            setLocked(nextLocked)
         }
     }, [])
 
@@ -130,6 +143,10 @@ export function PermissionsProvider({ children }) {
 
     const can = useCallback((permissionKey) => {
         if (!permissionKey || !roleKey) return false
+        // Manage Role Permissions is reserved for Power Admin only.
+        if (permissionKey === 'manage_role_permissions') {
+            return roleKey === 'power_admin'
+        }
         // Live matrix is the source of truth so Power Admin changes apply without re-login
         if (Object.prototype.hasOwnProperty.call(matrix[roleKey] || {}, permissionKey)) {
             return Boolean(matrix[roleKey][permissionKey])

@@ -676,19 +676,6 @@ export default function DeploymentRequestPanel() {
         </div>
       </div>
 
-      {/* Workflow info banner */}
-      <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-xs text-blue-800">
-        <div className="flex items-start gap-2">
-          <FaEdit className="w-3.5 h-3.5 shrink-0 mt-0.5 text-blue-600" />
-          <div>
-            <p className="font-bold">Deployment → Content Editing → Approval Workflow</p>
-            <p className="mt-1 text-blue-700">
-              1. Submit a deployment request → 2. Platform admin deploys the site → 3. Assign an {advisorLabel.toLowerCase()} to edit content → 4. {advisorLabel} edits sections and submits change requests → 5. Approver reviews and approves/rejects.
-            </p>
-          </div>
-        </div>
-      </div>
-
       {/* Search */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6">
         <div className="relative flex-1 sm:max-w-md">
