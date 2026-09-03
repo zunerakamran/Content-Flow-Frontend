@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
 import {
   FaCheckCircle,
   FaClock,
@@ -77,15 +77,6 @@ function getRequestSections(req) {
       names: req.section_edits.map(e => e.section_name || 'Section'),
     }
   }
-  try {
-    const parsed = JSON.parse(req.proposed_content)
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return {
-        type: 'batch',
-        names: parsed.map(p => p.section_name || 'Section'),
-      }
-    }
-  } catch { /* ignore malformed content */ }
   return { type: 'unknown', names: [] }
 }
 
@@ -94,6 +85,16 @@ function getRequestSearchText(req) {
   const idText = `request ${req.id}`
   if (type === 'single') return `${names[0]} ${idText}`
   if (type === 'batch') return `${names.join(' ')} ${idText}`
+  // Fallback for search only: avoid parsing `proposed_content` during initial render
+  // so the list stays responsive for large history payloads.
+  try {
+    const parsed = JSON.parse(req.proposed_content)
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const derivedNames = parsed.map(p => p.section_name || 'Section')
+      return `${derivedNames.join(' ')} ${idText}`
+    }
+  } catch { /* ignore malformed content */ }
+
   return `Change Request ${req.id}`
 }
 
@@ -755,7 +756,17 @@ const RequestCard = memo(function RequestCard({
 export default function ReviewQueuePanel({ variant = 'active' } = {}) {
   const { user } = useAuth()
   const [requests, setRequests] = useState([])
-  const [previewSnapshots, setPreviewSnapshots] = useState(() => loadPreviewSnapshots())
+  const previewSnapshotsRef = useRef({})
+  const snapshotsLoadedRef = useRef(false)
+  const [previewSnapshots, setPreviewSnapshots] = useState({})
+  const ensurePreviewSnapshotsLoaded = useCallback(() => {
+    if (snapshotsLoadedRef.current) return previewSnapshotsRef.current
+    const loaded = loadPreviewSnapshots()
+    previewSnapshotsRef.current = loaded
+    setPreviewSnapshots(loaded)
+    snapshotsLoadedRef.current = true
+    return loaded
+  }, [])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [search, setSearch] = useState('')
@@ -764,12 +775,18 @@ export default function ReviewQueuePanel({ variant = 'active' } = {}) {
 
   const cachePreview = useCallback((requestId, preview) => {
     if (!preview) return
-    setPreviewSnapshots(prev => savePreviewSnapshot(prev, requestId, preview))
-  }, [])
+    const baseSnapshots = ensurePreviewSnapshotsLoaded()
+    const next = savePreviewSnapshot(baseSnapshots, requestId, preview)
+    previewSnapshotsRef.current = next
+    setPreviewSnapshots(next)
+  }, [ensurePreviewSnapshotsLoaded])
 
   const getCachedPreview = useCallback(
-    (requestId) => previewSnapshots[requestId] || null,
-    [previewSnapshots]
+    (requestId) => {
+      ensurePreviewSnapshotsLoaded()
+      return previewSnapshotsRef.current[requestId] || null
+    },
+    [ensurePreviewSnapshotsLoaded]
   )
 
   const fetchRequests = useCallback(async (isRefresh = false) => {

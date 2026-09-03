@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, memo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from 'react'
 import {
   FaCheckCircle,
   FaClock,
@@ -77,15 +77,6 @@ function getRequestSections(req) {
       names: req.section_edits.map(e => e.section_name || 'Section'),
     }
   }
-  try {
-    const parsed = JSON.parse(req.proposed_content)
-    if (Array.isArray(parsed) && parsed.length > 0) {
-      return {
-        type: 'batch',
-        names: parsed.map(p => p.section_name || 'Section'),
-      }
-    }
-  } catch { /* ignore */ }
   return { type: 'unknown', names: [] }
 }
 
@@ -94,6 +85,17 @@ function getRequestSearchText(req) {
   const idText = `request ${req.id}`
   if (type === 'single') return `${names[0]} ${idText}`
   if (type === 'batch') return `${names.join(' ')} ${idText}`
+  // Fallback for search only: some requests may not include `section` / `section_edits`
+  // and instead store section data inside `proposed_content` (JSON). We avoid parsing
+  // during initial render for performance, but do it here when the user is searching.
+  try {
+    const parsed = JSON.parse(req.proposed_content)
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const derivedNames = parsed.map(p => p.section_name || 'Section')
+      return `${derivedNames.join(' ')} ${idText}`
+    }
+  } catch { /* ignore */ }
+
   return `Change Request ${req.id}`
 }
 
@@ -583,7 +585,17 @@ export default function ChangeRequestAssignmentPanel({
   const [users, setUsers] = useState([])
   const [selectedApprover, setSelectedApprover] = useState({})
   const [assigningId, setAssigningId] = useState(null)
-  const [previewSnapshots, setPreviewSnapshots] = useState(() => loadPreviewSnapshots())
+  const previewSnapshotsRef = useRef({})
+  const snapshotsLoadedRef = useRef(false)
+  const [previewSnapshots, setPreviewSnapshots] = useState({})
+  const ensurePreviewSnapshotsLoaded = useCallback(() => {
+    if (snapshotsLoadedRef.current) return previewSnapshotsRef.current
+    const loaded = loadPreviewSnapshots()
+    previewSnapshotsRef.current = loaded
+    setPreviewSnapshots(loaded)
+    snapshotsLoadedRef.current = true
+    return loaded
+  }, [])
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [requestSearch, setRequestSearch] = useState('')
@@ -602,12 +614,18 @@ export default function ChangeRequestAssignmentPanel({
 
   const cachePreview = useCallback((requestId, preview) => {
     if (!preview) return
-    setPreviewSnapshots(prev => savePreviewSnapshot(prev, requestId, preview))
-  }, [])
+    const baseSnapshots = ensurePreviewSnapshotsLoaded()
+    const next = savePreviewSnapshot(baseSnapshots, requestId, preview)
+    previewSnapshotsRef.current = next
+    setPreviewSnapshots(next)
+  }, [ensurePreviewSnapshotsLoaded])
 
   const getCachedPreview = useCallback(
-    (requestId) => previewSnapshots[requestId] || null,
-    [previewSnapshots]
+    (requestId) => {
+      ensurePreviewSnapshotsLoaded()
+      return previewSnapshotsRef.current[requestId] || null
+    },
+    [ensurePreviewSnapshotsLoaded]
   )
 
   const fetchRequests = useCallback(async () => {
